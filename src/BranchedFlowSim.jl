@@ -3,8 +3,9 @@ module BranchedFlowSim
 # Helpers
 export fermi_dot, gaussian_packet, absorbing_potential, lattice_points_in_a_box, lattice_potential, triangle_potential
 
-# Simulation
+# Simulation and analysis
 export SplitOperatorStepper, timestep!, time_evolution
+export compute_energy_spectrum, compute_eigenfunctions
 
 # Visualization
 export wavefunction_to_image, save_animation
@@ -250,6 +251,34 @@ function compute_correlation_function(xgrid, Ψs)
     @assert N == Ny
     return [braket(xgrid, Ψs[:, :, 1], Ψs[:, :, i]) for i ∈ 1:Nt]
 end
+
+function compute_energy_spectrum(xgrid, Ψs, ts)
+    dt = ts[2] - ts[1]
+    pt = compute_correlation_function(xgrid, Ψs)
+    # pt .*= 1 .- cos.((2π / T) * ts)
+
+    Es = fftshift(fftfreq(length(ts), 1/dt))
+    pE = fftshift(ifft(pt))
+    return pE, Es
+end
+
+function compute_eigenfunctions(xgrid, Ψs, ts, Es)
+    Nx = size(Ψs)[1]
+    ΨE = zeros(ComplexF64, (Nx, Nx, length(Es)))
+    T = ts[end]
+    for (i,t) ∈ enumerate(ts)
+        w = 1 - cos(2pi * t / T)
+        w = 1
+        for (j,E) ∈ enumerate(Es)
+            ΨE[:, :, j] .+= Ψs[:, :, i] * w * exp(1im * t * E)
+        end
+    end
+    # Normalize each computed eigenfunction
+    for Ψ ∈ eachslice(ΨE, dims=3)
+        Ψ ./= sqrt(total_prob(xgrid, Ψ))
+    end
+    return ΨE
+end 
 
 # TODO:
 # - docstrings
