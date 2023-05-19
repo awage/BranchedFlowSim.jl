@@ -30,7 +30,7 @@ end
 function fermi_dot(xgrid, pos, radius, softness=1)
     # N x N matrix of distance from `pos`
     dist = sqrt.(((xgrid .- pos[2]) .^ 2) .+ transpose(((xgrid .- pos[1]) .^ 2)))
-    α = radius / (softness)
+    α = radius / (5 * softness)
     return fermi_step.(radius .- dist, α)
 end
 
@@ -204,21 +204,6 @@ function triangle_potential(xgrid, a, dot_height, dot_radius=0.1 * a, dot_softne
     return lattice_potential(xgrid, A, dot_height, dot_radius, offset, dot_softness)
 end
 
-function simple_potential(xgrid)
-    # Build potential function
-    N = length(xgrid)
-    potential = zeros(ComplexF64, N, N)
-    # Add absorbing potential at edges
-    absorb_width = 2
-    absorb_strength = 20
-    potential += absorbing_potential(xgrid, absorb_strength, absorb_width)
-
-    dot_height = 100
-    dot_radius = 0.25
-    potential += triangle_potential(xgrid, 2, dot_height, dot_radius)
-    return potential
-end
-
 function wavefunction_to_image(xgrid, Ψ, potential, maxval=0.0)
     if maxval == 0.0
         maxval = maximum(abs.(real(Ψ)))
@@ -258,26 +243,6 @@ function save_animation(fname, xgrid, potential, Ψs, ts,
     VideoIO.save(fname, imgstack, framerate=fps)
 end
 
-function simple_anim()
-    L = 20
-    Nx = 1000
-    T = 5
-    dt = T / 150
-    momentum = [5, 0]
-    xgrid = LinRange(-L / 2, L / 2, Nx)
-
-    # Build initial wavefunction
-    Ψ = gaussian_packet(xgrid, [0, 0], momentum, 1)
-
-    potential = simple_potential(xgrid)
-    Ψs, ts = time_evolve(xgrid, potential, Ψ, T, dt)
-    num_steps = size(Ψs)[2]
-
-    fps = 15
-    dur = 10
-    animate_evolution("packet_2d.mp4", xgrid, potential, Ψs, ts)
-end
-
 function compute_correlation_function(xgrid, Ψs)
     N = length(xgrid)
     Nx, Ny, Nt = size(Ψs)
@@ -285,5 +250,12 @@ function compute_correlation_function(xgrid, Ψs)
     @assert N == Ny
     return [braket(xgrid, Ψs[:, :, 1], Ψs[:, :, i]) for i ∈ 1:Nt]
 end
+
+# TODO:
+# - docstrings
+# - eigenfunction computation
+# - different ColorSchemes
+# - Energy spectrum
+# - General commenting and cleanliness
 
 end # module BranchedFlowSim
