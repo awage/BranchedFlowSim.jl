@@ -2,6 +2,8 @@ module BranchedFlowSim
 
 # Helpers
 export fermi_dot, gaussian_packet, absorbing_potential, lattice_points_in_a_box, lattice_potential, triangle_potential
+export braket
+export total_prob
 
 # Simulation and analysis
 export SplitOperatorStepper, timestep!, time_evolution
@@ -22,12 +24,30 @@ import VideoIO
 import ImageIO
 import FileIO
 
-const mass::Float64 = 1.0
+include("colormap.jl")
 
+const mass::Float64 = 1.0
+# colorscheme = colorscheme_daza
+colorscheme = ColorSchemes.berlin
+
+"""
+    fermi_step(x, α)
+
+Smooth step function, i.e. goes from 0 to 1 as x goes from negative to
+positive. α is a term controlling how smooth the transition from 0 to 1 is.
+Equal to Fermi-Dirac distribution where α=kT, so large values of α correspond
+to smooth transition and small values to an abrupt one.
+"""
 function fermi_step(x, α)
     return 1 / (1 + exp(-x / α))
 end
 
+"""
+    fermi_dot(xgrid, pos, radius, softness=1)
+
+Return a potential function matrix of size length(xgrid)×length(xgrid) with
+value tending to 1 inside a circle of given position and radius.
+"""
 function fermi_dot(xgrid, pos, radius, softness=1)
     # N x N matrix of distance from `pos`
     dist = sqrt.(((xgrid .- pos[2]) .^ 2) .+ transpose(((xgrid .- pos[1]) .^ 2)))
@@ -35,6 +55,12 @@ function fermi_dot(xgrid, pos, radius, softness=1)
     return fermi_step.(radius .- dist, α)
 end
 
+"""
+    gaussian_packet(xgrid, pos, momentum, Δ)
+
+Returns a 2D gaussian packet with given mean position and momentum. Δ is
+standard deviation from the center along one axis.
+"""
 function gaussian_packet(xgrid, pos, momentum, Δ)
     x0 = pos[1]
     y0 = pos[2]
@@ -65,10 +91,22 @@ function braket(xgrid, Ψ, Φ)
     return trapz((xgrid, xgrid), ca)
 end
 
+"""
+    total_prob(xgrid, Ψ)
+
+Returns total probability of Ψ, i.e. <Ψ|Ψ>.
+"""
 function total_prob(xgrid, Ψ)
     return trapz((xgrid, xgrid), abs.(Ψ) .^ 2)
 end
 
+"""
+    absorbing_potential(xgrid, strength, width)
+
+Returns a length(xgrid)×length(xgrid) sized matrix representing an absorbing
+potential. `strength` is the maximum absolute value of the potential and
+`width` is the width of the absorbing wall in same units as `xgrid`.
+"""
 function absorbing_potential(xgrid, strength, width)
     N = length(xgrid)
     L = xgrid[end] - xgrid[1]
@@ -87,17 +125,24 @@ end
 """
     SplitOperatorStepper
 
-foofoo
+Type for efficient time propagation of 2D quantum wavefunctions. 
 """
 struct SplitOperatorStepper
-    dt :: Float64
-    V_step :: Matrix{ComplexF64}
-    T_step :: Matrix{ComplexF64}
-    
-    prepared_fft :: Any
-    prepared_ifft :: Any
+    dt::Float64
+    V_step::Matrix{ComplexF64}
+    T_step::Matrix{ComplexF64}
 
-    function SplitOperatorStepper(xgrid, Δt, potential)
+    prepared_fft::Any
+    prepared_ifft::Any
+
+    """
+    SplitOperatorStepper(xgrid, Δt, potential)
+
+Creates a stepper object for a 2D grid where coordinates are discretized
+according to `xgrid` (in both x and y coordinates). Applying this stepper with
+`timestep!` advances the picture by `Δt`.
+"""
+function SplitOperatorStepper(xgrid :: AbstractVector{Float64}, Δt :: Float64, potential)
         N = length(xgrid)
         @assert size(potential) == (N, N)
         dx = xgrid[2] - xgrid[1]
@@ -112,12 +157,17 @@ struct SplitOperatorStepper
         # Prepare in-place FFT to make repeated application faster.
         psi_placeholder = zeros(ComplexF64, N, N)
         my_fft = plan_fft!(psi_placeholder)
-        my_ifft= plan_ifft!(psi_placeholder)
+        my_ifft = plan_ifft!(psi_placeholder)
         return new(Δt, V_step, T_step, my_fft, my_ifft)
     end
 end
 
-function timestep!(Ψ, stepper)
+"""
+    timestep!(Ψ, stepper)
+
+Perform a time step using given SplitOperatorStepper. This operation mutates Ψ.
+"""
+function timestep!(Ψ, stepper :: SplitOperatorStepper)
     @assert size(Ψ) == size(stepper.V_step) "$(size(Ψ)) != $(size(stepper.V_step))"
     # Potential step in x-space:
     Ψ .*= stepper.V_step
@@ -127,11 +177,17 @@ function timestep!(Ψ, stepper)
     stepper.prepared_ifft * Ψ
 end
 
-function time_evolution(xgrid, potential, Ψ, T, Δt)
+"""
+    time_evolution(xgrid, potential, Ψ_initial, T, Δt)
+
+Performs time evolution for a 2D quantum system from t=0 to t=T in steps of Δt.
+System is discretized in coordinate space according to `xgrid``.
+"""
+function time_evolution(xgrid, potential, Ψ_initial, T, Δt)
     N = length(xgrid)
     stepper = SplitOperatorStepper(xgrid, Δt, potential)
     # Make a copy since we'll be modifying Ψ in-place.
-    Ψ = copy(Ψ)
+    Ψ = copy(Ψ_initial)
     ts = 0:Δt:T
     steps = length(ts)
     result_Ψs = zeros(ComplexF64, N, N, steps)
@@ -144,11 +200,11 @@ function time_evolution(xgrid, potential, Ψ, T, Δt)
 end
 
 """
-    lattice_points_in_box(avec, bvec, L)
+    lattice_points_in_a_box(A, L)
 
-Returns all lattice points in L-by-L sized box (2D) centered at (0,0). `avec`
-and `bvec` are the generating vectors. Returns a matrix with 2 rows and one
-column per lattice point.
+Returns all lattice points in L-by-L sized box (2D) centered at (0,0). A is a
+2×2 matrix with generating vectors of the lattice as the columns. Returns a
+matrix with 2 rows and one column per lattice point.
 """
 function lattice_points_in_a_box(A, L)
     # Start with a vector of 2d vectors
@@ -177,21 +233,29 @@ function lattice_points_in_a_box(A, L)
     return reduce(hcat, points)
 end
 
-function triangle_lattice_points_in_a_box(a, L)
-end
+"""
+    lattice_potential(xgrid, A, dot_height, dot_radius, offset=[0, 0],
+    dot_softness=1)
 
-function lattice_potential(xgrid, A, dot_height, dot_radius, offset=[0,0],
-    dot_softness = 1)
+Returns a potential matrix.
+"""
+function lattice_potential(xgrid, A, dot_height, dot_radius, offset=[0, 0],
+    dot_softness=1)
     N = length(xgrid)
     L = (xgrid[end] - xgrid[1]) + 10 * dot_radius + abs(maximum(offset))
     V = zeros(N, N)
     for point ∈ eachcol(lattice_points_in_a_box(A, L))
-        V .+= fermi_dot(xgrid, point + offset , dot_radius, dot_softness)
+        V .+= fermi_dot(xgrid, point + offset, dot_radius, dot_softness)
     end
     return V * dot_height
 end
 
 
+"""
+    triangle_potential(xgrid, a, dot_height, dot_radius=0.1 * a, dot_softness=1)
+
+Convenience function for creating a lattice potential with a triangle lattice.
+"""
 function triangle_potential(xgrid, a, dot_height, dot_radius=0.1 * a, dot_softness=1)
     # Lattice matrix
     A = a * [
@@ -205,27 +269,42 @@ function triangle_potential(xgrid, a, dot_height, dot_radius=0.1 * a, dot_softne
     return lattice_potential(xgrid, A, dot_height, dot_radius, offset, dot_softness)
 end
 
-function wavefunction_to_image(xgrid, Ψ, potential, maxval=0.0)
+"""
+    wavefunction_to_image(xgrid, Ψ, potential, maxval=0.0)
+
+Produces a RGB image showing given wavefunction Ψ and potential. If `maxval` is
+nonzero, Ψ values greater or equal to `maxval` are mapped to highest colors.
+"""
+function wavefunction_to_image(xgrid, Ψ, potential; maxval=0.0)
     if maxval == 0.0
         maxval = maximum(abs.(real(Ψ)))
     end
     max_pot = maximum(real(potential))
     img = get(ColorSchemes.gray1, real(potential) / max_pot)
-    
-    img .+= get(ColorSchemes.berlin, 0.5 * (real(Ψ) / maxval .+ 1))
+
+    img .+= get(colorscheme, 0.5 * (real(Ψ) / maxval .+ 1))
     # Convert to 8-bit channels. Clamping is needed since values over 1.0
     # cannot be represented in fixed point format.
     return map(img) do pixel
-        convert(RGB{N0f8}, mapc((c)->clamp(c, 0.0, 1.0), pixel))
+        convert(RGB{N0f8}, mapc((c) -> clamp(c, 0.0, 1.0), pixel))
     end
 end
 
-function save_animation(fname, xgrid, potential, Ψs, ts,
-        duration=10,
-        constant_colormap=false)
+"""
+    save_animation(fname, xgrid, potential, Ψs, ts;
+    duration=10,
+    constant_colormap=false)
+
+Produces an animation and stores it to a file at `fname`. `Ψs` should be a
+length(xgrid)×length(xgrid)×length(ts) matrix and `ts` the 
+"""
+function save_animation(fname, xgrid, potential, Ψs;
+    duration=10,
+    constant_colormap=false)
     # Figure out how many frames to render.
     max_fps = 40
-    num_frames = length(ts)
+    num_steps = size(Ψs)[3]
+    num_frames = num_steps
     skip = 1
     fps = round(Int, num_frames / duration)
     while fps > max_fps
@@ -235,13 +314,18 @@ function save_animation(fname, xgrid, potential, Ψs, ts,
         fps = round(Int, num_frames / duration)
     end
 
-    maxval = if constant_colormap maximum(real(Ψs)) else 0.0 end
+    maxval = if constant_colormap
+        maximum(real(Ψs[:,:, 1 + num_steps ÷ 10]))
+    else
+        0.0
+    end
 
     imgstack = (
-        wavefunction_to_image(xgrid, Ψs[:, :, i], potential, maxval)
-        for i ∈ 1:skip:length(ts)
+        wavefunction_to_image(xgrid, Ψs[:, :, i], potential, maxval=maxval)
+        for i ∈ 1:skip:num_steps
     )
-    VideoIO.save(fname, imgstack, framerate=fps)
+    VideoIO.save(fname, imgstack, framerate=fps,
+        encoder_options=(crf=23, preset="fast"))
 end
 
 function compute_correlation_function(xgrid, Ψs)
@@ -257,7 +341,7 @@ function compute_energy_spectrum(xgrid, Ψs, ts)
     pt = compute_correlation_function(xgrid, Ψs)
     # pt .*= 1 .- cos.((2π / T) * ts)
 
-    Es = fftshift(fftfreq(length(ts), 1/dt))
+    Es = fftshift(fftfreq(length(ts), 1 / dt))
     pE = fftshift(ifft(pt))
     return pE, Es
 end
@@ -266,10 +350,10 @@ function compute_eigenfunctions(xgrid, Ψs, ts, Es)
     Nx = size(Ψs)[1]
     ΨE = zeros(ComplexF64, (Nx, Nx, length(Es)))
     T = ts[end]
-    for (i,t) ∈ enumerate(ts)
+    for (i, t) ∈ enumerate(ts)
         w = 1 - cos(2pi * t / T)
         w = 1
-        for (j,E) ∈ enumerate(Es)
+        for (j, E) ∈ enumerate(Es)
             ΨE[:, :, j] .+= Ψs[:, :, i] * w * exp(1im * t * E)
         end
     end
@@ -278,13 +362,10 @@ function compute_eigenfunctions(xgrid, Ψs, ts, Es)
         Ψ ./= sqrt(total_prob(xgrid, Ψ))
     end
     return ΨE
-end 
+end
 
 # TODO:
 # - docstrings
-# - eigenfunction computation
-# - different ColorSchemes
-# - Energy spectrum
 # - General commenting and cleanliness
 
 end # module BranchedFlowSim
