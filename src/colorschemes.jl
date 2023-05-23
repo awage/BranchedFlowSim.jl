@@ -78,3 +78,42 @@ Colorscheme similar to one used by Alvar Daza in
 https://www.pnas.org/doi/10.1073/pnas.2110285118.
 """
 const colorscheme_daza :: ColorScheme = make_colorscheme_daza();
+
+function make_sigmoid_berlin(c=20)
+    xs = LinRange(-1, 1, 1024)
+    sigmoid = 1 ./ (1 .+ exp.(- c * xs))
+    colors = get(ColorSchemes.berlin, sigmoid)
+    return ColorScheme(colors)
+end
+
+const sigmoid_berlin = make_sigmoid_berlin()
+
+function hsv_color(z)
+    r = abs(z)
+    arg = angle(z)
+    return RGB{Float64}(HSV{Float64}(rad2deg(arg), 1, r))
+end
+
+abstract type ComplexColorScheme end
+
+struct ComplexHSV <: ComplexColorScheme
+end
+
+struct RealPartColor <: ComplexColorScheme
+    cs :: ColorScheme
+end
+
+# 
+const complex_hsv = ComplexHSV()
+const complex_berlin = RealPartColor(ColorSchemes.berlin)
+
+# Provide identical syntax
+function Base.get(c :: ComplexHSV, color_or_arr)
+    return hsv_color.(color_or_arr)
+end
+
+function Base.get(c :: RealPartColor, color_or_arr)
+    # Convert from -1:1 to 0:1
+    r = (real(color_or_arr) .+ 1) / 2
+    return get(c.cs, r)
+end

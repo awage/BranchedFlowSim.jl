@@ -4,6 +4,7 @@ module BranchedFlowSim
 export fermi_dot, gaussian_packet, absorbing_potential, lattice_points_in_a_box, lattice_potential, triangle_potential
 export braket
 export total_prob
+export gaussian_correlated_random
 
 # Simulation and analysis
 export SplitOperatorStepper, timestep!, time_evolution
@@ -24,11 +25,9 @@ import VideoIO
 import ImageIO
 import FileIO
 
-include("colormap.jl")
+include("colorschemes.jl")
 
 const mass::Float64 = 1.0
-# colorscheme = colorscheme_daza
-colorscheme = ColorSchemes.berlin
 
 """
     fermi_step(x, α)
@@ -142,7 +141,7 @@ Creates a stepper object for a 2D grid where coordinates are discretized
 according to `xgrid` (in both x and y coordinates). Applying this stepper with
 `timestep!` advances the picture by `Δt`.
 """
-function SplitOperatorStepper(xgrid :: AbstractVector{Float64}, Δt :: Float64, potential)
+    function SplitOperatorStepper(xgrid::AbstractVector{Float64}, Δt::Float64, potential)
         N = length(xgrid)
         @assert size(potential) == (N, N)
         dx = xgrid[2] - xgrid[1]
@@ -167,7 +166,7 @@ end
 
 Perform a time step using given SplitOperatorStepper. This operation mutates Ψ.
 """
-function timestep!(Ψ, stepper :: SplitOperatorStepper)
+function timestep!(Ψ, stepper::SplitOperatorStepper)
     @assert size(Ψ) == size(stepper.V_step) "$(size(Ψ)) != $(size(stepper.V_step))"
     # Potential step in x-space:
     Ψ .*= stepper.V_step
@@ -256,7 +255,7 @@ end
 
 Convenience function for creating a lattice potential with a triangle lattice.
 """
-function triangle_potential(xgrid, a, dot_height, dot_radius=0.1 * a, dot_softness=1)
+function triangle_potential(xgrid, a, dot_height, dot_radius=0.2 * a, dot_softness=1)
     # Lattice matrix
     A = a * [
         1 cos(π / 3)
@@ -270,19 +269,21 @@ function triangle_potential(xgrid, a, dot_height, dot_radius=0.1 * a, dot_softne
 end
 
 """
-    wavefunction_to_image(xgrid, Ψ, potential, maxval=0.0)
+    wavefunction_to_image(xgrid, Ψ, potential, max_modulus=0.0)
 
-Produces a RGB image showing given wavefunction Ψ and potential. If `maxval` is
-nonzero, Ψ values greater or equal to `maxval` are mapped to highest colors.
+Produces a RGB image showing given wavefunction Ψ and potential. If `max_modulus` is
+nonzero, Ψ values greater or equal to `max_modulus` are mapped to highest colors.
 """
-function wavefunction_to_image(xgrid, Ψ, potential; maxval=0.0)
-    if maxval == 0.0
-        maxval = maximum(abs.(real(Ψ)))
+function wavefunction_to_image(xgrid, Ψ, potential;
+    max_modulus=0.0,
+    colorscheme=complex_berlin)
+    if max_modulus == 0.0
+        max_modulus = maximum(abs.(real(Ψ)))
     end
     max_pot = maximum(real(potential))
     img = get(ColorSchemes.gray1, real(potential) / max_pot)
 
-    img .+= get(colorscheme, 0.5 * (real(Ψ) / maxval .+ 1))
+    img .+= get(colorscheme, Ψ / max_modulus)
     # Convert to 8-bit channels. Clamping is needed since values over 1.0
     # cannot be represented in fixed point format.
     return map(img) do pixel
@@ -314,14 +315,14 @@ function save_animation(fname, xgrid, potential, Ψs;
         fps = round(Int, num_frames / duration)
     end
 
-    maxval = if constant_colormap
-        maximum(real(Ψs[:,:, 1 + num_steps ÷ 10]))
+    max_modulus = if constant_colormap
+        maximum(abs(Ψs[:, :, 1+num_steps÷10]))
     else
         0.0
     end
 
     imgstack = (
-        wavefunction_to_image(xgrid, Ψs[:, :, i], potential, maxval=maxval)
+        wavefunction_to_image(xgrid, Ψs[:, :, i], potential, max_modulus=max_modulus)
         for i ∈ 1:skip:num_steps
     )
     VideoIO.save(fname, imgstack, framerate=fps,
@@ -364,8 +365,16 @@ function compute_eigenfunctions(xgrid, Ψs, ts, Es)
     return ΨE
 end
 
-# TODO:
-# - docstrings
-# - General commenting and cleanliness
+function gaussian_correlated_random(xs, ys, scale)
+    dist2 = (ys.^2) .+ transpose(xs.^2)
+    # Not sure why, but 
+    corr =  2 * exp.(-dist2/(scale^2))
+    # XXX Explain this
+    num_points = length(xs) * length(ys)
+    fcorr = fft(corr) / num_points
+    phase = rand(length(ys), length(xs))
+    vrand = ifft(num_points * sqrt.(fcorr) .* exp.(im*2pi*phase))
+    return real(vrand)
+end
 
 end # module BranchedFlowSim
