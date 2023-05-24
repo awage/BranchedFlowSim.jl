@@ -26,6 +26,7 @@ import ImageIO
 import FileIO
 
 include("colorschemes.jl")
+default_colorscheme = complex_berlin
 
 const mass::Float64 = 1.0
 
@@ -50,7 +51,7 @@ value tending to 1 inside a circle of given position and radius.
 function fermi_dot(xgrid, pos, radius, softness=1)
     # N x N matrix of distance from `pos`
     dist = sqrt.(((xgrid .- pos[2]) .^ 2) .+ transpose(((xgrid .- pos[1]) .^ 2)))
-    α = radius / (5 * softness)
+    α = softness * radius / 5
     return fermi_step.(radius .- dist, α)
 end
 
@@ -238,7 +239,7 @@ end
 
 Returns a potential matrix.
 """
-function lattice_potential(xgrid, A, dot_height, dot_radius, offset=[0, 0],
+function lattice_potential(xgrid, A, dot_height, dot_radius; offset=[0, 0],
     dot_softness=1)
     N = length(xgrid)
     L = (xgrid[end] - xgrid[1]) + 10 * dot_radius + abs(maximum(offset))
@@ -265,7 +266,9 @@ function triangle_potential(xgrid, a, dot_height, dot_radius=0.2 * a, dot_softne
     # Computed by taking the average of three lattice points,
     # one of which is (0,0).
     offset = (A[:, 1] + A[:, 2]) / 3
-    return lattice_potential(xgrid, A, dot_height, dot_radius, offset, dot_softness)
+    return lattice_potential(xgrid, A, dot_height, dot_radius,
+        offset=offset,
+        dot_softness=dot_softness)
 end
 
 """
@@ -274,14 +277,20 @@ end
 Produces a RGB image showing given wavefunction Ψ and potential. If `max_modulus` is
 nonzero, Ψ values greater or equal to `max_modulus` are mapped to highest colors.
 """
-function wavefunction_to_image(xgrid, Ψ, potential;
+function wavefunction_to_image(xgrid, Ψ;
+    potential=nothing,
     max_modulus=0.0,
-    colorscheme=complex_berlin)
+    colorscheme=default_colorscheme
+)
     if max_modulus == 0.0
         max_modulus = maximum(abs.(real(Ψ)))
     end
-    max_pot = maximum(real(potential))
-    img = get(ColorSchemes.gray1, real(potential) / max_pot)
+    img = zeros(RGB{Float64}, size(Ψ))
+    if potential !== nothing
+        min_pot = minimum(real(potential))
+        max_pot = maximum(real(potential))
+        img .+= get(ColorSchemes.gray1, 0.5 * (real(potential) .- min_pot) / (max_pot - min_pot))
+    end
 
     img .+= get(colorscheme, Ψ / max_modulus)
     # Convert to 8-bit channels. Clamping is needed since values over 1.0
@@ -301,7 +310,8 @@ length(xgrid)×length(xgrid)×length(ts) matrix and `ts` the
 """
 function save_animation(fname, xgrid, potential, Ψs;
     duration=10,
-    constant_colormap=false)
+    constant_colormap=false,
+    colorscheme=default_colorscheme)
     # Figure out how many frames to render.
     max_fps = 40
     num_steps = size(Ψs)[3]
@@ -322,7 +332,8 @@ function save_animation(fname, xgrid, potential, Ψs;
     end
 
     imgstack = (
-        wavefunction_to_image(xgrid, Ψs[:, :, i], potential, max_modulus=max_modulus)
+        wavefunction_to_image(xgrid, Ψs[:, :, i]; potential=potential, max_modulus=max_modulus,
+            colorscheme=colorscheme)
         for i ∈ 1:skip:num_steps
     )
     VideoIO.save(fname, imgstack, framerate=fps,
@@ -355,7 +366,7 @@ function compute_eigenfunctions(xgrid, Ψs, ts, Es)
         w = 1 - cos(2pi * t / T)
         w = 1
         for (j, E) ∈ enumerate(Es)
-            ΨE[:, :, j] .+= Ψs[:, :, i] * w * exp(1im * t * E)
+            ΨE[:, :, j] .+= Ψs[:, :, i] .* w .* exp(1im * t * E)
         end
     end
     # Normalize each computed eigenfunction
@@ -366,14 +377,14 @@ function compute_eigenfunctions(xgrid, Ψs, ts, Es)
 end
 
 function gaussian_correlated_random(xs, ys, scale)
-    dist2 = (ys.^2) .+ transpose(xs.^2)
+    dist2 = (ys .^ 2) .+ transpose(xs .^ 2)
     # Not sure why, but 
-    corr =  2 * exp.(-dist2/(scale^2))
+    corr = 2 * exp.(-dist2 / (scale^2))
     # XXX Explain this
     num_points = length(xs) * length(ys)
     fcorr = fft(corr) / num_points
     phase = rand(length(ys), length(xs))
-    vrand = ifft(num_points * sqrt.(fcorr) .* exp.(im*2pi*phase))
+    vrand = ifft(num_points * sqrt.(fcorr) .* exp.(im * 2pi * phase))
     return real(vrand)
 end
 

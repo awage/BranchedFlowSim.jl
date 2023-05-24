@@ -79,7 +79,7 @@ https://www.pnas.org/doi/10.1073/pnas.2110285118.
 """
 const colorscheme_daza :: ColorScheme = make_colorscheme_daza();
 
-function make_sigmoid_berlin(c=20)
+function make_sigmoid_berlin(c=10)
     xs = LinRange(-1, 1, 1024)
     sigmoid = 1 ./ (1 .+ exp.(- c * xs))
     colors = get(ColorSchemes.berlin, sigmoid)
@@ -103,6 +103,10 @@ struct RealPartColor <: ComplexColorScheme
     cs :: ColorScheme
 end
 
+struct AbsColor <: ComplexColorScheme
+    cs :: ColorScheme
+end
+
 # 
 const complex_hsv = ComplexHSV()
 const complex_berlin = RealPartColor(ColorSchemes.berlin)
@@ -116,4 +120,8 @@ function Base.get(c :: RealPartColor, color_or_arr)
     # Convert from -1:1 to 0:1
     r = (real(color_or_arr) .+ 1) / 2
     return get(c.cs, r)
+end
+
+function Base.get(c :: AbsColor, color_or_arr)
+    return get(c.cs, abs.(color_or_arr))
 end
