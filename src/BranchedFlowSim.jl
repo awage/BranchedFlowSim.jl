@@ -377,8 +377,18 @@ function compute_eigenfunctions(xgrid, Ψs, ts, Es)
     return ΨE
 end
 
+function middle(xs)
+    if length(xs) % 2 == 1
+        return xs[1+end÷2]
+    end
+    return (xs[end÷2] + xs[1+end÷2]) / 2
+end
+
 function gaussian_correlated_random(xs, ys, scale)
-    dist2 = (ys .^ 2) .+ transpose(xs .^ 2)
+    ymid = middle(ys)
+    xmid = middle(xs)
+
+    dist2 = ((ys.-ymid) .^ 2) .+ transpose((xs.-xmid) .^ 2)
     # Not sure why, but 
     corr = 2 * exp.(-dist2 / (scale^2))
     # XXX Explain this

@@ -6,13 +6,11 @@ using LaTeXStrings
 Lx = 10
 Ly = 12
 # Weird rectangle size
-Nx = 999
-Ny = 777
+Nx = 512
+Ny = 512
 
 # This is the "feature scale" of the random potential
 scale = 0.5
-
-num_plots = 10
 
 xs = LinRange(-Lx / 2, Lx / 2, Nx)
 ys = LinRange(-Ly / 2, Ly / 2, Ny)
