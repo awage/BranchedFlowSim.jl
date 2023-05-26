@@ -114,11 +114,11 @@ function absorbing_potential(xgrid, strength, width)
     # Width in grid points
     width_n = round(Int, N * width / L)
     pot = zeros((N, N))
-    pot[1:width_n, :] .+= LinRange(strength, 0, width_n)
-    pot[:, 1:width_n] .+= LinRange(strength, 0, width_n)'
-    pot[N-width_n+1:N, :] .+= LinRange(0, strength, width_n)
-    pot[:, N-width_n+1:N] .+= LinRange(0, strength, width_n)'
-    return -1im * pot
+    pot[1:width_n, :] .+= LinRange(1, 0, width_n).^2
+    pot[:, 1:width_n] .+= (LinRange(1, 0, width_n).^2)'
+    pot[N-width_n+1:N, :] .+= LinRange(0, 1, width_n).^2
+    pot[:, N-width_n+1:N] .+= (LinRange(0, 1, width_n).^2)'
+    return -1im * strength *  pot
 end
 
 
@@ -288,8 +288,9 @@ function wavefunction_to_image(xgrid, Ψ;
     img = zeros(RGB{Float64}, size(Ψ))
     if potential !== nothing
         min_pot = minimum(real(potential))
-        max_pot = maximum(real(potential))
-        img .+= get(ColorSchemes.gray1, 0.5 * (real(potential) .- min_pot) / (max_pot - min_pot))
+        max_pot = maximum(real(potential)) + 1e-8
+        img .+= get(ColorSchemes.gray1,
+            0.5 * (real(potential) .- min_pot) / (max_pot - min_pot))
     end
 
     img .+= get(colorscheme, Ψ / max_modulus)
@@ -363,10 +364,9 @@ function compute_eigenfunctions(xgrid, Ψs, ts, Es)
     ΨE = zeros(ComplexF64, (Nx, Nx, length(Es)))
     T = ts[end]
     for (i, t) ∈ enumerate(ts)
-        w = 1 - cos(2pi * t / T)
-        w = 1
+        # w = 1 - cos(2pi * t / T)
         for (j, E) ∈ enumerate(Es)
-            ΨE[:, :, j] .+= Ψs[:, :, i] .* w .* exp(1im * t * E)
+            ΨE[:, :, j] .+= Ψs[:, :, i] .* exp(1im * t * E)
         end
     end
     # Normalize each computed eigenfunction
