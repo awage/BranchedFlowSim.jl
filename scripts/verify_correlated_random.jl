@@ -81,4 +81,5 @@ lines!(ax, rs, exp.(-(rs / scale) .^ 2),
 
 axislegend(ax)
 
+save("outputs/verify_correlated_random.png", fig)
 display(fig)

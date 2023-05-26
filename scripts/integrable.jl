@@ -41,41 +41,11 @@ function pixel_heatmap(path, data; kwargs...)
     save(path, scene)
 end
 
-function collect_eigenfunctions(xgrid, Ψ_initial, potential, Δt, steps, energies)
-    stepper = SplitOperatorStepper(xgrid, Δt, potential)
-    Ψ = copy(Ψ_initial)
-    # Collect eigenfunctions
-    ΨE = zeros(ComplexF64, length(xgrid), length(xgrid), length(energies))
-    t = 0
-    tmp = copy(Ψ)
-    for step = 1:steps
-        timestep!(Ψ, stepper)
-        t += Δt
-        for (ei,E) ∈ enumerate(energies)
-            @views ΨE[:, :, ei] .+= Ψ .* exp(1im * t * E)
-        end
-    end
-    # Normalize eigenfunctions
-    for Ψ ∈ eachslice(ΨE, dims=3)
-        Ψ ./= sqrt(total_prob(xgrid, Ψ))
-    end
-    return ΨE
-end
-
-function analyze(path_prefix, xgrid, Ψ, potential, energies)
-    # This consumes a lot of memory, free up what we can beforehand to escape
-    # the OOM killer.
-    GC.gc()
+function analyze(path_prefix, xgrid, Ψ, potential, Δt, num_steps, energies)
     pixel_heatmap(path_prefix * "_potential.png", real(potential))
-    @time "time evolution" Ψs, ts = time_evolution(xgrid, potential, Ψ, T, dt)
-    print("Start <Ψ|Ψ>=$(total_prob(xgrid, Ψs[:,:,1]))\n")
-    print("End <Ψ|Ψ>=$(total_prob(xgrid, Ψs[:,:,end]))\n")
 
-   #  @time "video done" save_animation(
-   #      path_prefix * ".mp4", xgrid, potential, Ψs, duration=20, constant_colormap=false)
-
-    # Also compute an eigenfunction for some energy.
-    @time "eigenfunctions done" ΨE = compute_eigenfunctions(xgrid, Ψs, ts, energies)
+    @time "eigenfunctions done" ΨE = collect_eigenfunctions(
+        xgrid, Ψ, potential, Δt, num_steps, energies)
     for (ei, eigenfunc) ∈ enumerate(eachslice(ΨE, dims=3))
         E = eigenfunction_E[ei]
         save(
@@ -88,33 +58,36 @@ function analyze(path_prefix, xgrid, Ψ, potential, energies)
             path_prefix * "_eigenfunc_$(round(Int, E))_prob.png",
             log.(prob),
             colormap=prob_colorscheme.colors,
-            colorrange=(-7, 0))
+            colorrange=(-9, 0))
     end
     return ΨE
 end
 
+scale = 4
 # Simulation parameters
-L = 20
-num_grid_points = 512
-num_steps = 500
+L = 20 * scale
+num_grid_points = 1024
+num_steps = 500 * scale
 V0 = 100
-maxE = 3 * V0
+maxE = 5 * V0
 # Fix 
-dt = 0.33 / maxE
+dt = 1 / maxE
 T = dt * num_steps
 # Potential parameters
-lattice_constant = 1
-dot_width = 0.2
+lattice_constant = L / 20
+dot_width = 0.2 * scale
 dot_softness = 0.5
 wall_strength = 100
 # Initial wavefunction parameters
-packet_pos = [0.12, 0.23]
+packet_pos = lattice_constant * [0.12, 0.23]
 packet_momentum = [0, 0]
 # Match Alvar's params
 # packet_width = 0.1581
-packet_width = 0.05
+# This is kept constant w.r.t. `scale`, which can cause problems 
+# due to spatial resolution.
+packet_width = 0.08
 # Output parameters
-eigenfunction_E = LinRange(V0, maxE, 10)
+eigenfunction_E = LinRange(V0, maxE, 8)
 
 xgrid = LinRange(-L / 2, L / 2, num_grid_points)
 
@@ -131,8 +104,8 @@ square_potential = lattice_potential(xgrid, lattice_constant * [1 0; 0 1], 1,
 
 # analyze("outputs/free", xgrid, Ψ_initial, absorbing_walls, eigenfunction_E)
 
-for approx ∈ [0, 5, 9]
-# for approx ∈ [0]
+for approx ∈ [0]
+    # for approx ∈ [0]
     println("Running for approx=$(approx)")
 
     path_prefix = "outputs/square/square$(approx)"
@@ -151,5 +124,7 @@ for approx ∈ [0, 5, 9]
     potential *= V0
     potential += absorbing_walls
 
-    analyze(path_prefix, xgrid, Ψ_initial, potential, eigenfunction_E)
+    analyze(path_prefix, xgrid, Ψ_initial, potential,
+        dt, num_steps,
+        eigenfunction_E)
 end

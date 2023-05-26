@@ -9,6 +9,7 @@ export gaussian_correlated_random
 # Simulation and analysis
 export SplitOperatorStepper, timestep!, time_evolution
 export compute_energy_spectrum, compute_eigenfunctions
+export collect_eigenfunctions
 
 # Visualization
 export wavefunction_to_image, save_animation
@@ -387,5 +388,34 @@ function gaussian_correlated_random(xs, ys, scale)
     vrand = ifft(num_points * sqrt.(fcorr) .* exp.(im * 2pi * phase))
     return real(vrand)
 end
+
+"""
+    collect_eigenfunctions(xgrid, Ψ_initial, potential, Δt, steps, energies)
+
+Returns eigenfunctions for given `energies` by running a simulation for given
+initial wavefunction, potential, Δt, and number of steps.
+"""
+function collect_eigenfunctions(xgrid, Ψ_initial, potential, Δt, steps, energies)
+    stepper = SplitOperatorStepper(xgrid, Δt, potential)
+    Ψ = copy(Ψ_initial)
+    # Collect eigenfunctions
+    ΨE = zeros(ComplexF64, length(xgrid), length(xgrid), length(energies))
+    t = 0
+    tmp = copy(Ψ)
+    for step = 1:steps
+        timestep!(Ψ, stepper)
+        t += Δt
+        Threads.@threads for ei ∈ 1:length(energies)
+            E = energies[ei]
+            @views ΨE[:, :, ei] .+= Ψ .* exp(1im * t * E)
+        end
+    end
+    # Normalize eigenfunctions
+    for Ψ ∈ eachslice(ΨE, dims=3)
+        Ψ ./= sqrt(total_prob(xgrid, Ψ))
+    end
+    return ΨE
+end
+
 
 end # module BranchedFlowSim
