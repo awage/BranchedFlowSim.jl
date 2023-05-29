@@ -143,7 +143,8 @@ Creates a stepper object for a 2D grid where coordinates are discretized
 according to `xgrid` (in both x and y coordinates). Applying this stepper with
 `timestep!` advances the picture by `Δt`.
 """
-    function SplitOperatorStepper(xgrid::AbstractVector{Float64}, Δt::Float64, potential)
+    function SplitOperatorStepper(xgrid::AbstractVector{Float64}, Δt::Float64, potential,
+         hbar::Float64 = 1.0)
         N = length(xgrid)
         @assert size(potential) == (N, N)
         dx = xgrid[2] - xgrid[1]
@@ -151,9 +152,9 @@ according to `xgrid` (in both x and y coordinates). Applying this stepper with
         px = 2π * fftfreq(N, 1 / dx)
         # Kinetic operator is diagonal in p space:
         p2 = (px .^ 2) .+ transpose(px .^ 2)
-        T_step = exp.(-Δt .* 1im .* p2 / 2mass)
+        T_step = exp.(-Δt .* hbar * 1im .* p2 / 2mass)
         # Potential operator is diagonal in x space:
-        V_step = exp.(-1im .* Δt .* potential)
+        V_step = exp.(-1im .* Δt .* potential / hbar)
 
         # Prepare in-place FFT to make repeated application faster.
         psi_placeholder = zeros(ComplexF64, N, N)
@@ -179,14 +180,14 @@ function timestep!(Ψ, stepper::SplitOperatorStepper)
 end
 
 """
-    time_evolution(xgrid, potential, Ψ_initial, T, Δt)
+    time_evolution(xgrid, potential, Ψ_initial, T, Δt, hbar=1.0)
 
 Performs time evolution for a 2D quantum system from t=0 to t=T in steps of Δt.
 System is discretized in coordinate space according to `xgrid``.
 """
-function time_evolution(xgrid, potential, Ψ_initial, T, Δt)
+function time_evolution(xgrid, potential, Ψ_initial, T, Δt, hbar=1.0)
     N = length(xgrid)
-    stepper = SplitOperatorStepper(xgrid, Δt, potential)
+    stepper = SplitOperatorStepper(xgrid, Δt, potential, hbar)
     # Make a copy since we'll be modifying Ψ in-place.
     Ψ = copy(Ψ_initial)
     ts = 0:Δt:T
@@ -240,8 +241,8 @@ end
 
 Returns a potential matrix.
 """
-function lattice_potential(xgrid, A, dot_height, dot_radius; offset=[0, 0],
-    dot_softness=1)
+function lattice_potential(xgrid, A, dot_height, dot_radius;
+     offset=[0, 0], dot_softness=1)
     N = length(xgrid)
     L = (xgrid[end] - xgrid[1]) + 10 * dot_radius + abs(maximum(offset))
     V = zeros(N, N)

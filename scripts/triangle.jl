@@ -29,7 +29,7 @@ potential = triangle_potential(xgrid, lattice_constant, dot_potential, dot_radiu
 Ψ = gaussian_packet(xgrid, packet_pos, packet_momentum, packet_width)
 
 Ψs = nothing # Just to free memory
-@time "time evolution" Ψs, ts = time_evolution(xgrid, potential, Ψ, T, dt)
+@time "time evolution" Ψs, ts = time_evolution(xgrid, potential, Ψ, T, dt, 0.5)
 print("Start <Ψ|Ψ>=$(total_prob(xgrid, Ψs[:,:,1]))\n")
 print("End <Ψ|Ψ>=$(total_prob(xgrid, Ψs[:,:,end]))\n")
 
@@ -49,5 +49,5 @@ save(path_prefix * "_spectrum.pdf", fig)
 save(path_prefix * "_eigenfunc.png",
     wavefunction_to_image(
         xgrid, ΨE[:, :, 1],
-        potential,
+        potential=potential,
         max_modulus=0.5 * maximum(abs.(ΨE))))

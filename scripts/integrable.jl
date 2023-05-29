@@ -104,7 +104,7 @@ square_potential = lattice_potential(xgrid, lattice_constant * [1 0; 0 1], 1,
 
 # analyze("outputs/free", xgrid, Ψ_initial, absorbing_walls, eigenfunction_E)
 
-for approx ∈ [0]
+for approx ∈ [0, 5, 9]
     # for approx ∈ [0]
     println("Running for approx=$(approx)")
 
