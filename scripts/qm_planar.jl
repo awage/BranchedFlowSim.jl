@@ -2,26 +2,32 @@ using BranchedFlowSim
 using CairoMakie
 using Makie
 
-path_prefix = "outputs/qm_planar"
+path_prefix = "outputs/qm_planar/planar"
+rm(dirname(path_prefix), recursive=true)
+mkpath(dirname(path_prefix))
 
-ħ = 0.5
+ħ = 1.0
+scale = 4.0
 aspect_ratio = 5
 
 Ny = 256
 Nx = aspect_ratio * Ny
 
-H = 2
+rows = 2
+cols = rows * aspect_ratio
+
+H = scale * rows
 W = H * aspect_ratio
 
-px = 10
-x0 = 1.5
-packet_Δx = 0.25
-v0 = 20
+px = scale * 10
+x0 = scale * 1.5
+packet_Δx = scale * 0.25
+v0 = 20 * scale^2
 # These are tuned to get rid of reflections
-absorbing_wall_width = 0.75
-absorbing_wall_strength = 300
+absorbing_wall_width = scale * 0.75
+absorbing_wall_strength = 300 * scale.^2
 
-with_walls = false
+with_walls = true
 
 if !with_walls
     path_prefix = path_prefix * "_periodic"
@@ -49,10 +55,10 @@ xstart = if with_walls
 else
     1
 end
-for x ∈ xstart:W
-    for y ∈ 1:H
-        p = [x - 0.5, y - 0.5]
-        add_fermi_dot!(potential, xgrid, ygrid, p, 0.25)
+for x ∈ xstart:cols
+    for y ∈ 1:rows
+        p = scale * [x - 0.5, y - 0.5]
+        add_fermi_dot!(potential, xgrid, ygrid, p, 0.25scale)
     end
 end
 potential *= v0
@@ -66,8 +72,10 @@ if with_walls
 end
 
 
-dt = 1 / (3 * E)
-num_steps = if with_walls 400 else 1000 end
+dt = 1 / (E)
+# Enough steps such that the packet travels the distance twice.
+T = 2 * (W / px)
+num_steps = round(Int, T / dt)
 
 # Make planar gaussian packet moves to the right
 Ψ_initial = ones(Ny) * transpose(exp.(-((xgrid .- x0) ./ (packet_Δx * √2)) .^ 2 + 1im * px * xgrid / ħ))
@@ -81,7 +89,7 @@ evolution = time_evolution(xgrid, ygrid, potential, Ψ_initial, dt, num_steps, �
 @time "making animation" make_animation(path_prefix * ".mp4", evolution, potential,
     max_modulus=0.5)
 
-energies = LinRange(v0, 5 * v0, 5)
+energies = LinRange(v0, E + (E-v0), 5)
 @time "eigenfunctions" ΨE = collect_eigenfunctions(evolution, energies,
     window=!with_walls)
 for (ei, E) ∈ enumerate(energies)
