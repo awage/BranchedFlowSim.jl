@@ -11,25 +11,69 @@ function pixel_heatmap(path, data; kwargs...)
     save(path, scene)
 end
 
+
 v0 = 0.03
 
-sim_height = 20
-sim_width = 100
-num_rays = 1024
+sim_height = 10
+sim_width = 200
+num_rays = 512
 correlation_scale = 1
 
 Ny = num_rays
 Nx = num_rays * (sim_width ÷ sim_height)
-ys = LinRange(0, sim_height, Ny+1)[1:end-1]
-xs = LinRange(0, sim_width, Nx)
+ys = LinRange(0, sim_height, Ny + 1)[1:end-1]
+xs = LinRange(0, sim_width, Nx + 1)[1:end-1]
 
-dx = xs[2]-xs[1]
-dy = ys[2]-ys[1]
+dx = xs[2] - xs[1]
+dy = ys[2] - ys[1]
 dt = dx
 
+function make_grid_potential(num_rows)
+    pot = zeros(length(ys), length(xs))
+    onedot = zeros(length(ys), length(ys))
+    # θ = deg2rad(5)
+    θ = atan(1/num_rows)
+    print("θ=$(rad2deg(θ))°\n")
+    lattice_constant = sim_height / sqrt(1 + num_rows^2)
+    lattice_matrix = lattice_constant * [
+        cos(θ) -sin(θ)
+        sin(θ) cos(θ)
+    ]
+    radius = lattice_constant / 4
+    points = lattice_points_in_a_box(
+        lattice_matrix,
+        -3 * radius, sim_width + 3 * radius,
+        -3 * radius, sim_height + 3 * radius
+    )
+    for p ∈ eachcol(points)
+        add_fermi_dot!(pot, xs, ys, p, radius)
+    end
+    return pot
+end
+
+function make_triangle_potential()
+    pot = zeros(length(ys), length(xs))
+    lattice_constant = sim_height / (2 * sin(π/3))
+    lattice_matrix = lattice_constant * [
+        1 cos(π / 3)
+        0 sin(π / 3)
+    ]
+    radius = lattice_constant / 4
+    points = lattice_points_in_a_box(
+        lattice_matrix,
+        -3 * radius, sim_width + 3 * radius,
+        -3 * radius, sim_height + 3 * radius
+    )
+    for p ∈ eachcol(points)
+        add_fermi_dot!(pot, xs, ys, p, radius)
+    end
+    return pot
+end
+
+
 # potential = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-potential = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-for p ∈ 
+@time "made potential" potential = v0 * make_angled_grid_potential(xs, ys, 3)
+# @time "made potential" potential = v0 * make_triangle_potential()
 
 # fig = Figure(resolution=(2*Nx,2*Ny))
 # ax = Axis(fig[1,1])
@@ -38,7 +82,7 @@ for p ∈
 
 # Compute F(x,y) = -∂V(x,y)/∂y
 # 
-force = (circshift(potential, [-1, 0]).-circshift(potential, [1, 0])) ./ (2*dy)
+force = (circshift(potential, [-1, 0]) .- circshift(potential, [1, 0])) ./ (2 * dy)
 # fig = Figure(resolution=(2*Nx,2*Ny))
 # ax = Axis(fig[1,1])
 # heatmap!(ax, xs, ys, force')
@@ -59,7 +103,7 @@ for (xi, x) ∈ enumerate(xs)
     ray_y .+= dt .* ray_py
     # Collect
     for y ∈ ray_y
-        yi = 1 + ((Ny + round(Int, (y / sim_height)*Ny)) % Ny)
+        yi = 1 + ((Ny + round(Int, (y / sim_height) * Ny)) % Ny)
         image[yi, xi] += 1
     end
     # Wrap
@@ -73,8 +117,8 @@ end
 scene = Scene(camera=campixel!, resolution=size(potential'))
 heatmap!(scene, potential'; colormap=:Greens_3)
 heatmap!(scene, image'; colormap=[
-RGBA(0,0,0,0), RGBA(0,0,0,1),
-],
-colorrange=(0, 20)
+        RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
+    ],
+    colorrange=(0, 20)
 )
 save("outputs/kaplan.png", scene)

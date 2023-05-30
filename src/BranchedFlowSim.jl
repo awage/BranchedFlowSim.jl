@@ -1,8 +1,7 @@
 module BranchedFlowSim
 
 # Helpers
-export fermi_dot, gaussian_packet, absorbing_potential, lattice_points_in_a_box, lattice_potential, triangle_potential
-export braket
+export gaussian_packet, braket
 export total_prob
 export gaussian_correlated_random
 
@@ -13,6 +12,7 @@ export collect_eigenfunctions
 
 # Visualization
 export wavefunction_to_image, save_animation
+export make_animation
 
 using LinearAlgebra
 using FFTW
@@ -27,34 +27,11 @@ import ImageIO
 import FileIO
 
 include("colorschemes.jl")
+include("potentials.jl")
+
 default_colorscheme = complex_berlin
 
 const mass::Float64 = 1.0
-
-"""
-    fermi_step(x, α)
-
-Smooth step function, i.e. goes from 0 to 1 as x goes from negative to
-positive. α is a term controlling how smooth the transition from 0 to 1 is.
-Equal to Fermi-Dirac distribution where α=kT, so large values of α correspond
-to smooth transition and small values to an abrupt one.
-"""
-function fermi_step(x, α)
-    return 1 / (1 + exp(-x / α))
-end
-
-"""
-    fermi_dot(xgrid, pos, radius, softness=1)
-
-Return a potential function matrix of size length(xgrid)×length(xgrid) with
-value tending to 1 inside a circle of given position and radius.
-"""
-function fermi_dot(xgrid, pos, radius, softness=1)
-    # N x N matrix of distance from `pos`
-    dist = sqrt.(((xgrid .- pos[2]) .^ 2) .+ transpose(((xgrid .- pos[1]) .^ 2)))
-    α = softness * radius / 5
-    return fermi_step.(radius .- dist, α)
-end
 
 """
     gaussian_packet(xgrid, pos, momentum, Δ)
@@ -93,33 +70,21 @@ function braket(xgrid, Ψ, Φ)
 end
 
 """
+    total_prob(xgrid, ygrid, Ψ)
+
+Returns total probability of Ψ, i.e. <Ψ|Ψ>.
+"""
+function total_prob(xgrid, ygrid, Ψ)
+    return trapz((ygrid, xgrid), abs.(Ψ) .^ 2)
+end
+
+"""
     total_prob(xgrid, Ψ)
 
 Returns total probability of Ψ, i.e. <Ψ|Ψ>.
 """
 function total_prob(xgrid, Ψ)
-    return trapz((xgrid, xgrid), abs.(Ψ) .^ 2)
-end
-
-"""
-    absorbing_potential(xgrid, strength, width)
-
-Returns a length(xgrid)×length(xgrid) sized matrix representing an absorbing
-potential. `strength` is the maximum absolute value of the potential and
-`width` is the width of the absorbing wall in same units as `xgrid`.
-"""
-function absorbing_potential(xgrid, strength, width)
-    N = length(xgrid)
-    L = xgrid[end] - xgrid[1]
-
-    # Width in grid points
-    width_n = round(Int, N * width / L)
-    pot = zeros((N, N))
-    pot[1:width_n, :] .+= LinRange(1, 0, width_n).^2
-    pot[:, 1:width_n] .+= (LinRange(1, 0, width_n).^2)'
-    pot[N-width_n+1:N, :] .+= LinRange(0, 1, width_n).^2
-    pot[:, N-width_n+1:N] .+= (LinRange(0, 1, width_n).^2)'
-    return -1im * strength *  pot
+    return total_prob(xgrid, xgrid, Ψ)
 end
 
 
@@ -137,6 +102,40 @@ struct SplitOperatorStepper
     prepared_ifft::Any
 
     """
+    SplitOperatorStepper(
+        xgrid::AbstractVector{Float64},
+        ygrid::AbstractVector{Float64},
+         Δt::Float64, potential,
+        hbar::Float64=1.0)
+
+TBW
+"""
+    function SplitOperatorStepper(
+        xgrid::AbstractVector{Float64},
+        ygrid::AbstractVector{Float64},
+        Δt::Float64, potential,
+        hbar::Real=1.0)
+        Nx = length(xgrid)
+        Ny = length(ygrid)
+        @assert size(potential) == (Ny, Nx)
+        dx = xgrid[2] - xgrid[1]
+        dy = ygrid[2] - ygrid[1]
+        # Find momentum values corresponding to each fft value
+        px = 2π * fftfreq(Nx, 1 / dx)
+        py = 2π * fftfreq(Ny, 1 / dy)
+        # Kinetic operator is diagonal in p space:
+        p2 = (py .^ 2) .+ transpose(px .^ 2)
+        T_step = exp.(-Δt .* hbar * 1im .* p2 / 2mass)
+        # Potential operator is diagonal in x space:
+        V_step = exp.(-1im .* Δt .* potential / hbar)
+
+        # Prepare in-place FFT to make repeated application faster.
+        psi_placeholder = zeros(ComplexF64, Ny, Nx)
+        my_fft = plan_fft!(psi_placeholder)
+        my_ifft = plan_ifft!(psi_placeholder)
+        return new(Δt, V_step, T_step, my_fft, my_ifft)
+    end
+    """
     SplitOperatorStepper(xgrid, Δt, potential)
 
 Creates a stepper object for a 2D grid where coordinates are discretized
@@ -144,23 +143,8 @@ according to `xgrid` (in both x and y coordinates). Applying this stepper with
 `timestep!` advances the picture by `Δt`.
 """
     function SplitOperatorStepper(xgrid::AbstractVector{Float64}, Δt::Float64, potential,
-         hbar::Float64 = 1.0)
-        N = length(xgrid)
-        @assert size(potential) == (N, N)
-        dx = xgrid[2] - xgrid[1]
-        # Find momentum values corresponding to each fft value
-        px = 2π * fftfreq(N, 1 / dx)
-        # Kinetic operator is diagonal in p space:
-        p2 = (px .^ 2) .+ transpose(px .^ 2)
-        T_step = exp.(-Δt .* hbar * 1im .* p2 / 2mass)
-        # Potential operator is diagonal in x space:
-        V_step = exp.(-1im .* Δt .* potential / hbar)
-
-        # Prepare in-place FFT to make repeated application faster.
-        psi_placeholder = zeros(ComplexF64, N, N)
-        my_fft = plan_fft!(psi_placeholder)
-        my_ifft = plan_ifft!(psi_placeholder)
-        return new(Δt, V_step, T_step, my_fft, my_ifft)
+        hbar::Float64=1.0)
+        return SplitOperatorStepper(xgrid, xgrid, Δt, potential, hbar)
     end
 end
 
@@ -178,6 +162,41 @@ function timestep!(Ψ, stepper::SplitOperatorStepper)
     Ψ .*= stepper.T_step
     stepper.prepared_ifft * Ψ
 end
+
+struct TimeEvolution
+    stepper::SplitOperatorStepper
+    dt::Float64
+    num_steps::Int64
+    xgrid::Vector{Float64}
+    ygrid::Vector{Float64}
+    potential::Matrix{ComplexF64}
+    Ψ_initial::Matrix{ComplexF64}
+end
+
+function time_evolution(
+    xgrid::AbstractVector{Float64},
+    ygrid::AbstractVector{Float64},
+    potential, Ψ, dt, num_steps, hbar=1.0)
+    stepper = SplitOperatorStepper(xgrid, ygrid, dt, potential, hbar)
+    return TimeEvolution(stepper, dt, num_steps, xgrid, ygrid, potential, Ψ)
+end
+
+function Base.iterate(it::TimeEvolution)
+    return ((0.0, it.Ψ_initial), (copy(it.Ψ_initial), 0))
+end
+
+function Base.iterate(it::TimeEvolution, (Ψ, step))
+    if step == it.num_steps
+        return nothing
+    end
+    timestep!(Ψ, it.stepper)
+    return ((step + 1) * it.dt, copy(Ψ)), (Ψ, step + 1)
+end
+
+function Base.length(it::TimeEvolution)
+    return 1 + it.num_steps
+end
+
 
 """
     time_evolution(xgrid, potential, Ψ_initial, T, Δt, hbar=1.0)
@@ -201,77 +220,7 @@ function time_evolution(xgrid, potential, Ψ_initial, T, Δt, hbar=1.0)
     return result_Ψs, Vector(0:Δt:T)
 end
 
-"""
-    lattice_points_in_a_box(A, L)
 
-Returns all lattice points in L-by-L sized box (2D) centered at (0,0). A is a
-2×2 matrix with generating vectors of the lattice as the columns. Returns a
-matrix with 2 rows and one column per lattice point.
-"""
-function lattice_points_in_a_box(A, L)
-    # Start with a vector of 2d vectors
-    points = Vector{Vector{Float64}}()
-    avec = A[:, 1]
-    bvec = A[:, 2]
-    halfL = L / 2
-    # Solve the maximum integer multiple of each vector by mapping each corner
-    # of the box to the lattice basis.
-    Na = 0
-    Nb = 0
-    for corner ∈ [[halfL, halfL], [halfL, -halfL]]
-        ca, cb = A \ corner
-        Na = max(Na, ceil(Int, abs(ca)))
-        Nb = max(Nb, ceil(Int, abs(cb)))
-    end
-    for ka ∈ -Na:Na
-        for kb ∈ -Nb:Nb
-            v = ka * avec + kb * bvec
-            if maximum(abs.(v)) <= halfL
-                push!(points, v)
-            end
-        end
-    end
-    # Convert to a N-by-2 matrix
-    return reduce(hcat, points)
-end
-
-"""
-    lattice_potential(xgrid, A, dot_height, dot_radius, offset=[0, 0],
-    dot_softness=1)
-
-Returns a potential matrix.
-"""
-function lattice_potential(xgrid, A, dot_height, dot_radius;
-     offset=[0, 0], dot_softness=1)
-    N = length(xgrid)
-    L = (xgrid[end] - xgrid[1]) + 10 * dot_radius + abs(maximum(offset))
-    V = zeros(N, N)
-    for point ∈ eachcol(lattice_points_in_a_box(A, L))
-        V .+= fermi_dot(xgrid, point + offset, dot_radius, dot_softness)
-    end
-    return V * dot_height
-end
-
-
-"""
-    triangle_potential(xgrid, a, dot_height, dot_radius=0.1 * a, dot_softness=1)
-
-Convenience function for creating a lattice potential with a triangle lattice.
-"""
-function triangle_potential(xgrid, a, dot_height, dot_radius=0.2 * a, dot_softness=1)
-    # Lattice matrix
-    A = a * [
-        1 cos(π / 3)
-        0 sin(π / 3)
-    ]
-    # Add offset such that 0,0 is in the center of a triangle.
-    # Computed by taking the average of three lattice points,
-    # one of which is (0,0).
-    offset = (A[:, 1] + A[:, 2]) / 3
-    return lattice_potential(xgrid, A, dot_height, dot_radius,
-        offset=offset,
-        dot_softness=dot_softness)
-end
 
 """
     wavefunction_to_image(xgrid, Ψ, potential, max_modulus=0.0)
@@ -279,7 +228,7 @@ end
 Produces a RGB image showing given wavefunction Ψ and potential. If `max_modulus` is
 nonzero, Ψ values greater or equal to `max_modulus` are mapped to highest colors.
 """
-function wavefunction_to_image(xgrid, Ψ;
+function wavefunction_to_image(Ψ;
     potential=nothing,
     max_modulus=0.0,
     colorscheme=default_colorscheme
@@ -335,7 +284,7 @@ function save_animation(fname, xgrid, potential, Ψs;
     end
 
     imgstack = (
-        wavefunction_to_image(xgrid, Ψs[:, :, i]; potential=potential, max_modulus=max_modulus,
+        wavefunction_to_image(Ψs[:, :, i]; potential=potential, max_modulus=max_modulus,
             colorscheme=colorscheme)
         for i ∈ 1:skip:num_steps
     )
@@ -389,7 +338,7 @@ function gaussian_correlated_random(xs, ys, scale)
     ymid = middle(ys)
     xmid = middle(xs)
 
-    dist2 = ((ys.-ymid) .^ 2) .+ transpose((xs.-xmid) .^ 2)
+    dist2 = ((ys .- ymid) .^ 2) .+ transpose((xs .- xmid) .^ 2)
     # Not sure why, but 
     corr = 2 * exp.(-dist2 / (scale^2))
     # XXX Explain this
@@ -428,5 +377,71 @@ function collect_eigenfunctions(xgrid, Ψ_initial, potential, Δt, steps, energi
     return ΨE
 end
 
+"""
+    collect_eigenfunctions(evolution :: TimeEvolution, energies)
+
+Returns eigenfunctions for given `energies` by running a given time evolution.
+"""
+function collect_eigenfunctions(evolution::TimeEvolution, energies;
+    window=false)
+    ΨE = zeros(ComplexF64, length(evolution.ygrid), length(evolution.xgrid),
+        length(energies))
+    T = evolution.num_steps * evolution.dt
+    for (t, Ψ) ∈ evolution
+        w = 1.0
+        if window
+            w = 1.0 - cos(t*2pi / T)
+        end
+        Threads.@threads for ei ∈ 1:length(energies)
+            E = energies[ei]
+            @views ΨE[:, :, ei] .+= Ψ .* (w * exp(1im * t * E))
+        end
+    end
+    print("$(length(evolution.xgrid)) ---- $(length(evolution.ygrid))\n")
+    # Normalize eigenfunctions
+    for Ψ ∈ eachslice(ΨE, dims=3)
+        print("$(size(Ψ))\n")
+        prob = total_prob(evolution.xgrid, evolution.ygrid, Ψ)
+        Ψ ./= sqrt(prob)
+    end
+    return ΨE
+end
+
+"""
+    make_animation(fname, xgrid, potential, Ψs, ts;
+    duration=10,
+    constant_colormap=false)
+
+Produces an animation and stores it to a file at `fname`. `Ψs` should be a
+length(xgrid)×length(xgrid)×length(ts) matrix and `ts` the 
+"""
+function make_animation(fname, evolution::TimeEvolution, potential;
+    duration=10,
+    colorscheme=default_colorscheme,
+    max_modulus=0.0
+)
+    # Figure out how many frames to render.
+    max_fps = 40
+    num_steps = length(evolution)
+    num_frames = num_steps
+    skip = 1
+    fps = round(Int, num_frames / duration)
+    while fps > max_fps
+        # Instead of rendering each frame, only render half.
+        skip *= 2
+        num_frames ÷= 2
+        fps = round(Int, num_frames / duration)
+    end
+
+    # XXX
+
+    imgstack = (
+        wavefunction_to_image(Ψ; potential=potential, max_modulus=max_modulus,
+            colorscheme=colorscheme)
+        for (t, Ψ) ∈ evolution
+    )
+    VideoIO.save(fname, imgstack, framerate=fps,
+        encoder_options=(crf=23, preset="fast"))
+end
 
 end # module BranchedFlowSim
