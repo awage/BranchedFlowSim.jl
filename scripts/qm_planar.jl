@@ -1,14 +1,16 @@
 using BranchedFlowSim
 using CairoMakie
 using Makie
+using ColorSchemes
+using ColorTypes
 
 path_prefix = "outputs/qm_planar/planar"
 rm(dirname(path_prefix), recursive=true)
 mkpath(dirname(path_prefix))
 
 ħ = 1.0
-scale = 4.0
-aspect_ratio = 5
+scale = 3.0
+aspect_ratio = 10
 
 Ny = 256
 Nx = aspect_ratio * Ny
@@ -40,8 +42,31 @@ function pixel_heatmap(path, data; kwargs...)
     save(path, scene)
 end
 
+function heatmap_with_potential(path, data, potential; colorrange=extrema(data))
+   # fire = reverse(ColorSchemes.linear_kryw_0_100_c71_n256)
+    pot_colormap = ColorSchemes.grays
+    # data_colormap = ColorSchemes.viridis
+    data_colormap = fire
+
+    V = real(potential)
+    minV, maxV = extrema(V)
+    minD, maxD = colorrange
+    print("datarange: [$(minD),$(maxD)]\n")
+    pot_img = get(pot_colormap, (V .- minV) ./ (maxV - minV + 1e-9))
+    data_img = get(data_colormap, (data .- minD) / (maxD - minD))
+    
+    img = mapc.((d,v) -> clamp(d - 0.2 * v, 0, 1), data_img, pot_img) 
+    save(path, img)
+end
+
 E = px^2 / 2
 print("E=$(E)\n")
+# Higher energies require smaller timesteps
+dt = 1 / (E)
+# Enough steps such that the packet travels the distance
+T = 1.3 * (W / px)
+num_steps = round(Int, T / dt)
+
 
 @assert W / Nx == H / Ny
 
@@ -50,19 +75,19 @@ ygrid = range(0, step=H / Ny, length=Ny)
 
 potential = zeros(ComplexF64, Ny, Nx)
 
-xstart = if with_walls
-    3
-else
-    1
-end
-for x ∈ xstart:cols
-    for y ∈ 1:rows
-        p = scale * [x - 0.5, y - 0.5]
-        add_fermi_dot!(potential, xgrid, ygrid, p, 0.25scale)
-    end
-end
-potential *= v0
-# potential *= 0.0
+# xstart = if with_walls
+#     3
+# else
+#     1
+# end
+# for x ∈ xstart:cols
+#     for y ∈ 1:rows
+#         p = scale * [x - 0.5, y - 0.5]
+#         add_fermi_dot!(potential, xgrid, ygrid, p, 0.25scale)
+#     end
+# end
+# potential *= v0
+potential = v0 * make_angled_grid_potential(xgrid, ygrid, 0)
 # Make absorbing walls on the left and the right
 if with_walls
     absorbing_profile = -1im * absorbing_wall_strength .*
@@ -71,11 +96,6 @@ if with_walls
     potential += ones(Ny) * transpose(absorbing_profile)
 end
 
-
-dt = 1 / (E)
-# Enough steps such that the packet travels the distance twice.
-T = 2 * (W / px)
-num_steps = round(Int, T / dt)
 
 # Make planar gaussian packet moves to the right
 Ψ_initial = ones(Ny) * transpose(exp.(-((xgrid .- x0) ./ (packet_Δx * √2)) .^ 2 + 1im * px * xgrid / ħ))
@@ -86,13 +106,16 @@ pixel_heatmap(path_prefix * "_initial_real.png", real(Ψ_initial))
 
 evolution = time_evolution(xgrid, ygrid, potential, Ψ_initial, dt, num_steps, ħ)
 
-@time "making animation" make_animation(path_prefix * ".mp4", evolution, potential,
-    max_modulus=0.5)
+# @time "making animation" make_animation(path_prefix * ".mp4", evolution, potential,
+#     max_modulus=0.5)
 
 energies = LinRange(v0, E + (E-v0), 5)
 @time "eigenfunctions" ΨE = collect_eigenfunctions(evolution, energies,
     window=!with_walls)
 for (ei, E) ∈ enumerate(energies)
-    pixel_heatmap(path_prefix * "_eigenfunc_$(round(Int, E)).png",
-        abs.(ΨE[:, :, ei]) .^ 2)
+    # pixel_heatmap(path_prefix * "_eigenfunc_$(round(Int, E)).png",
+    #     abs.(ΨE[:, :, ei]) .^ 2)
+    heatmap_with_potential(
+        path_prefix * "_eigenfunc_$(round(Int, E)).png",
+        abs.(ΨE[:,:,ei]) .^2, potential)
 end

@@ -69,23 +69,20 @@ Return a potential function matrix of size length(xgrid)×length(xgrid) with
 value tending to 1 inside a circle of given position and radius.
 """
 function fermi_dot(xgrid::AbstractVector{Float64},
-    pos, radius, softness=1)
-    # N x N matrix of distance from `pos`
-    dist = sqrt.(((xgrid .- pos[2]) .^ 2) .+ transpose(((xgrid .- pos[1]) .^ 2)))
-    α = softness * radius / 5
-    return fermi_step.(radius .- dist, α)
+    pos, radius, softness=0.2)
+    return fermi_dot(xgrid, xgrid, pos, radius, softness)
 end
 
 function fermi_dot(xgrid::AbstractVector{Float64},
     ygrid::AbstractVector{Float64},
-    pos, radius, softness=1)
+    pos, radius, softness=0.2)
     # N x N matrix of distance from `pos`
     dist = sqrt.(((ygrid .- pos[2]) .^ 2) .+ transpose(((xgrid .- pos[1]) .^ 2)))
-    α = softness * radius / 5
+    α = softness * radius
     return fermi_step.(radius .- dist, α)
 end
 
-function add_fermi_dot!(arr, xgrid, ygrid, pos, radius, softness=1)
+function add_fermi_dot!(arr, xgrid, ygrid, pos, radius, softness=0.2)
     xmin = pos[1] - 3 * radius
     xmax = pos[1] + 3 * radius
     ymin = pos[2] - 3 * radius
@@ -115,12 +112,12 @@ end
 
 """
     lattice_potential(xgrid, A, dot_height, dot_radius, offset=[0, 0],
-    dot_softness=1)
+    dot_softness=0.2)
 
 Returns a potential matrix.
 """
 function lattice_potential(xgrid, A, dot_height, dot_radius;
-    offset=[0, 0], dot_softness=1)
+    offset=[0, 0], dot_softness=0.2)
     N = length(xgrid)
     L = (xgrid[end] - xgrid[1]) + 10 * dot_radius + abs(maximum(offset))
     V = zeros(N, N)
@@ -136,7 +133,7 @@ end
 
 Convenience function for creating a lattice potential with a triangle lattice.
 """
-function triangle_potential(xgrid, a, dot_height, dot_radius=0.2 * a, dot_softness=1)
+function triangle_potential(xgrid, a, dot_height, dot_radius=0.2 * a, dot_softness=0.2)
     # Lattice matrix
     A = a * [
         1 cos(π / 3)
@@ -187,6 +184,10 @@ function make_angled_grid_potential(xs, ys, int_cot::Integer)
     θ = atan(1 / int_cot)
     print("make_angled_grid_potential: θ=$(rad2deg(θ))°\n")
     lattice_constant = H / sqrt(1 + int_cot^2)
+    if int_cot == 0
+        # Special case
+        lattice_constant = H/2
+    end
     lattice_matrix = lattice_constant * [
         cos(θ) -sin(θ)
         sin(θ) cos(θ)
@@ -197,8 +198,10 @@ function make_angled_grid_potential(xs, ys, int_cot::Integer)
         xs[1]-3 * radius, xs[end] + 3 * radius,
         ys[1] -3 * radius, ys[end] + 3 * radius
     )
+    # XXX:
+    softness = 0.05
     for p ∈ eachcol(points)
-        add_fermi_dot!(pot, xs, ys, p, radius)
+        add_fermi_dot!(pot, xs, ys, p, radius, softness)
     end
     return pot
 end
