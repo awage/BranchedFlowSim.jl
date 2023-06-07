@@ -12,12 +12,13 @@ function pixel_heatmap(path, data; kwargs...)
 end
 
 
-v0 = 0.03
-
 sim_height = 10
-sim_width = 200
+sim_width = 20
 num_rays = 512
 correlation_scale = 1
+v0 = 0.04
+
+num_simulations = 100
 
 Ny = num_rays
 Nx = num_rays * (sim_width ÷ sim_height)
@@ -71,8 +72,8 @@ function make_triangle_potential()
 end
 
 
-# potential = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-@time "made potential" potential = v0 * make_angled_grid_potential(xs, ys, 3)
+potential = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
+# @time "made potential" potential = v0 * make_angled_grid_potential(xs, ys, 0)
 # @time "made potential" potential = v0 * make_triangle_potential()
 
 # fig = Figure(resolution=(2*Nx,2*Ny))
@@ -93,9 +94,12 @@ force_itp = scale(force_itp, ys, xs)
 force_itp = extrapolate(force_itp, Periodic())
 
 ray_y = Vector(ys)
+# ray_y = rand(length(ys)) * sim_height
 ray_py = zeros(num_rays)
+# ray_py = rand(num_rays) .- 0.5
 
 image = zero(potential)
+num_branches = zeros(length(xs))
 for (xi, x) ∈ enumerate(xs)
     # kick
     ray_py .+= dt .* force_itp(ray_y, x)
@@ -103,12 +107,21 @@ for (xi, x) ∈ enumerate(xs)
     ray_y .+= dt .* ray_py
     # Collect
     for y ∈ ray_y
-        yi = 1 + ((Ny + round(Int, (y / sim_height) * Ny)) % Ny)
+        yi = 1 + ((100Ny + round(Int, (y / sim_height) * Ny)) % Ny)
         image[yi, xi] += 1
     end
     # Wrap
-    ray_y .+= sim_height
-    ray_y .%= sim_height
+    # ray_y .+= sim_height
+    # ray_y .%= sim_height
+    
+    # Count branches
+    caustics = 0
+    for j ∈ 2:(num_rays-1)
+        if sign(ray_y[j] - ray_y[j-1]) != sign(ray_y[j+1] - ray_y[j])
+            caustics += 1
+        end
+    end
+    num_branches[xi] = caustics / 2
 end
 
 # pixel_heatmap("outputs/kaplan_potential.png", potential', colormap=:Greens)
@@ -122,3 +135,9 @@ heatmap!(scene, image'; colormap=[
     colorrange=(0, 20)
 )
 save("outputs/kaplan.png", scene)
+
+# psquared = vec(sum((image ./ num_rays).^2, dims=1)) ./ num_rays
+# lines(psquared, axis=(limits=(nothing, (0, 4e-5)),))
+# save("outputs/kaplan_p2.png", current_figure())
+lines(xs, num_branches)
+current_figure()

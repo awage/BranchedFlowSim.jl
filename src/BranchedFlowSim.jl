@@ -20,9 +20,9 @@ using Trapz
 using ColorSchemes
 using ColorTypes # For RGB
 using FixedPointNumbers # For N0f8
+using VideoIO, ProgressMeter
 
 # Qualified imports
-import VideoIO
 import ImageIO
 import FileIO
 
@@ -390,7 +390,7 @@ function collect_eigenfunctions(evolution::TimeEvolution, energies;
     for (t, Ψ) ∈ evolution
         w = 1.0
         if window
-            w = 1.0 - cos(t*2pi / T)
+            w = 1.0 - cos(t * 2pi / T)
         end
         Threads.@threads for ei ∈ 1:length(energies)
             E = energies[ei]
@@ -433,15 +433,17 @@ function make_animation(fname, evolution::TimeEvolution, potential;
         fps = round(Int, num_frames / duration)
     end
 
-    # XXX
-
-    imgstack = (
-        wavefunction_to_image(Ψ; potential=potential, max_modulus=max_modulus,
-            colorscheme=colorscheme)
-        for (t, Ψ) ∈ evolution
-    )
-    VideoIO.save(fname, imgstack, framerate=fps,
-        encoder_options=(crf=23, preset="fast"))
+    VideoIO.open_video_out(fname,
+        RGB{N0f8}, size(potential),
+        framerate=fps,
+        encoder_options=(crf=23, preset="fast")) do writer
+        @showprogress "Making animation..." for (t, Ψ) ∈ evolution
+            img = wavefunction_to_image(Ψ;
+                potential=potential, max_modulus=max_modulus,
+                colorscheme=colorscheme)
+            write(writer, img)
+        end
+    end
 end
 
 end # module BranchedFlowSim

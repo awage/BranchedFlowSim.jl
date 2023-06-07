@@ -176,7 +176,7 @@ Returns a potential which is angled with cot(θ)=int_cot. This strange way to
 specify the angle is required so that the returned potential is periodic along
 the y axis.
 """
-function make_angled_grid_potential(xs, ys, int_cot::Integer)
+function make_angled_grid_potential(xs, ys, int_cot::Integer; softness=0.2)
     dy = ys[2] - ys[1]
     H = length(ys) * dy
     pot = zeros(length(ys), length(xs))
@@ -198,8 +198,6 @@ function make_angled_grid_potential(xs, ys, int_cot::Integer)
         xs[1]-3 * radius, xs[end] + 3 * radius,
         ys[1] -3 * radius, ys[end] + 3 * radius
     )
-    # XXX:
-    softness = 0.05
     for p ∈ eachcol(points)
         add_fermi_dot!(pot, xs, ys, p, radius, softness)
     end

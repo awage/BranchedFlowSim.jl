@@ -3,22 +3,34 @@ using CairoMakie
 using Makie
 using ColorSchemes
 using ColorTypes
+using FFTW
+
+# Maybe should set somw
+FFTW.set_num_threads(8)
 
 path_prefix = "outputs/qm_planar/planar"
-rm(dirname(path_prefix), recursive=true)
+# rm(dirname(path_prefix), recursive=true)
 mkpath(dirname(path_prefix))
 
 ħ = 1.0
 scale = 3.0
-aspect_ratio = 10
+aspect_ratio = 8
 
 Ny = 256
 Nx = aspect_ratio * Ny
 
-rows = 2
-cols = rows * aspect_ratio
+# Here are some hacks to make images with same feature size but with different
+# angles.
+# TODO: document better if this ends up being useful.
+int_cot = 3
+angle = acot(int_cot)
 
-H = scale * rows
+if int_cot != 0
+    H = scale * int_cot / cos(angle)
+else
+    # Multiply by 2 to have more dots.
+    H = scale * 2
+end
 W = H * aspect_ratio
 
 px = scale * 10
@@ -43,7 +55,7 @@ function pixel_heatmap(path, data; kwargs...)
 end
 
 function heatmap_with_potential(path, data, potential; colorrange=extrema(data))
-   # fire = reverse(ColorSchemes.linear_kryw_0_100_c71_n256)
+    fire = reverse(ColorSchemes.linear_kryw_0_100_c71_n256)
     pot_colormap = ColorSchemes.grays
     # data_colormap = ColorSchemes.viridis
     data_colormap = fire
@@ -87,7 +99,9 @@ potential = zeros(ComplexF64, Ny, Nx)
 #     end
 # end
 # potential *= v0
-potential = v0 * make_angled_grid_potential(xgrid, ygrid, 0)
+# potential = v0 * make_angled_grid_potential(xgrid, ygrid, int_cot)
+potential = (v0/3) * gaussian_correlated_random(xgrid, ygrid, 1)
+
 # Make absorbing walls on the left and the right
 if with_walls
     absorbing_profile = -1im * absorbing_wall_strength .*
@@ -106,10 +120,12 @@ pixel_heatmap(path_prefix * "_initial_real.png", real(Ψ_initial))
 
 evolution = time_evolution(xgrid, ygrid, potential, Ψ_initial, dt, num_steps, ħ)
 
-# @time "making animation" make_animation(path_prefix * ".mp4", evolution, potential,
-#     max_modulus=0.5)
+@time "making animation" make_animation(path_prefix * ".mp4", evolution, potential,
+    max_modulus=0.5)
 
-energies = LinRange(v0, E + (E-v0), 5)
+# energies = LinRange(v0, E + (E-v0), 5)
+# Other energies don't show up nicely.
+energies = [E]
 @time "eigenfunctions" ΨE = collect_eigenfunctions(evolution, energies,
     window=!with_walls)
 for (ei, E) ∈ enumerate(energies)

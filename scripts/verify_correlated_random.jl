@@ -3,14 +3,14 @@ using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
 
-Lx = 10
-Ly = 12
+Lx = 2
+Ly = 2
 # Weird rectangle size
 Nx = 512
 Ny = 512
 
 # This is the "feature scale" of the random potential
-scale = 0.5
+scale = 0.1
 
 xs = LinRange(-Lx / 2, Lx / 2, Nx)
 ys = LinRange(-Ly / 2, Ly / 2, Ny)
@@ -75,7 +75,7 @@ ax = Axis(fig[3, 1:2], xlabel=L"r")
 lines!(ax, rs, corr,
     label=L"\overline{V(\vec{r})V(\vec{r} + \vec{r}')}")
 lines!(ax, rs, exp.(-(rs / scale) .^ 2),
-    label=L"\exp(-r^2/s^2)")
+    label=L"\exp(-(r^2/s^2)")
 
 axislegend(ax)
 
