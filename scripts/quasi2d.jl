@@ -3,6 +3,7 @@ using CairoMakie
 using Interpolations
 using LaTeXStrings
 using LinearAlgebra
+using StaticArrays
 using Makie
 using ColorTypes
 
@@ -34,8 +35,7 @@ function simulate_num_branches(xs, ys, ts, potential)
     ti = 1
     for (xi, x) ∈ enumerate(xs)
         # kick
-        forces = force.(potential, x, ray_y)
-        ray_py .+= dt .* [f[2] for f ∈ forces]
+        ray_py .+= dt .* [force(potential, x, y)[2] for y ∈ ray_y]
         # drift
         ray_y .+= dt .* ray_py
         if ts[ti] <= x
@@ -46,18 +46,6 @@ function simulate_num_branches(xs, ys, ts, potential)
         end
     end
     return num_branches
-end
-
-function make_y_force(xs, ys, potential)
-    dy = ys[2] - ys[1]
-    # Compute F_y(x,y) = -∂V(x,y)/∂y
-    force = (circshift(potential, [-1, 0])
-             .-
-             circshift(potential, [1, 0])) ./ (2 * dy)
-    force_itp = interpolate(transpose(force), BSpline(Linear()))
-    force_itp = scale(force_itp, xs, ys)
-    force_itp = extrapolate(force_itp, Periodic())
-    return force_itp
 end
 
 function visualize_sim(path, xs, ys, potential)
@@ -153,9 +141,9 @@ struct PeriodicGridPotential <: Function
 Note: `arr` is indexed as arr[y,x].
 """
     function PeriodicGridPotential(xs, ys, arr::AbstractMatrix{Float64})
-        itp = interpolate(transpose(arr), BSpline(Cubic()))
+        itp = interpolate(transpose(arr), BSpline(Cubic(Periodic(OnCell()))))
+        itp = extrapolate(itp, Periodic(OnCell()))
         itp = scale(itp, xs, ys)
-        itp = extrapolate(itp, Periodic())
         return new(itp)
     end
 end
@@ -176,7 +164,12 @@ function force_diff(V, x::Real, y::Real)
     ]
 end
 
-function test_force()
+"""
+    compare_force_with_diff(p)
+
+Debugging function for comparing `force` implementation with `force_diff`
+"""
+function compare_force_with_diff(p)
     xs = LinRange(0, 3, 99)
     ys = LinRange(0, 3, 124)
     fig, ax, plt = heatmap(xs, ys, (x, y) -> norm(force_diff(p, x, y) - force(p, x, y)))
@@ -188,7 +181,8 @@ path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
 sim_width = 2
-num_rays = 768
+# num_rays = 768
+num_rays = 256
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (1/2).
 ϵ_percent = 8
@@ -216,9 +210,8 @@ Threads.@threads for i ∈ 1:num_sims
 end
 nb = vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
 
-
 # Periodic potential
-lattice_a = 0.2
+lattice_a = 0.1
 dot_radius = 0.25 * lattice_a
 dot_v0 = 0.08 * 0.5
 lines(ts, nb, label="random (mean)", linestyle=:dash,
@@ -231,7 +224,7 @@ for deg ∈ [0, 15, 30, 45]
     potential = LatticePotential(lattice_a * rotation_matrix(lattice_θ),
         dot_radius, dot_v0; offset=[lattice_a / 2, 0])
 
-    grid_nb = simulate_num_branches(xs, ys, ts, potential)
+    grid_nb = simulate_num_branches(xs, ys, ts, potential) / sim_height
 
     lines!(ts, grid_nb, label="grid $(deg)°")
 end
@@ -243,7 +236,7 @@ Threads.@threads for di ∈ 1:length(angles)
     θ = angles[di]
     potential = LatticePotential(lattice_a * rotation_matrix(θ),
         dot_radius, dot_v0; offset=[lattice_a / 2, 0])
-    grid_nb[:, di] = simulate_num_branches(xs, ys, ts, potential)
+    grid_nb[:, di] = simulate_num_branches(xs, ys, ts, potential) / sim_height
 end
 grid_nb_mean = sum(grid_nb, dims=2) / length(angles)
 lines!(ts, vec(grid_nb_mean), label="grid (mean)", linestyle=:dot)
@@ -258,8 +251,7 @@ pixel_heatmap(path_prefix * "grid_potential.png",
     colormap=:Greens_3
 )
 
-rand_potential = PeriodicGridPotential(xs, ys,
-    v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-)
+rand_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
+rand_potential = PeriodicGridPotential(xs, ys, rand_arr)
 visualize_sim(path_prefix * "grid_sim.png", xs, ys, potential)
-visualize_sim(path_prefix * "rand_sim.png", xs, ys,rand_potential)
+visualize_sim(path_prefix * "rand_sim.png", xs, ys, rand_potential)
