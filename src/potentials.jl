@@ -1,4 +1,4 @@
-export fermi_dot, add_fermi_dot!
+export fermi_step, fermi_dot, add_fermi_dot!
 export absorbing_potential, lattice_points_in_a_box, lattice_potential, triangle_potential
 export make_angled_grid_potential
 
