@@ -2,7 +2,7 @@
 using LinearAlgebra
 using StaticArrays
 
-export LatticePotential, PeriodicGridPotential
+export LatticePotential, PeriodicGridPotential, RotatedPotential
 export rotation_matrix, force, force_x, force_y
 export quasi2d_num_branches
 export grid_eval
@@ -143,6 +143,15 @@ function force_diff(V, x::Real, y::Real)
 end
 
 """
+    force(V::Function, x::Real, y::Real)
+
+TBW
+"""
+function force(V::Function, x::Real, y::Real)
+    return force_diff(V, x, y)
+end
+
+"""
     compare_force_with_diff(p)
 
 Debugging function for comparing `force` implementation with `force_diff`
@@ -199,4 +208,24 @@ function grid_eval(xs, ys, fun)
     return [
         fun(x,y) for y ∈ ys, x ∈ xs
     ]
+end
+
+struct RotatedPotential
+    A::SMatrix{2,2,Float64}
+    A_inv::SMatrix{2,2,Float64}
+    V::Any
+    function RotatedPotential(θ::Real, V)
+        rot = rotation_matrix(θ)
+        return new(rot, inv(rot), V)
+    end
+end
+
+function (V::RotatedPotential)(x::Real, y::Real)::Float64
+    x,y = V.A * SVector(x,y)
+    return V.V(x, y)
+end
+function force(V::RotatedPotential, x::Real, y::Real)::SVector{2, Float64}
+    x,y = V.A * SVector(x,y)
+    F = force(V.V, x,y)
+    return V.A_inv * F
 end
