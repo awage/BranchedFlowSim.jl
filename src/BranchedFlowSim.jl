@@ -3,7 +3,7 @@ module BranchedFlowSim
 # Helpers
 export gaussian_packet, braket
 export total_prob
-export gaussian_correlated_random
+export gaussian_correlated_random, gaussian_correlated_random_like
 
 # Simulation and analysis
 export SplitOperatorStepper, timestep!, time_evolution
@@ -28,6 +28,8 @@ import FileIO
 
 include("colorschemes.jl")
 include("potentials.jl")
+# TODO: Figure out if this file should be in potentials.jl
+include("classical.jl")
 
 default_colorscheme = complex_berlin
 
@@ -337,14 +339,21 @@ end
 function gaussian_correlated_random(xs, ys, scale)
     ymid = middle(ys)
     xmid = middle(xs)
-
+    # TODO: Explain this. 
     dist2 = ((ys .- ymid) .^ 2) .+ transpose((xs .- xmid) .^ 2)
-    # Not sure why, but 
-    corr = 2 * exp.(-dist2 / (scale^2))
-    # XXX Explain this
+    corr =  exp.(-dist2 / (scale^2))
     num_points = length(xs) * length(ys)
-    fcorr = fft(corr) / num_points
+    # Convert DFT result to fourier series
+    fcorr = (2/num_points)*fft(corr)
     phase = rand(length(ys), length(xs))
+    vrand = ifft(num_points * sqrt.(fcorr) .* exp.(im * 2pi * phase))
+    return real(vrand)
+end
+
+function gaussian_correlated_random_like(corr)
+    num_points = length(corr)
+    fcorr = 2*fft(corr) / num_points
+    phase = rand(size(corr)...)
     vrand = ifft(num_points * sqrt.(fcorr) .* exp.(im * 2pi * phase))
     return real(vrand)
 end
