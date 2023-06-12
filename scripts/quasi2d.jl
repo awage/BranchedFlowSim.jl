@@ -46,28 +46,35 @@ function visualize_sim(path, xs, ys, potential)
     save(path, scene)
 end
 
-function compare_shapes(ts, left_nb, right_nb, llabel, rlabel)
-    fig = Figure(resolution=(600, 600))
-    rcolor = RGB(0.8,0,0)
+function compare_shapes(ts, left_nb, right_nb, llabel, rlabel; same_axis=false)
+    fig = Figure(resolution=(800, 600))
+    rcolor = RGB(0.8, 0, 0)
 
     # Scale such that midpoints are equal
     llimits = (0.0, maximum(left_nb))
-    rlimits = llimits .* (right_nb[end ÷ 2] / left_nb[end÷2])
+    rlimits = llimits .* (right_nb[end÷2] / left_nb[end÷2])
     xlimits = (0.0, sim_width)
 
     axl = Axis(fig[1, 1],
         xlabel=L"t", ylabel=L"N_b", title=LaTeXString("Number of branches"), limits=(xlimits, llimits))
-    axr = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
-        yaxisposition=:right, ygridcolor=RGBAf(0.8,0.0,0.0,0.12),
-        yticklabelcolor=rcolor,limits=(xlimits, rlimits))
-    hidespines!(axr)
-    hidexdecorations!(axr)
+    if !same_axis
+        axr = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
+            yaxisposition=:right, ygridcolor=RGBAf(0.8, 0.0, 0.0, 0.12),
+            yticklabelcolor=rcolor, limits=(xlimits, rlimits))
+        hidespines!(axr)
+        hidexdecorations!(axr)
+    else
+        axr = axl
+    end
 
-    lines!(axl, ts,left_nb , label=llabel, linestyle=:dash)
+
+    lines!(axl, ts, left_nb, label=llabel, linestyle=:dash)
     lines!(axr, ts, right_nb, label=rlabel, linestyle=:dot,
         color=rcolor)
     axislegend(axl, position=:lt)
-    axislegend(axr, position=:rb)
+    if !same_axis
+        axislegend(axr, position=:rb)
+    end
     return fig
 end
 
@@ -75,8 +82,8 @@ end
 path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
-sim_width = 3
-num_rays = 512
+sim_width = 5
+num_rays = 1024
 # num_rays = 512
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (1/2).
@@ -92,7 +99,7 @@ ys = LinRange(0, sim_height, Ny + 1)[1:end-1]
 xs = LinRange(0, sim_width, Nx + 1)[1:end-1]
 
 # Time steps to count branches.
-ts = LinRange(0, xs[end], 100)
+ts = LinRange(0, xs[end], 200)
 
 # Run simulations to count branches
 
@@ -141,7 +148,7 @@ lines!(ax, ts, grid_nb_mean, label=L"grid ($a=%$(lattice_a)$) (mean)", linestyle
 
 # Integrable potential
 
-integrable_pot(x, y) = -(v0) * (cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
+integrable_pot(x, y) = v0 * (cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
 
 angles = LinRange(0, π / 2, 51)[1:end-1]
 int_nb = zeros(length(ts), length(angles))
@@ -161,17 +168,30 @@ save(path_prefix * "branches.png", fig, px_per_unit=2)
 
 ## Make a comparison between rand and grid but scale it
 fig = compare_shapes(ts, nb_rand, grid_nb_mean,
-L"random $l_c=%$correlation_scale$ (mean) ",
-L"grid ($a=%$(lattice_a)$) (mean)")
+    L"Metzger, $l_c=%$correlation_scale$",
+    L"periodic lattice, $a=%$(lattice_a)$ (mean)", same_axis=true)
 display(fig)
 save(path_prefix * "compare_grid_rand.png", fig, px_per_unit=2)
 
 # 
 fig = compare_shapes(ts, nb_rand, int_nb_mean,
-L"random $l_c=%$correlation_scale$ (mean) ",
-L"integrable ($a=%$(lattice_a)$) (mean)")
+    L"Metzger, $l_c=%$correlation_scale$",
+    L"${v_0}(\cos(2\pi x / a)+\cos(2\pi y / a))$, $a=%$(lattice_a)$ (mean)",
+    same_axis=true)
 display(fig)
 save(path_prefix * "compare_int_rand.png", fig, px_per_unit=2)
+
+fig = Figure(resolution=(800, 600))
+ax = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
+    title=LaTeXString("Number of branches"), limits=((0, sim_width), (0, nothing)))
+
+lines!(ax, ts, nb_rand, label=L"Metzger, $l_c=%$correlation_scale$")
+lines!(ax, ts, grid_nb_mean, label=L"periodic lattice, $a=%$(lattice_a)$ (mean)")
+lines!(ax, ts, int_nb_mean,
+    label=L"${v_0}(\cos(2\pi x / a)+\cos(2\pi y / a))$, $a=%$(lattice_a)$ (mean)")
+axislegend(ax, position=:lt)
+save(path_prefix * "compare_three.png", fig, px_per_unit=2)
+display(fig)
 
 ## Visualize simulations
 potential = LatticePotential(lattice_a * rotation_matrix(0),
@@ -186,17 +206,19 @@ visualize_sim(path_prefix * "grid_sim.png", xs, ys, potential)
 visualize_sim(path_prefix * "rand_sim.png", xs, ys, rand_potential)
 visualize_sim(path_prefix * "int_sim.png", xs, ys, integrable_pot)
 visualize_sim(path_prefix * "int_rot_sim.png", xs, ys,
-    RotatedPotential(pi/10, integrable_pot)
+    RotatedPotential(pi / 10, integrable_pot)
 )
 
 ## Test stuff
 
-potential = LatticePotential(lattice_a * rotation_matrix(0),
-    dot_radius, 0.08 * 0.5, offset=[lattice_a / 2, 0])
-potential = integrable_pot
+if false
+    potential = LatticePotential(lattice_a * rotation_matrix(0),
+        dot_radius, 0.08 * 0.5, offset=[lattice_a / 2, 0])
+    potential = integrable_pot
 
-rpot = RotatedPotential(pi/5, potential)
-ss = BranchedFlowSim.compare_force_with_diff(rpot)
-fig, ax, plt = heatmap(xs, ys, ss)
-Colorbar(fig[1, 2], plt)
-fig
+    rpot = RotatedPotential(pi / 5, potential)
+    ss = BranchedFlowSim.compare_force_with_diff(rpot)
+    fig, ax, plt = heatmap(xs, ys, ss)
+    Colorbar(fig[1, 2], plt)
+    fig
+end

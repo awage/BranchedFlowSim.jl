@@ -1,4 +1,6 @@
 # TODO: Figure out if this file should be in potentials.jl
+# Currently this contains mostly potential functions and quasi2d simulation
+# for branch counting.
 using LinearAlgebra
 using StaticArrays
 
