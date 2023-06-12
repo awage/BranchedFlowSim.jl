@@ -14,38 +14,6 @@ function pixel_heatmap(path, data; kwargs...)
     save(path, scene)
 end
 
-function visualize_sim(path, xs, ys, potential)
-    image = zeros(length(ys), length(xs))
-    dt = xs[2] - xs[1]
-    dy = ys[2] - ys[1]
-    ray_y = Vector(ys)
-    ray_py = zeros(length(ys))
-    for (xi, x) ∈ enumerate(xs)
-        # kick
-        ray_py .+= dt .* map(f -> f[2], force.(Ref(potential), x, ray_y))
-        # drift
-        ray_y .+= dt .* ray_py
-        # Collect
-        for y ∈ ray_y
-            yi = 1 + round(Int, y / dy)
-            if yi >= 1 && yi <= length(ys)
-                image[yi, xi] += 1
-            end
-        end
-    end
-    scene = Scene(camera=campixel!, resolution=size(image'))
-    pot_values = [
-        potential(x, y) for x ∈ xs, y ∈ ys
-    ]
-    heatmap!(scene, pot_values; colormap=:Greens_3)
-    heatmap!(scene, image'; colormap=[
-            RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
-        ],
-        colorrange=(0, 20)
-    )
-    save(path, scene)
-end
-
 function compare_shapes(ts, left_nb, right_nb, llabel, rlabel; same_axis=false)
     fig = Figure(resolution=(800, 600))
     rcolor = RGB(0.8, 0, 0)
@@ -82,14 +50,15 @@ end
 path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
-sim_width = 5
-num_rays = 1024
+sim_width = 2
+num_rays = 512
 # num_rays = 512
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (1/2).
 ϵ_percent = 8
 v0 = ϵ_percent * 0.01 * 0.5
 softness = 0.2
+dynamic_rays = false
 
 num_sims = 100
 
@@ -107,7 +76,8 @@ num_branches = zeros(length(ts), num_sims)
 Threads.@threads for i ∈ 1:num_sims
     pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
     potential = PeriodicGridPotential(xs, ys, pot_arr)
-    num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential)
+    num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential,
+        dynamic_rays=dynamic_rays)
 end
 nb_rand = vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
 
@@ -129,7 +99,7 @@ for deg ∈ [0, 15, 30, 45]
     potential = LatticePotential(lattice_a * rotation_matrix(lattice_θ),
         dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
 
-    grid_nb = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
+    grid_nb = quasi2d_num_branches(xs, ys, ts, potential, dynamic_rays=dynamic_rays) / sim_height
 
     lines!(ax, ts, grid_nb, label=L"grid ($a=%$(lattice_a)$) %$(deg)°")
 end
@@ -141,7 +111,7 @@ Threads.@threads for di ∈ 1:length(angles)
     θ = angles[di]
     potential = LatticePotential(lattice_a * rotation_matrix(θ),
         dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
-    grid_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
+    grid_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential, dynamic_rays=dynamic_rays) / sim_height
 end
 grid_nb_mean = vec(sum(grid_nb, dims=2) / length(angles))
 lines!(ax, ts, grid_nb_mean, label=L"grid ($a=%$(lattice_a)$) (mean)", linestyle=:dot)
@@ -155,7 +125,9 @@ int_nb = zeros(length(ts), length(angles))
 Threads.@threads for di ∈ 1:length(angles)
     θ = angles[di]
     potential = RotatedPotential(θ, integrable_pot)
-    int_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
+    tys = LinRange(0, 1, 2num_rays)
+    int_nb[:, di] = quasi2d_num_branches(xs, tys, ts, potential,
+     dynamic_rays=false) / sim_height
 end
 int_nb_mean = vec(sum(int_nb, dims=2) / length(angles))
 
@@ -202,10 +174,10 @@ pixel_heatmap(path_prefix * "grid_potential.png",
 )
 rand_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
 rand_potential = PeriodicGridPotential(xs, ys, rand_arr)
-visualize_sim(path_prefix * "grid_sim.png", xs, ys, potential)
-visualize_sim(path_prefix * "rand_sim.png", xs, ys, rand_potential)
-visualize_sim(path_prefix * "int_sim.png", xs, ys, integrable_pot)
-visualize_sim(path_prefix * "int_rot_sim.png", xs, ys,
+quasi2d_visualize_rays(path_prefix * "grid_sim.png", xs, ys, potential)
+quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs, ys, rand_potential)
+quasi2d_visualize_rays(path_prefix * "int_sim.png", xs, ys, integrable_pot)
+quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", xs, ys,
     RotatedPotential(pi / 10, integrable_pot)
 )
 

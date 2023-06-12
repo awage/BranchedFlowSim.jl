@@ -3,10 +3,11 @@
 # for branch counting.
 using LinearAlgebra
 using StaticArrays
+using Makie
 
 export LatticePotential, PeriodicGridPotential, RotatedPotential
 export rotation_matrix, force, force_x, force_y
-export quasi2d_num_branches
+export quasi2d_num_branches, quasi2d_visualize_rays
 export grid_eval
 
 """
@@ -20,9 +21,9 @@ struct LatticePotential
     radius::Float64
     v0::Float64
     α::Float64
-    offset::SVector{2, Float64}
+    offset::SVector{2,Float64}
     function LatticePotential(A, radius, v0; offset=[0, 0], softness=0.2)
-        return new(A, inv(A), radius, v0, radius * softness, SVector{2, Float64}(offset))
+        return new(A, inv(A), radius, v0, radius * softness, SVector{2,Float64}(offset))
     end
 end
 
@@ -53,7 +54,7 @@ function (V::LatticePotential)(x::Real, y::Real)::Float64
     return V.v0 * v
 end
 
-function force(V::LatticePotential, x::Real, y::Real)::SVector{2, Float64}
+function force(V::LatticePotential, x::Real, y::Real)::SVector{2,Float64}
     # Find 4 closest lattice vectors
     r = SVector(x, y) - V.offset
     a = V.A_inv * r
@@ -76,24 +77,24 @@ function force_x(V::LatticePotential, x, y)
     return force(V, x, y)[1]
 end
 
-function force_y(V::LatticePotential, x, y) :: Float64
+function force_y(V::LatticePotential, x, y)::Float64
     return force(V, x, y)[2]
-#    # Find 4 closest lattice vectors
-#    r = SVector(x, y) - V.offset
-#    a = V.A_inv * r
-#    ind = floor.(a)
-#    F = 0.0
-#    for offset ∈ four_offsets
-#        R = V.A * (ind + offset)
-#        rR = r - R
-#        d = norm(rR)
-#        if d <= 1e-9
-#            return 0.0
-#        end
-#        z = exp((-V.radius + d) / V.α)
-#        F += rR[2] * (z / (V.α * d * (1 + z)^2))
-#    end
-#    return F * V.v0
+    #    # Find 4 closest lattice vectors
+    #    r = SVector(x, y) - V.offset
+    #    a = V.A_inv * r
+    #    ind = floor.(a)
+    #    F = 0.0
+    #    for offset ∈ four_offsets
+    #        R = V.A * (ind + offset)
+    #        rR = r - R
+    #        d = norm(rR)
+    #        if d <= 1e-9
+    #            return 0.0
+    #        end
+    #        z = exp((-V.radius + d) / V.α)
+    #        F += rR[2] * (z / (V.α * d * (1 + z)^2))
+    #    end
+    #    return F * V.v0
 end
 
 struct PeriodicGridPotential
@@ -162,7 +163,7 @@ function compare_force_with_diff(p)
     xs = LinRange(0, 3, 99)
     ys = LinRange(0, 3, 124)
     return [
-        norm(force_diff(p, x, y) - force(p, x, y)) for y∈ys, x∈xs
+        norm(force_diff(p, x, y) - force(p, x, y)) for y ∈ ys, x ∈ xs
     ]
     # fig, ax, plt = heatmap(xs, ys, (x, y) -> norm(force_diff(p, x, y) - force(p, x, y)))
     # Colorbar(fig[1, 2], plt)
@@ -179,21 +180,35 @@ function count_zero_crossing(fx)
     return c
 end
 
-function quasi2d_num_branches(xs, ys, ts, potential)
+function get_dynamic_rays(ray_y, ray_py, maxd)
+    new_ray_y = [ray_y[1]]
+    new_ray_py = [ray_py[1]]
+    sizehint!(new_ray_y, length(ray_y))
+    sizehint!(new_ray_py, length(ray_py))
+    for j ∈ 2:length(ray_y)
+        if abs(ray_y[j] - ray_y[j-1]) > maxd
+            # Add new ray with mean values
+            push!(new_ray_y, (ray_y[j-1] + ray_y[j]) / 2)
+            push!(new_ray_py, (ray_py[j-1] + ray_py[j]) / 2)
+            #          println("new ray!, t=$x, y=$(new_ray_y[end])")
+        end
+        push!(new_ray_y, ray_y[j])
+        push!(new_ray_py, ray_py[j])
+    end
+    return new_ray_y, new_ray_py
+end
+
+function quasi2d_num_branches(xs, ys, ts, potential; dynamic_rays=false)
     dx = xs[2] - xs[1]
     dt = dx
-    num_rays = length(ys)
-    # Compute F(x,y) = -∂V(x,y)/∂y
+    orig_dy = ys[2] - ys[1]
     ray_y = Vector(ys)
-    ray_py = zeros(num_rays)
+    ray_py = zeros(length(ys))
     num_branches = zeros(length(ts))
     ti = 1
     for (xi, x) ∈ enumerate(xs)
         # kick
         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # for i ∈ 1:num_rays
-        #     ray_py[i] += dt * force_y(potential, x, ray_y[i])
-        # end
         # drift
         ray_y .+= dt .* ray_py
         if ts[ti] <= x
@@ -201,14 +216,58 @@ function quasi2d_num_branches(xs, ys, ts, potential)
             caustics = count_zero_crossing(ray_y[2:end] - ray_y[1:end-1])
             num_branches[ti] = caustics / 2
             ti += 1
+            if dynamic_rays
+                maxd = 10 * orig_dy
+                ray_y, ray_py = get_dynamic_rays(ray_y, ray_py, maxd)
+            end
         end
     end
+    println("num rays: $(length(ray_y))")
     return num_branches
+end
+
+function quasi2d_visualize_rays(path, xs, ys, potential;
+     dynamic_rays=false, height=length(ys)
+     )
+    image = zeros(height, length(xs))
+    dt = xs[2] - xs[1]
+    dy = ys[2] - ys[1]
+    ray_y = Vector(ys)
+    ray_py = zeros(length(ys))
+    for (xi, x) ∈ enumerate(xs)
+        # kick
+        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+        # drift
+        ray_y .+= dt .* ray_py
+        # Collect
+        for y ∈ ray_y
+            yi = 1 + round(Int, (y / dy)*height / length(ys))
+            if yi >= 1 && yi <= height
+                image[yi, xi] += 1
+            end
+        end
+        if dynamic_rays && (xi%10 == 0)
+            maxd = 10 * dy
+            ray_y, ray_py = get_dynamic_rays(ray_y, ray_py, maxd)
+        end
+    end
+    scene = Scene(camera=campixel!, resolution=size(image'))
+    ypixels = LinRange(ys[1], ys[end], height)
+    pot_values = [
+        potential(x, y) for x ∈ xs, y ∈ ypixels
+    ]
+    heatmap!(scene, pot_values; colormap=:Greens_3)
+    heatmap!(scene, image'; colormap=[
+            RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
+        ],
+        colorrange=(0, 20*length(ys)/height)
+    )
+    save(path, scene)
 end
 
 function grid_eval(xs, ys, fun)
     return [
-        fun(x,y) for y ∈ ys, x ∈ xs
+        fun(x, y) for y ∈ ys, x ∈ xs
     ]
 end
 
@@ -223,11 +282,11 @@ struct RotatedPotential
 end
 
 function (V::RotatedPotential)(x::Real, y::Real)::Float64
-    x,y = V.A * SVector(x,y)
+    x, y = V.A * SVector(x, y)
     return V.V(x, y)
 end
-function force(V::RotatedPotential, x::Real, y::Real)::SVector{2, Float64}
-    x,y = V.A * SVector(x,y)
-    F = force(V.V, x,y)
+function force(V::RotatedPotential, x::Real, y::Real)::SVector{2,Float64}
+    x, y = V.A * SVector(x, y)
+    F = force(V.V, x, y)
     return V.A_inv * F
 end
