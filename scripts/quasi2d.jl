@@ -50,7 +50,7 @@ end
 path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
-sim_width = 2
+sim_width = 4
 num_rays = 512
 # num_rays = 512
 correlation_scale = 0.1
@@ -174,12 +174,20 @@ pixel_heatmap(path_prefix * "grid_potential.png",
 )
 rand_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
 rand_potential = PeriodicGridPotential(xs, ys, rand_arr)
-quasi2d_visualize_rays(path_prefix * "grid_sim.png", xs, ys, potential)
-quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs, ys, rand_potential)
 quasi2d_visualize_rays(path_prefix * "int_sim.png", xs, ys, integrable_pot)
-quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", xs, ys,
-    RotatedPotential(pi / 10, integrable_pot)
+quasi2d_visualize_rays(path_prefix * "grid_sim.png", xs, ys, potential)
+quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", xs, LinRange(0, 1, 1024),
+    RotatedPotential(pi / 10, integrable_pot),
+    triple_y = true
 )
+rot_lattice = LatticePotential(lattice_a * rotation_matrix(-pi/10),
+    dot_radius, v0, offset=[0, 0])
+quasi2d_visualize_rays(path_prefix * "grid_rot_sim.png", xs, LinRange(0, 1, 1024),
+    rot_lattice,
+    triple_y = true
+)
+quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs,
+    LinRange(0, 1, 1024), rand_potential, triple_y=true)
 
 ## Test stuff
 

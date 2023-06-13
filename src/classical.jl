@@ -226,12 +226,38 @@ function quasi2d_num_branches(xs, ys, ts, potential; dynamic_rays=false)
     return num_branches
 end
 
-function quasi2d_visualize_rays(path, xs, ys, potential;
-     dynamic_rays=false, height=length(ys)
+"""
+    quasi2d_visualize_rays(path, xs, ys, potential;
+        dynamic_rays=false,
+        triple_y=false,
+        height=(if triple_y 3*length(ys) else length(ys) end)
      )
-    image = zeros(height, length(xs))
+
+TBW
+"""
+function quasi2d_visualize_rays(path, xs, ys, potential;
+    dynamic_rays=false,
+    triple_y=false,
+)
     dt = xs[2] - xs[1]
     dy = ys[2] - ys[1]
+    sim_height = dy * length(ys)
+    sim_width = dt * length(xs)
+    height=round(Int,
+        if triple_y
+            3 * length(xs) * sim_height / sim_width
+        else
+            sim_height * length(xs) / sim_width
+        end
+    )
+    image = zeros(height, length(xs))
+    # Height of one pixel in simulation length units
+    pixel_h = if triple_y
+        3 * sim_height / height
+    else
+        sim_height / height
+    end
+    sim_pixels = sim_height / pixel_h
     ray_y = Vector(ys)
     ray_py = zeros(length(ys))
     for (xi, x) ∈ enumerate(xs)
@@ -241,18 +267,24 @@ function quasi2d_visualize_rays(path, xs, ys, potential;
         ray_y .+= dt .* ray_py
         # Collect
         for y ∈ ray_y
-            yi = 1 + round(Int, (y / dy)*height / length(ys))
+            yi = 1 + round(Int, y / pixel_h)
+            if triple_y
+                yi += height ÷ 3
+            end
             if yi >= 1 && yi <= height
                 image[yi, xi] += 1
             end
         end
-        if dynamic_rays && (xi%10 == 0)
+        if dynamic_rays && (xi % 10 == 0)
             maxd = 10 * dy
             ray_y, ray_py = get_dynamic_rays(ray_y, ray_py, maxd)
         end
     end
     scene = Scene(camera=campixel!, resolution=size(image'))
     ypixels = LinRange(ys[1], ys[end], height)
+    if triple_y
+        ypixels = LinRange(ys[1] - sim_height, ys[end] + sim_height, height)
+    end
     pot_values = [
         potential(x, y) for x ∈ xs, y ∈ ypixels
     ]
@@ -260,7 +292,7 @@ function quasi2d_visualize_rays(path, xs, ys, potential;
     heatmap!(scene, image'; colormap=[
             RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
         ],
-        colorrange=(0, 20*length(ys)/height)
+        colorrange=(0, 15 * length(ys) / sim_pixels)
     )
     save(path, scene)
 end
@@ -290,3 +322,26 @@ function force(V::RotatedPotential, x::Real, y::Real)::SVector{2,Float64}
     F = force(V.V, x, y)
     return V.A_inv * F
 end
+
+struct RepeatedPotential
+    dot_potential::Any
+    potential_size::Float64
+    locations::Matrix{Float64}
+    grid_x::Float64
+    grid_y::Float64
+    grid_locations::Matrix{Vector{SVector{2,Float64}}}
+
+    function RepeatedPotential(locations, dot_potential, potential_size)
+        min_x, max_x = extrema(locations[1, :])
+        min_y, max_y = extrema(locations[2, :])
+        # XXX: Explain this math
+        grid_w = 2 + ceil(Int, (max_x - min_x) / potential_size)
+        grid_h = 2 + ceil(Int, (max_y - min_y) / potential_size)
+        grid_locations = [
+            Vector{SVector{2,Float64}}()
+            for y ∈ 1:grid_h, x ∈ 1:grid_x
+        ]
+        return new(dot_potential, potential_size, locations, min_x, min_y, grid_locations)
+    end
+end
+
