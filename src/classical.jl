@@ -5,25 +5,53 @@ using LinearAlgebra
 using StaticArrays
 using Makie
 
-export LatticePotential, PeriodicGridPotential, RotatedPotential
+export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
+export RepeatedPotential
 export rotation_matrix, force, force_x, force_y
 export quasi2d_num_branches, quasi2d_visualize_rays
 export grid_eval
 
 """
-LatticePotential
+Potentials have two defined function 
+"""
+abstract type Potential end
 
+struct FermiDotPotential <: Potential
+    radius::Float64
+    α::Float64
+    v0::Float64
+    function FermiDotPotential(radius, softness, v0)
+        return new(radius, softness * radius, v0)
+    end
+end
+
+function (V::FermiDotPotential)(x::Real, y::Real)::Float64
+    # return V.v0 * fermi_step(sqrt(x^2+y^2)-V.radius, V.softness)
+    d = V.radius - sqrt(x^2 + y^2)
+    return V.v0 / (1 + exp(-d / V.α))
+end
+
+function force(V::FermiDotPotential, x::Real, y::Real)::SVector{2,Float64}
+    d = sqrt(x^2 + y^2)
+    if d <= 1e-9
+        return SVector(0.0, 0.0)
+    end
+    z = exp((-V.radius + d) / V.α)
+    return SVector(x, y) * (V.v0 * z / (V.α * d * (1 + z)^2))
+end
+
+"""
+LatticePotential
 
 """
 struct LatticePotential
     A::SMatrix{2,2,Float64}
     A_inv::SMatrix{2,2,Float64}
-    radius::Float64
-    v0::Float64
-    α::Float64
+    dot_potential::Any
     offset::SVector{2,Float64}
     function LatticePotential(A, radius, v0; offset=[0, 0], softness=0.2)
-        return new(A, inv(A), radius, v0, radius * softness, SVector{2,Float64}(offset))
+        dot = FermiDotPotential(radius, softness, v0)
+        return new(A, inv(A), dot, SVector{2,Float64}(offset))
     end
 end
 
@@ -48,10 +76,9 @@ function (V::LatticePotential)(x::Real, y::Real)::Float64
     v = 0.0
     for offset ∈ four_offsets
         R = V.A * (ind + offset)
-        d = norm(R - r)
-        v += fermi_step(V.radius - d, V.α)
+        v += V.dot_potential(R[1] - r[1], R[2] - r[2])
     end
-    return V.v0 * v
+    return v
 end
 
 function force(V::LatticePotential, x::Real, y::Real)::SVector{2,Float64}
@@ -62,15 +89,9 @@ function force(V::LatticePotential, x::Real, y::Real)::SVector{2,Float64}
     F = SVector(0.0, 0.0)
     for offset ∈ four_offsets
         R = V.A * (ind + offset)
-        rR = r - R
-        d = norm(rR)
-        if d <= 1e-9
-            return SVector(0.0, 0.0)
-        end
-        z = exp((-V.radius + d) / V.α)
-        F += rR * (z / (V.α * d * (1 + z)^2))
+        F += force(V.dot_potential, x - R[1], y - R[2])
     end
-    return F * V.v0
+    return F
 end
 
 function force_x(V::LatticePotential, x, y)
@@ -160,8 +181,8 @@ end
 Debugging function for comparing `force` implementation with `force_diff`
 """
 function compare_force_with_diff(p)
-    xs = LinRange(0, 3, 99)
-    ys = LinRange(0, 3, 124)
+    xs = LinRange(0, 1, 99)
+    ys = LinRange(0, 1, 124)
     return [
         norm(force_diff(p, x, y) - force(p, x, y)) for y ∈ ys, x ∈ xs
     ]
@@ -237,13 +258,13 @@ TBW
 """
 function quasi2d_visualize_rays(path, xs, ys, potential;
     dynamic_rays=false,
-    triple_y=false,
+    triple_y=false
 )
     dt = xs[2] - xs[1]
     dy = ys[2] - ys[1]
     sim_height = dy * length(ys)
     sim_width = dt * length(xs)
-    height=round(Int,
+    height = round(Int,
         if triple_y
             3 * length(xs) * sim_height / sim_width
         else
@@ -323,6 +344,7 @@ function force(V::RotatedPotential, x::Real, y::Real)::SVector{2,Float64}
     return V.A_inv * F
 end
 
+
 struct RepeatedPotential
     dot_potential::Any
     potential_size::Float64
@@ -330,6 +352,8 @@ struct RepeatedPotential
     grid_x::Float64
     grid_y::Float64
     grid_locations::Matrix{Vector{SVector{2,Float64}}}
+    grid_w::Int64
+    grid_h::Int64
 
     function RepeatedPotential(locations, dot_potential, potential_size)
         min_x, max_x = extrema(locations[1, :])
@@ -339,9 +363,57 @@ struct RepeatedPotential
         grid_h = 2 + ceil(Int, (max_y - min_y) / potential_size)
         grid_locations = [
             Vector{SVector{2,Float64}}()
-            for y ∈ 1:grid_h, x ∈ 1:grid_x
+            for y ∈ 1:grid_h, x ∈ 1:grid_w
         ]
-        return new(dot_potential, potential_size, locations, min_x, min_y, grid_locations)
+        offsets = [
+            0 0
+            0 1
+            1 0
+            0 -1
+            -1 0
+            -1 -1
+            -1 1
+            1 1
+            1 -1
+        ]'
+        for (x,y) ∈ eachcol(locations)
+            ix = 2 + floor(Int, (x - min_x) / potential_size)
+            iy = 2 + floor(Int, (y - min_y) / potential_size)
+            for (dx,dy) ∈ eachcol(offsets)
+                push!(grid_locations[iy+dy,ix+dx], SVector(x, y))
+            end
+        end
+        return new(dot_potential, potential_size,
+            locations, min_x, min_y, grid_locations,
+            grid_w, grid_h
+        )
     end
 end
 
+function (V::RepeatedPotential)(x::Real, y::Real)::Float64
+    # find index
+    ix = 2 + floor(Int, (x - V.grid_x) / V.potential_size)
+    iy = 2 + floor(Int, (y - V.grid_y) / V.potential_size)
+    if ix < 1 || iy < 1 || ix > V.grid_w || iy > V.grid_h
+        return 0.0
+    end
+    v = 0
+    for (rx, ry) ∈ V.grid_locations[iy, ix]
+        v += V.dot_potential(x - rx, y - ry)
+    end
+    return v
+end
+
+function force(V::RepeatedPotential, x::Real, y::Real)::SVector{2,Float64}
+    # find index
+    ix = 2 + floor((x - V.grid_x) / V.potential_size)
+    iy = 2 + floor((y - V.grid_y) / V.potential_size)
+    if ix < 1 || iy < 1 || ix > V.grid_w || iy > V.grid_h
+        return SVector(0.0, 0.0)
+    end
+    F = SVector(0.0, 0.0)
+    for (rx, ry) ∈ V.grid_locations[iy, ix]
+        F += force(V.dot_potential, x - rx, y - ry)
+    end
+    return F
+end
