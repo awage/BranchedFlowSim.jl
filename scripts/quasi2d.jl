@@ -116,13 +116,18 @@ function integrable_pot(x::Real, y::Real)::Float64
     v0 * (cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
 end
 
-function get_nb_int()::Vector{Float64}
+function integrable_pot2(x::Real, y::Real)::Float64
+    k = 2pi / lattice_a
+    v0 * (cos(k * x) + cos(k * y) - (1 / 3) * (cos(2k * x) + cos(2k * y)))
+end
+
+function get_nb_int(V)::Vector{Float64}
     num_angles = 50
-    angles = LinRange(0, π / 2, num_angles+1)[1:end-1]
+    angles = LinRange(0, π / 2, num_angles + 1)[1:end-1]
     int_nb_arr = zeros(length(ts), length(angles))
     Threads.@threads for di ∈ 1:length(angles)
         θ = angles[di]
-        potential = RotatedPotential(θ, integrable_pot)
+        potential = RotatedPotential(θ, V)
         # tys = LinRange(0, 1, 2num_rays)
         int_nb_arr[:, di] = quasi2d_num_branches(xs, ys, ts, potential,
             dynamic_rays=false) / sim_height
@@ -136,11 +141,11 @@ function random_dot_potential()
     xmax = sim_width + 1
     ymin = -y_extra
     ymax = sim_height + y_extra
-    box_dims = 
-    num_dots = round(Int, (xmax-xmin)*(ymax-ymin)/lattice_a^2)
+    box_dims =
+        num_dots = round(Int, (xmax - xmin) * (ymax - ymin) / lattice_a^2)
     locs = zeros(2, num_dots)
     for i ∈ 1:num_dots
-        locs[:,i] = [xmin,ymin] + rand(2) .* [xmax-xmin, ymax-ymin]
+        locs[:, i] = [xmin, ymin] + rand(2) .* [xmax - xmin, ymax - ymin]
     end
     return RepeatedPotential(
         locs,
@@ -164,7 +169,8 @@ end
 
 @time "rand sim" nb_rand = get_random_nb()
 @time "lattice sim" nb_lattice = get_lattice_mean_nb()
-@time "int sim" nb_int = get_nb_int()
+@time "int sim" nb_int = get_nb_int(integrable_pot)
+@time "int sim 2" nb_int2 = get_nb_int(integrable_pot2)
 @time "rand dot sim" nb_rand_dots = get_nb_rand_dots()
 
 ## Make a comparison between rand, lattice, and int
@@ -178,6 +184,8 @@ lines!(ax, ts, nb_lattice, label=L"periodic lattice, $a=%$(lattice_a)$ (mean)")
 lines!(ax, ts, nb_rand_dots, label=LaTeXString("random dots"))
 lines!(ax, ts, nb_int,
     label=L"${v_0}(\cos(2\pi x / a)+\cos(2\pi y / a))$, $a=%$(lattice_a)$ (mean)")
+lines!(ax, ts, nb_int2,
+    label=L"${v_0}(\cos(2\pi x / a)+\cos(2\pi y / a)-(1/3)(\cos(4\pi x / a)+\cos(4\pi y / a)))$, $a=%$(lattice_a)$ (mean)")
 axislegend(ax, position=:lt)
 save(path_prefix * "branches.png", fig, px_per_unit=2)
 display(fig)
@@ -189,18 +197,22 @@ quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs, ys, rand_potential)
 quasi2d_visualize_rays(path_prefix * "int_sim.png", xs, ys, integrable_pot)
 potential = LatticePotential(lattice_a * rotation_matrix(0),
     dot_radius, v0, offset=[0, 0])
-lattice_mat = lattice_a * rotation_matrix(-pi/10)
+lattice_mat = lattice_a * rotation_matrix(-pi / 10)
 rot_lattice = LatticePotential(lattice_mat, dot_radius, v0)
 quasi2d_visualize_rays(path_prefix * "lattice_sim.png", xs, ys,
     potential
 )
 quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", xs, LinRange(0, 1, 1024),
     RotatedPotential(pi / 10, integrable_pot),
-    triple_y = true
+    triple_y=true
+)
+quasi2d_visualize_rays(path_prefix * "int2_rot_sim.png", xs, LinRange(0, 1, 1024),
+    RotatedPotential(pi / 10, integrable_pot2),
+    triple_y=true
 )
 quasi2d_visualize_rays(path_prefix * "lattice_rot_sim.png", xs, LinRange(0, 1, 1024),
     rot_lattice,
-    triple_y = true
+    triple_y=true
 )
 
 rand_dot_potential = random_dot_potential()

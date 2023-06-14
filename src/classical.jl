@@ -163,12 +163,12 @@ end
 
 function force_y(V::Function, x::Real, y::Real)::Float64
     h = 1e-6
-    return - (V(x, y + h) - V(x, y - h)) / (2 * h)
+    return - (@inline V(x, y + h) - @inline V(x, y - h)) / (2 * h)
 end
 
 function force_x(V::Function, x::Real, y::Real)::Float64
     h = 1e-6
-    return -(V(x + h, y) - V(x - h, y)) / (2 * h)
+    return -(@inline V(x + h, y) - @inline V(x - h, y)) / (2 * h)
 end
 
 """
