@@ -4,6 +4,7 @@
 using LinearAlgebra
 using StaticArrays
 using Makie
+using Interpolations
 
 export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
 export RepeatedPotential
@@ -44,14 +45,16 @@ end
 LatticePotential
 
 """
-struct LatticePotential
+struct LatticePotential{DotPotential <: Potential} <: Potential
     A::SMatrix{2,2,Float64}
     A_inv::SMatrix{2,2,Float64}
-    dot_potential::Any
+    dot_potential::DotPotential
     offset::SVector{2,Float64}
+    four_offsets::SVector{4, SVector{2, Float64}}
     function LatticePotential(A, radius, v0; offset=[0, 0], softness=0.2)
         dot = FermiDotPotential(radius, softness, v0)
-        return new(A, inv(A), dot, SVector{2,Float64}(offset))
+        fo = [ SVector(0.0, 0.0), A[:, 1], A[:, 2], A[:, 1] + A[:, 2]]
+        return new{FermiDotPotential}(A, inv(A), dot, SVector{2,Float64}(offset), fo)
     end
 end
 
@@ -67,55 +70,34 @@ function rotation_matrix(θ)
     ]
 end
 
-const four_offsets = [SVector(0, 0), SVector(0, 1), SVector(1, 0), SVector(1, 1)]
 function (V::LatticePotential)(x::Real, y::Real)::Float64
     # Find 4 closest lattice vectors
     r = SVector(x, y) - V.offset
-    a = V.A_inv * r
-    ind = floor.(a)
+    a::SVector{2, Float64} = V.A_inv * r
+    # ind = SVector{2, Float64}(floor(a[1]), floor(a[2]))
+    ind::SVector{2, Float64} = floor.(a)
     v = 0.0
-    for offset ∈ four_offsets
-        R = V.A * (ind + offset)
-        v += V.dot_potential(R[1] - r[1], R[2] - r[2])
+    R0 = V.A * ind
+    for offset ∈ V.four_offsets
+        R = R0 + offset
+        v += V.dot_potential(r[1] - R[1], r[2] - R[2])
     end
     return v
 end
 
 function force(V::LatticePotential, x::Real, y::Real)::SVector{2,Float64}
     # Find 4 closest lattice vectors
-    r = SVector(x, y) - V.offset
-    a = V.A_inv * r
-    ind = floor.(a)
-    F = SVector(0.0, 0.0)
-    for offset ∈ four_offsets
-        R = V.A * (ind + offset)
-        F += force(V.dot_potential, x - R[1], y - R[2])
+    r = SVector{2, Float64}(x - V.offset[1], y - V.offset[2])
+    a::SVector{2, Float64} = V.A_inv * r
+    # ind = SVector{2, Float64}(floor(a[1]), floor(a[2]))
+    ind::SVector{2, Float64} = floor.(a)
+    F::SVector{2, Float64} = SVector(0.0, 0.0)
+    R0::SVector{2, Float64} = V.A * ind
+    for offset ∈ V.four_offsets
+        rR::SVector{2,Float64} = r .- (R0 .+ offset)
+        F += @inline force(V.dot_potential, rR[1], rR[2])::SVector{2, Float64}
     end
     return F
-end
-
-function force_x(V::LatticePotential, x, y)
-    return force(V, x, y)[1]
-end
-
-function force_y(V::LatticePotential, x, y)::Float64
-    return force(V, x, y)[2]
-    #    # Find 4 closest lattice vectors
-    #    r = SVector(x, y) - V.offset
-    #    a = V.A_inv * r
-    #    ind = floor.(a)
-    #    F = 0.0
-    #    for offset ∈ four_offsets
-    #        R = V.A * (ind + offset)
-    #        rR = r - R
-    #        d = norm(rR)
-    #        if d <= 1e-9
-    #            return 0.0
-    #        end
-    #        z = exp((-V.radius + d) / V.α)
-    #        F += rR[2] * (z / (V.α * d * (1 + z)^2))
-    #    end
-    #    return F * V.v0
 end
 
 struct PeriodicGridPotential
@@ -345,8 +327,8 @@ function force(V::RotatedPotential, x::Real, y::Real)::SVector{2,Float64}
 end
 
 
-struct RepeatedPotential
-    dot_potential::Any
+struct RepeatedPotential{DotPotential <: Potential} <: Potential
+    dot_potential::DotPotential
     potential_size::Float64
     locations::Matrix{Float64}
     grid_x::Float64
@@ -355,12 +337,13 @@ struct RepeatedPotential
     grid_w::Int64
     grid_h::Int64
 
-    function RepeatedPotential(locations, dot_potential, potential_size)
+    function RepeatedPotential(locations :: AbstractMatrix,
+            dot_potential :: Potential, potential_size :: Real)
         min_x, max_x = extrema(locations[1, :])
         min_y, max_y = extrema(locations[2, :])
         # XXX: Explain this math
-        grid_w = 2 + ceil(Int, (max_x - min_x) / potential_size)
-        grid_h = 2 + ceil(Int, (max_y - min_y) / potential_size)
+        grid_w = 3 + ceil(Int, (max_x - min_x) / potential_size)
+        grid_h = 3 + ceil(Int, (max_y - min_y) / potential_size)
         grid_locations = [
             Vector{SVector{2,Float64}}()
             for y ∈ 1:grid_h, x ∈ 1:grid_w
@@ -376,14 +359,14 @@ struct RepeatedPotential
             1 1
             1 -1
         ]'
-        for (x,y) ∈ eachcol(locations)
+        for (x, y) ∈ eachcol(locations)
             ix = 2 + floor(Int, (x - min_x) / potential_size)
             iy = 2 + floor(Int, (y - min_y) / potential_size)
-            for (dx,dy) ∈ eachcol(offsets)
-                push!(grid_locations[iy+dy,ix+dx], SVector(x, y))
+            for (dx, dy) ∈ eachcol(offsets)
+                push!(grid_locations[iy+dy, ix+dx], SVector(x, y))
             end
         end
-        return new(dot_potential, potential_size,
+        return new{typeof(dot_potential)}(dot_potential, potential_size,
             locations, min_x, min_y, grid_locations,
             grid_w, grid_h
         )
@@ -399,21 +382,21 @@ function (V::RepeatedPotential)(x::Real, y::Real)::Float64
     end
     v = 0
     for (rx, ry) ∈ V.grid_locations[iy, ix]
-        v += V.dot_potential(x - rx, y - ry)
+        v += @inline V.dot_potential(x - rx, y - ry)
     end
     return v
 end
 
 function force(V::RepeatedPotential, x::Real, y::Real)::SVector{2,Float64}
     # find index
-    ix = 2 + floor((x - V.grid_x) / V.potential_size)
-    iy = 2 + floor((y - V.grid_y) / V.potential_size)
+    ix = 2 + floor(Int, (x - V.grid_x) / V.potential_size)
+    iy = 2 + floor(Int, (y - V.grid_y) / V.potential_size)
     if ix < 1 || iy < 1 || ix > V.grid_w || iy > V.grid_h
         return SVector(0.0, 0.0)
     end
     F = SVector(0.0, 0.0)
     for (rx, ry) ∈ V.grid_locations[iy, ix]
-        F += force(V.dot_potential, x - rx, y - ry)
+        F += @inline force(V.dot_potential, x - rx, y - ry)
     end
     return F
 end

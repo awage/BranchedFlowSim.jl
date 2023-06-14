@@ -1,6 +1,7 @@
 using BranchedFlowSim
 using CairoMakie
 using Interpolations
+using Statistics
 using LaTeXStrings
 using LinearAlgebra
 using StaticArrays
@@ -46,7 +47,6 @@ function compare_shapes(ts, left_nb, right_nb, llabel, rlabel; same_axis=false)
     return fig
 end
 
-
 path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
@@ -70,8 +70,9 @@ xs = LinRange(0, sim_width, Nx + 1)[1:end-1]
 # Time steps to count branches.
 ts = LinRange(0, xs[end], 200)
 
-# Run simulations to count branches
 
+function 
+# Run simulations to count branches
 num_branches = zeros(length(ts), num_sims)
 Threads.@threads for i ∈ 1:num_sims
     pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
@@ -164,41 +165,3 @@ lines!(ax, ts, int_nb_mean,
 axislegend(ax, position=:lt)
 save(path_prefix * "compare_three.png", fig, px_per_unit=2)
 display(fig)
-
-## Visualize simulations
-potential = LatticePotential(lattice_a * rotation_matrix(0),
-    dot_radius, 0.08 * 0.5, offset=[lattice_a / 2, 0])
-pixel_heatmap(path_prefix * "grid_potential.png",
-    [potential(x, y) for x ∈ xs, y ∈ ys],
-    colormap=:Greens_3
-)
-rand_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-rand_potential = PeriodicGridPotential(xs, ys, rand_arr)
-quasi2d_visualize_rays(path_prefix * "int_sim.png", xs, ys, integrable_pot)
-quasi2d_visualize_rays(path_prefix * "grid_sim.png", xs, ys, potential)
-quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", xs, LinRange(0, 1, 1024),
-    RotatedPotential(pi / 10, integrable_pot),
-    triple_y = true
-)
-rot_lattice = LatticePotential(lattice_a * rotation_matrix(-pi/10),
-    dot_radius, v0, offset=[0, 0])
-quasi2d_visualize_rays(path_prefix * "grid_rot_sim.png", xs, LinRange(0, 1, 1024),
-    rot_lattice,
-    triple_y = true
-)
-quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs,
-    LinRange(0, 1, 1024), rand_potential, triple_y=true)
-
-## Test stuff
-
-if false
-    potential = LatticePotential(lattice_a * rotation_matrix(0),
-        dot_radius, 0.08 * 0.5, offset=[lattice_a / 2, 0])
-    potential = integrable_pot
-
-    rpot = RotatedPotential(pi / 5, potential)
-    ss = BranchedFlowSim.compare_force_with_diff(rpot)
-    fig, ax, plt = heatmap(xs, ys, ss)
-    Colorbar(fig[1, 2], plt)
-    fig
-end
