@@ -75,12 +75,23 @@ lattice_a::Float64 = 0.2
 dot_radius = 0.25 * lattice_a
 dot_v0 = 0.08 * 0.5
 
+function random_potential()
+    # Use a different discretization for the random potential, no need to
+    # match the number of rays
+    rand_N = 256
+    rNy = rand_N
+    rNx = round(Int, rand_N * (sim_width / sim_height))
+    rys = LinRange(0, sim_height, rNy + 1)[1:end-1]
+    rxs = LinRange(0, sim_width, rNx + 1)[1:end-1]
+    pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
+    return PeriodicGridPotential(xs, ys, pot_arr)
+end
+
 function get_random_nb()::Vector{Float64}
     # Run simulations to count branches
     num_branches = zeros(length(ts), num_sims)
     Threads.@threads for i ∈ 1:num_sims
-        pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-        potential = PeriodicGridPotential(xs, ys, pot_arr)
+        potential = random_potential()
         num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential,
             dynamic_rays=dynamic_rays)
     end
@@ -104,6 +115,7 @@ end
 function integrable_pot(x::Real, y::Real)::Float64
     v0 * (cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
 end
+
 function get_nb_int()::Vector{Float64}
     num_angles = 50
     angles = LinRange(0, π / 2, num_angles+1)[1:end-1]

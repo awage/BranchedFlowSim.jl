@@ -13,11 +13,11 @@ export quasi2d_num_branches, quasi2d_visualize_rays
 export grid_eval
 
 """
-Potentials have two defined function 
-"""
-abstract type Potential end
+Potentials are essentially functions
 
-struct FermiDotPotential <: Potential
+"""
+
+struct FermiDotPotential
     radius::Float64
     α::Float64
     v0::Float64
@@ -45,16 +45,19 @@ end
 LatticePotential
 
 """
-struct LatticePotential{DotPotential <: Potential} <: Potential
-    A::SMatrix{2,2,Float64}
-    A_inv::SMatrix{2,2,Float64}
+struct LatticePotential{DotPotential}
+    A::SMatrix{2,2,Float64, 4}
+    A_inv::SMatrix{2,2,Float64, 4}
     dot_potential::DotPotential
     offset::SVector{2,Float64}
     four_offsets::SVector{4, SVector{2, Float64}}
     function LatticePotential(A, radius, v0; offset=[0, 0], softness=0.2)
         dot = FermiDotPotential(radius, v0, softness)
         fo = [ SVector(0.0, 0.0), A[:, 1], A[:, 2], A[:, 1] + A[:, 2]]
-        return new{FermiDotPotential}(A, inv(A), dot, SVector{2,Float64}(offset), fo)
+        return new{FermiDotPotential}(
+            SMatrix{2,2}(A),
+            SMatrix{2,2}(inv(A)),
+             dot, SVector{2,Float64}(offset), fo)
     end
 end
 
@@ -88,13 +91,13 @@ end
 function force(V::LatticePotential, x::Real, y::Real)::SVector{2,Float64}
     # Find 4 closest lattice vectors
     r = SVector{2, Float64}(x - V.offset[1], y - V.offset[2])
-    a::SVector{2, Float64} = V.A_inv * r
+    a = (V.A_inv*r)::SVector{2, Float64}
     # ind = SVector{2, Float64}(floor(a[1]), floor(a[2]))
     ind::SVector{2, Float64} = floor.(a)
     F::SVector{2, Float64} = SVector(0.0, 0.0)
     R0::SVector{2, Float64} = V.A * ind
     for offset ∈ V.four_offsets
-        rR::SVector{2,Float64} = r .- (R0 .+ offset)
+        rR::SVector{2,Float64} = r - (R0 + offset)
         F += @inline force(V.dot_potential, rR[1], rR[2])::SVector{2, Float64}
     end
     return F
@@ -140,21 +143,32 @@ end
 Generic implementation of `force` function using numeric differentiation.
 Should only be used for testing.
 """
-function force_diff(V, x::Real, y::Real)
+function force_diff(V, x::Real, y::Real)::SVector{2, Float64}
     h = 1e-6
-    return -[
-        (V(x + h, y) - V(x - h, y)) / (2 * h)
-        (V(x, y + h) - V(x, y - h)) / (2 * h)
-    ]
+    return -SVector(
+        (@inline V(x + h, y) - @inline V(x - h, y)) / (2 * h),
+        (@inline V(x, y + h) - @inline V(x, y - h)) / (2 * h)
+    )
 end
 
 """
     force(V::Function, x::Real, y::Real)
 
-TBW
+Generic implementation of `force` function for potentials defined as plain
+functions. Uses numerical differentiation
 """
-function force(V::Function, x::Real, y::Real)
+function force(V::Function, x::Real, y::Real)::SVector{2, Float64}
     return force_diff(V, x, y)
+end
+
+function force_y(V::Function, x::Real, y::Real)::Float64
+    h = 1e-6
+    return - (V(x, y + h) - V(x, y - h)) / (2 * h)
+end
+
+function force_x(V::Function, x::Real, y::Real)::Float64
+    h = 1e-6
+    return -(V(x + h, y) - V(x - h, y)) / (2 * h)
 end
 
 """
@@ -307,13 +321,13 @@ function grid_eval(xs, ys, fun)
     ]
 end
 
-struct RotatedPotential
-    A::SMatrix{2,2,Float64}
-    A_inv::SMatrix{2,2,Float64}
-    V::Any
+struct RotatedPotential{DotPotential}
+    A::SMatrix{2,2,Float64, 4}
+    A_inv::SMatrix{2,2,Float64, 4}
+    V::DotPotential
     function RotatedPotential(θ::Real, V)
         rot = rotation_matrix(θ)
-        return new(rot, inv(rot), V)
+        return new{typeof(V)}(rot, inv(rot), V)
     end
 end
 
@@ -321,6 +335,7 @@ function (V::RotatedPotential)(x::Real, y::Real)::Float64
     x, y = V.A * SVector(x, y)
     return V.V(x, y)
 end
+
 function force(V::RotatedPotential, x::Real, y::Real)::SVector{2,Float64}
     x, y = V.A * SVector(x, y)
     F = force(V.V, x, y)
@@ -328,7 +343,7 @@ function force(V::RotatedPotential, x::Real, y::Real)::SVector{2,Float64}
 end
 
 
-struct RepeatedPotential{DotPotential <: Potential} <: Potential
+struct RepeatedPotential{DotPotential}
     dot_potential::DotPotential
     potential_size::Float64
     locations::Matrix{Float64}
@@ -338,8 +353,8 @@ struct RepeatedPotential{DotPotential <: Potential} <: Potential
     grid_w::Int64
     grid_h::Int64
 
-    function RepeatedPotential(locations :: AbstractMatrix,
-            dot_potential :: Potential, potential_size :: Real)
+    function RepeatedPotential(locations :: AbstractMatrix, 
+        dot_potential, potential_size :: Real)
         min_x, max_x = extrema(locations[1, :])
         min_y, max_y = extrema(locations[2, :])
         # XXX: Explain this math
