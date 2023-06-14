@@ -50,7 +50,8 @@ path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
 sim_width = 4
-num_rays = 512
+num_rays = 1024
+dt = 1/512
 # num_rays = 512
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (1/2).
@@ -61,7 +62,7 @@ softness = 0.2
 num_sims = 100
 
 Ny = num_rays
-Nx = round(Int, num_rays * (sim_width / sim_height))
+Nx = round(Int, sim_width / dt)
 ys = LinRange(0, sim_height, Ny + 1)[1:end-1]
 xs = LinRange(0, sim_width, Nx + 1)[1:end-1]
 

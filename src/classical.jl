@@ -13,23 +13,27 @@ export quasi2d_num_branches, quasi2d_visualize_rays
 export grid_eval
 
 """
-Potentials are essentially functions
-
+We consider an object V to be a Potential if it is callable with two floats
+(like V(x,y)) and has a defined function force(V, x, y) = -∇V. Plain functions
+are supported with numerical differentiation, and some of the potentials
+defined here can be composed together (LatticePotential, RepeatedPotential)
+to create complex yet efficient potential functions.
 """
 
 struct FermiDotPotential
     radius::Float64
     α::Float64
+    inv_α::Float64
     v0::Float64
     function FermiDotPotential(radius, v0, softness=0.2)
-        return new(radius, softness * radius, v0)
+        α = softness * radius
+        return new(radius, α, 1/α, v0)
     end
 end
 
 function (V::FermiDotPotential)(x::Real, y::Real)::Float64
-    # return V.v0 * fermi_step(sqrt(x^2+y^2)-V.radius, V.softness)
     d = V.radius - sqrt(x^2 + y^2)
-    return V.v0 / (1 + exp(-d / V.α))
+    return V.v0 / (1 + exp(-V.inv_α * d))
 end
 
 function force(V::FermiDotPotential, x::Real, y::Real)::SVector{2,Float64}
@@ -37,8 +41,8 @@ function force(V::FermiDotPotential, x::Real, y::Real)::SVector{2,Float64}
     if d <= 1e-9
         return SVector(0.0, 0.0)
     end
-    z = exp((-V.radius + d) / V.α)
-    return SVector(x, y) * (V.v0 * z / (V.α * d * (1 + z)^2))
+    z = exp(V.inv_α * (-V.radius + d))
+    return SVector(x, y) * (V.v0 * z *V.inv_α/ (d * (1 + z)^2))
 end
 
 """
