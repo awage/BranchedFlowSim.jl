@@ -36,7 +36,6 @@ function compare_shapes(ts, left_nb, right_nb, llabel, rlabel; same_axis=false)
         axr = axl
     end
 
-
     lines!(axl, ts, left_nb, label=llabel, linestyle=:dash)
     lines!(axr, ts, right_nb, label=rlabel, linestyle=:dot,
         color=rcolor)
@@ -56,7 +55,7 @@ num_rays = 512
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (1/2).
 ϵ_percent = 8
-v0 = ϵ_percent * 0.01 * 0.5
+v0::Float64 = ϵ_percent * 0.01 * 0.5
 softness = 0.2
 dynamic_rays = false
 
@@ -71,97 +70,128 @@ xs = LinRange(0, sim_width, Nx + 1)[1:end-1]
 ts = LinRange(0, xs[end], 200)
 
 
-function 
-# Run simulations to count branches
-num_branches = zeros(length(ts), num_sims)
-Threads.@threads for i ∈ 1:num_sims
-    pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-    potential = PeriodicGridPotential(xs, ys, pot_arr)
-    num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential,
-        dynamic_rays=dynamic_rays)
-end
-nb_rand = vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
-
 # Periodic potential
-lattice_a = 0.2
+lattice_a::Float64 = 0.2
 dot_radius = 0.25 * lattice_a
 dot_v0 = 0.08 * 0.5
 
-fig = Figure(resolution=(600, 600))
-ax = Axis(fig[1, 1],
-    xlabel=L"t", ylabel=L"N_b",
-    title=L"Number of branches, $\epsilon=%$ϵ_percent%%$")
-
-lines!(ax, ts, nb_rand, label=L"random $l_c=%$correlation_scale$ (mean) ", linestyle=:dash)
-for deg ∈ [0, 15, 30, 45]
-    # lattice_θ = π / 6
-    lattice_θ = deg2rad(deg)
-    # lattice_θ =0
-    potential = LatticePotential(lattice_a * rotation_matrix(lattice_θ),
-        dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
-
-    grid_nb = quasi2d_num_branches(xs, ys, ts, potential, dynamic_rays=dynamic_rays) / sim_height
-
-    lines!(ax, ts, grid_nb, label=L"grid ($a=%$(lattice_a)$) %$(deg)°")
+function get_random_nb()::Vector{Float64}
+    # Run simulations to count branches
+    num_branches = zeros(length(ts), num_sims)
+    Threads.@threads for i ∈ 1:num_sims
+        pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
+        potential = PeriodicGridPotential(xs, ys, pot_arr)
+        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential,
+            dynamic_rays=dynamic_rays)
+    end
+    return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
 end
 
 # Compute average over all angles
-angles = LinRange(0, π / 2, 51)[1:end-1]
-grid_nb = zeros(length(ts), length(angles))
-Threads.@threads for di ∈ 1:length(angles)
-    θ = angles[di]
-    potential = LatticePotential(lattice_a * rotation_matrix(θ),
-        dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
-    grid_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential, dynamic_rays=dynamic_rays) / sim_height
+function get_lattice_mean_nb()::Vector{Float64}
+    angles = LinRange(0, π / 2, 51)[1:end-1]
+    grid_nb = zeros(length(ts), length(angles))
+    Threads.@threads for di ∈ 1:length(angles)
+        θ = angles[di]
+        potential = LatticePotential(lattice_a * rotation_matrix(θ),
+            dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
+        grid_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential, dynamic_rays=dynamic_rays) / sim_height
+    end
+    return vec(sum(grid_nb, dims=2) / length(angles))
 end
-grid_nb_mean = vec(sum(grid_nb, dims=2) / length(angles))
-lines!(ax, ts, grid_nb_mean, label=L"grid ($a=%$(lattice_a)$) (mean)", linestyle=:dot)
 
 # Integrable potential
-
-integrable_pot(x, y) = v0 * (cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
-
-angles = LinRange(0, π / 2, 51)[1:end-1]
-int_nb = zeros(length(ts), length(angles))
-Threads.@threads for di ∈ 1:length(angles)
-    θ = angles[di]
-    potential = RotatedPotential(θ, integrable_pot)
-    tys = LinRange(0, 1, 2num_rays)
-    int_nb[:, di] = quasi2d_num_branches(xs, tys, ts, potential,
-     dynamic_rays=false) / sim_height
+function integrable_pot(x::Real, y::Real)::Float64
+    v0 * (cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
 end
-int_nb_mean = vec(sum(int_nb, dims=2) / length(angles))
+function get_nb_int()::Vector{Float64}
+    num_angles = 50
+    angles = LinRange(0, π / 2, num_angles+1)[1:end-1]
+    int_nb_arr = zeros(length(ts), length(angles))
+    Threads.@threads for di ∈ 1:length(angles)
+        θ = angles[di]
+        potential = RotatedPotential(θ, integrable_pot)
+        # tys = LinRange(0, 1, 2num_rays)
+        int_nb_arr[:, di] = quasi2d_num_branches(xs, ys, ts, potential,
+            dynamic_rays=false) / sim_height
+    end
+    return vec(sum(int_nb_arr, dims=2) / length(angles))
+end
 
-lines!(ax, ts, int_nb_mean, label=L"integrable (mean)$.$", linestyle=:dashdot)
+function random_dot_potential()
+    y_extra = 2
+    xmin = -1
+    xmax = sim_width + 1
+    ymin = -y_extra
+    ymax = sim_height + y_extra
+    box_dims = 
+    num_dots = round(Int, (xmax-xmin)*(ymax-ymin)/lattice_a^2)
+    locs = zeros(2, num_dots)
+    for i ∈ 1:num_dots
+        locs[:,i] = [xmin,ymin] + rand(2) .* [xmax-xmin, ymax-ymin]
+    end
+    return RepeatedPotential(
+        locs,
+        FermiDotPotential(dot_radius, v0),
+        lattice_a
+    )
+end
 
-axislegend(position=:lt)
-display(fig)
-save(path_prefix * "branches.png", fig, px_per_unit=2)
+function get_nb_rand_dots()::Vector{Float64}
+    # Run simulations to count branches
+    num_branches = zeros(length(ts), num_sims)
+    Threads.@threads for i ∈ 1:num_sims
+        potential = random_dot_potential()
+        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential,
+            dynamic_rays=dynamic_rays)
+    end
+    return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
+end
 
+## Actually evaluate
 
-## Make a comparison between rand and grid but scale it
-fig = compare_shapes(ts, nb_rand, grid_nb_mean,
-    L"Metzger, $l_c=%$correlation_scale$",
-    L"periodic lattice, $a=%$(lattice_a)$ (mean)", same_axis=true)
-display(fig)
-save(path_prefix * "compare_grid_rand.png", fig, px_per_unit=2)
+@time "rand sim" nb_rand = get_random_nb()
+@time "lattice sim" nb_lattice = get_lattice_mean_nb()
+@time "int sim" nb_int = get_nb_int()
+@time "rand dot sim" nb_rand_dots = get_nb_rand_dots()
 
-# 
-fig = compare_shapes(ts, nb_rand, int_nb_mean,
-    L"Metzger, $l_c=%$correlation_scale$",
-    L"${v_0}(\cos(2\pi x / a)+\cos(2\pi y / a))$, $a=%$(lattice_a)$ (mean)",
-    same_axis=true)
-display(fig)
-save(path_prefix * "compare_int_rand.png", fig, px_per_unit=2)
+## Make a comparison between rand, lattice, and int
 
 fig = Figure(resolution=(800, 600))
 ax = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
     title=LaTeXString("Number of branches"), limits=((0, sim_width), (0, nothing)))
 
 lines!(ax, ts, nb_rand, label=L"Metzger, $l_c=%$correlation_scale$")
-lines!(ax, ts, grid_nb_mean, label=L"periodic lattice, $a=%$(lattice_a)$ (mean)")
-lines!(ax, ts, int_nb_mean,
+lines!(ax, ts, nb_lattice, label=L"periodic lattice, $a=%$(lattice_a)$ (mean)")
+lines!(ax, ts, nb_rand_dots, label=LaTeXString("random dots"))
+lines!(ax, ts, nb_int,
     label=L"${v_0}(\cos(2\pi x / a)+\cos(2\pi y / a))$, $a=%$(lattice_a)$ (mean)")
 axislegend(ax, position=:lt)
-save(path_prefix * "compare_three.png", fig, px_per_unit=2)
+save(path_prefix * "branches.png", fig, px_per_unit=2)
 display(fig)
+
+## Visualize simulations
+rand_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
+rand_potential = PeriodicGridPotential(xs, ys, rand_arr)
+quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs, ys, rand_potential)
+quasi2d_visualize_rays(path_prefix * "int_sim.png", xs, ys, integrable_pot)
+potential = LatticePotential(lattice_a * rotation_matrix(0),
+    dot_radius, v0, offset=[0, 0])
+lattice_mat = lattice_a * rotation_matrix(-pi/10)
+rot_lattice = LatticePotential(lattice_mat, dot_radius, v0)
+quasi2d_visualize_rays(path_prefix * "lattice_sim.png", xs, ys,
+    potential
+)
+quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", xs, LinRange(0, 1, 1024),
+    RotatedPotential(pi / 10, integrable_pot),
+    triple_y = true
+)
+quasi2d_visualize_rays(path_prefix * "lattice_rot_sim.png", xs, LinRange(0, 1, 1024),
+    rot_lattice,
+    triple_y = true
+)
+
+rand_dot_potential = random_dot_potential()
+
+quasi2d_visualize_rays(path_prefix * "rand_dots_sim.png", xs,
+    ys, rand_dot_potential, triple_y=true)

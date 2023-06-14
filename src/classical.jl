@@ -21,7 +21,7 @@ struct FermiDotPotential <: Potential
     radius::Float64
     α::Float64
     v0::Float64
-    function FermiDotPotential(radius, softness, v0)
+    function FermiDotPotential(radius, v0, softness=0.2)
         return new(radius, softness * radius, v0)
     end
 end
@@ -52,7 +52,7 @@ struct LatticePotential{DotPotential <: Potential} <: Potential
     offset::SVector{2,Float64}
     four_offsets::SVector{4, SVector{2, Float64}}
     function LatticePotential(A, radius, v0; offset=[0, 0], softness=0.2)
-        dot = FermiDotPotential(radius, softness, v0)
+        dot = FermiDotPotential(radius, v0, softness)
         fo = [ SVector(0.0, 0.0), A[:, 1], A[:, 2], A[:, 1] + A[:, 2]]
         return new{FermiDotPotential}(A, inv(A), dot, SVector{2,Float64}(offset), fo)
     end
@@ -225,7 +225,8 @@ function quasi2d_num_branches(xs, ys, ts, potential; dynamic_rays=false)
             end
         end
     end
-    println("num rays: $(length(ray_y))")
+    # For debugging dynamic rays (BROKEN)
+    # println("num rays: $(length(ray_y))")
     return num_branches
 end
 
