@@ -19,6 +19,9 @@ are supported with numerical differentiation, and some of the potentials
 defined here can be composed together (LatticePotential, RepeatedPotential)
 to create complex yet efficient potential functions.
 """
+function ispotential(v)
+    return applicable(v, 1.2, 2.3) && applicable(force, v, 1.2, 2.3)
+end
 
 struct FermiDotPotential
     radius::Float64
