@@ -57,7 +57,6 @@ correlation_scale = 0.1
 ϵ_percent = 8
 v0::Float64 = ϵ_percent * 0.01 * 0.5
 softness = 0.2
-dynamic_rays = false
 
 num_sims = 100
 
@@ -92,8 +91,7 @@ function get_random_nb()::Vector{Float64}
     num_branches = zeros(length(ts), num_sims)
     Threads.@threads for i ∈ 1:num_sims
         potential = random_potential()
-        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential,
-            dynamic_rays=dynamic_rays)
+        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential)
     end
     return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
 end
@@ -106,7 +104,7 @@ function get_lattice_mean_nb()::Vector{Float64}
         θ = angles[di]
         potential = LatticePotential(lattice_a * rotation_matrix(θ),
             dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
-        grid_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential, dynamic_rays=dynamic_rays) / sim_height
+        grid_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
     end
     return vec(sum(grid_nb, dims=2) / length(angles))
 end
@@ -129,8 +127,7 @@ function get_nb_int(V)::Vector{Float64}
         θ = angles[di]
         potential = RotatedPotential(θ, V)
         # tys = LinRange(0, 1, 2num_rays)
-        int_nb_arr[:, di] = quasi2d_num_branches(xs, ys, ts, potential,
-            dynamic_rays=false) / sim_height
+        int_nb_arr[:, di] = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
     end
     return vec(sum(int_nb_arr, dims=2) / length(angles))
 end
@@ -159,8 +156,7 @@ function get_nb_rand_dots()::Vector{Float64}
     num_branches = zeros(length(ts), num_sims)
     Threads.@threads for i ∈ 1:num_sims
         potential = random_dot_potential()
-        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential,
-            dynamic_rays=dynamic_rays)
+        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential)
     end
     return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
 end

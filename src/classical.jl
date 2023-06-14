@@ -215,7 +215,7 @@ function get_dynamic_rays(ray_y, ray_py, maxd)
     return new_ray_y, new_ray_py
 end
 
-function quasi2d_num_branches(xs, ys, ts, potential; dynamic_rays=false)
+function quasi2d_num_branches(xs, ys, ts, potential)
     dx = xs[2] - xs[1]
     dt = dx
     orig_dy = ys[2] - ys[1]
@@ -233,14 +233,8 @@ function quasi2d_num_branches(xs, ys, ts, potential; dynamic_rays=false)
             caustics = count_zero_crossing(ray_y[2:end] - ray_y[1:end-1])
             num_branches[ti] = caustics / 2
             ti += 1
-            if dynamic_rays
-                maxd = 10 * orig_dy
-                ray_y, ray_py = get_dynamic_rays(ray_y, ray_py, maxd)
-            end
         end
     end
-    # For debugging dynamic rays (BROKEN)
-    # println("num rays: $(length(ray_y))")
     return num_branches
 end
 
