@@ -112,12 +112,16 @@ end
 
 # Integrable potential
 function integrable_pot(x::Real, y::Real)::Float64
-    v0 * (cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
+    (v0/4) * (2 + cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
 end
 
 function integrable_pot2(x::Real, y::Real)::Float64
+    a0 = 0.5 * 0.4441648435271566
+    a1 = 0.2632722982611676
+    a2 = 2 * 0.1491129866125936
     k = 2pi / lattice_a
-    v0 * (cos(k * x) + cos(k * y) - (1 / 3) * (cos(2k * x) + cos(2k * y)))
+    return v0 * (a0+a1*(cos(k * x) + cos(k * y))
+                + a2 * cos(k * x)*cos(k*y))
 end
 
 function get_nb_int(V)::Vector{Float64}

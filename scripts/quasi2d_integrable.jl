@@ -2,6 +2,7 @@ using BranchedFlowSim
 using CairoMakie
 using Interpolations
 using Statistics
+using FFTW
 using LaTeXStrings
 using LinearAlgebra
 using StaticArrays
@@ -55,10 +56,12 @@ function integrable_pot(x::Real, y::Real)::Float64
     v0 * (cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
 end
 
-# A bit 
 function integrable_pot2(x::Real, y::Real)::Float64
+    a0 = 0.4441648435271566 / 2
+    a1 = 0.2632722982611676
+    a2 = 0.1491129866125936
     k = 2pi / lattice_a
-    v0 * (cos(k * x) + cos(k * y) - (1 / 3) * (cos(2k * x) + cos(2k * y)))
+    return v0 * (a0+a1*(cos(k * x) + cos(k * y)) - a2 * cos(k * x)*cos(k*y))
 end
 
 function get_nb_int(V)::Vector{Float64}
@@ -74,86 +77,95 @@ function get_nb_int(V)::Vector{Float64}
     return vec(sum(int_nb_arr, dims=2) / length(angles))
 end
 
-function random_dot_potential()
-    y_extra = 2
-    xmin = -1
-    xmax = sim_width + 1
-    ymin = -y_extra
-    ymax = sim_height + y_extra
-    box_dims =
-        num_dots = round(Int, (xmax - xmin) * (ymax - ymin) / lattice_a^2)
-    locs = zeros(2, num_dots)
-    for i ∈ 1:num_dots
-        locs[:, i] = [xmin, ymin] + rand(2) .* [xmax - xmin, ymax - ymin]
+struct CosSeriesPotential{MatrixType}
+    w::MatrixType
+    k::Float64
+end
+
+function (V::CosSeriesPotential)(x, y)
+    len = size(V.w)[1]
+    xcos = MVector{len, Float64}(undef)
+    ycos = MVector{len, Float64}(undef)
+    xcos[1] = ycos[1] = 1.0
+    for k ∈ 2:len
+        kk = (k-1)*V.k
+        xcos[k] = cos(kk*x)
+        ycos[k] = cos(kk*y)
     end
-    return RepeatedPotential(
-        locs,
-        FermiDotPotential(dot_radius, v0),
-        lattice_a
+    xycos = ycos * transpose(xcos)
+    return sum(
+        V.w .* xycos
     )
 end
 
-function get_nb_rand_dots()::Vector{Float64}
-    # Run simulations to count branches
-    num_branches = zeros(length(ts), num_sims)
-    Threads.@threads for i ∈ 1:num_sims
-        potential = random_dot_potential()
-        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential)
+function BranchedFlowSim.force(V::CosSeriesPotential, x, y)
+    # TODO: This can be greatly optimized
+    return BranchedFlowSim.force_diff(V, x, y)
+end
+
+function potential_label(degree)
+    lbl = L"\sum_{n+m\le%$(degree)}a_{nm}\cos(nkx)\cos(mky)"
+end
+
+function make_integrable_potential(degree)
+    pot = LatticePotential(lattice_a * rotation_matrix(0),
+    dot_radius, v0)
+    # Find coefficients numerically by doing FFT
+    N = 128
+    xs = LinRange(0, lattice_a, N+1)[1:N]
+    g = grid_eval(xs, xs, pot)
+    # Fourier coefficients
+    w = (2/length(g))*fft(g)
+    # Convert from exp coefficients to cosine coefficients
+    w = real(w[1:(degree+1), 1:(degree+1)])
+    w[1,1] /= 2
+    w[2:end, 2:end] *= 2
+    for i ∈ 1:degree
+        for j ∈ 1:degree
+            if (i+j) > degree
+                w[1+i,1+j] = 0
+            end
+        end
     end
-    return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
+    k =  2pi/lattice_a
+    # Use statically sized arrays.
+    static_w = SMatrix{1+degree,1+degree,Float64,(1+degree)^2}(w)
+    return CosSeriesPotential{typeof(static_w)}(static_w, k)
 end
 
 ## Actually evaluate
 
-@time "rand sim" nb_rand = get_random_nb()
 @time "lattice sim" nb_lattice = get_lattice_mean_nb()
-@time "int sim" nb_int = get_nb_int(integrable_pot)
-@time "int sim 2" nb_int2 = get_nb_int(integrable_pot2)
-@time "rand dot sim" nb_rand_dots = get_nb_rand_dots()
+max_degree = 6
+int_potentials = [make_integrable_potential(degree) for degree ∈ 1:max_degree]
+@time "all int sims" nb_int = [get_nb_int(pot) for pot ∈ int_potentials]
 
 ## Make a comparison between rand, lattice, and int
 
-fig = Figure(resolution=(800, 600))
+fig = Figure(resolution=(1024, 768))
 ax = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
     title=LaTeXString("Number of branches"), limits=((0, sim_width), (0, nothing)))
 
-lines!(ax, ts, nb_rand, label=L"Metzger, $l_c=%$correlation_scale$")
 lines!(ax, ts, nb_lattice, label=L"periodic lattice, $a=%$(lattice_a)$ (mean)")
-lines!(ax, ts, nb_rand_dots, label=LaTeXString("random dots"))
-lines!(ax, ts, nb_int,
-    label=L"${v_0}(\cos(2\pi x / a)+\cos(2\pi y / a))$, $a=%$(lattice_a)$ (mean)")
-lines!(ax, ts, nb_int2,
-    label=L"${v_0}(\cos(2\pi x / a)+\cos(2\pi y / a)-(1/3)(\cos(4\pi x / a)+\cos(4\pi y / a)))$, $a=%$(lattice_a)$ (mean)")
+for degree ∈ 1:max_degree
+    #lbl=L"degree %$(degree) $\cos$ approx $a=%$(lattice_a)$ (mean)")
+    lbl = potential_label(degree)
+    lines!(ax, ts, nb_int[degree], label=lbl)
+end
 axislegend(ax, position=:lt)
-save(path_prefix * "branches.png", fig, px_per_unit=2)
+save(path_prefix * "int_branches.png", fig, px_per_unit=2)
 display(fig)
 
 ## Visualize simulations
-rand_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-rand_potential = PeriodicGridPotential(xs, ys, rand_arr)
-quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs, ys, rand_potential)
-quasi2d_visualize_rays(path_prefix * "int_sim.png", xs, ys, integrable_pot)
-potential = LatticePotential(lattice_a * rotation_matrix(0),
-    dot_radius, v0, offset=[0, 0])
+#
 lattice_mat = lattice_a * rotation_matrix(-pi / 10)
 rot_lattice = LatticePotential(lattice_mat, dot_radius, v0)
-quasi2d_visualize_rays(path_prefix * "lattice_sim.png", xs, ys,
-    potential
-)
-quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", xs, LinRange(0, 1, 1024),
-    RotatedPotential(pi / 10, integrable_pot),
-    triple_y=true
-)
-quasi2d_visualize_rays(path_prefix * "int2_rot_sim.png", xs, LinRange(0, 1, 1024),
-    RotatedPotential(pi / 10, integrable_pot2),
-    triple_y=true
-)
-quasi2d_visualize_rays(path_prefix * "lattice_rot_sim.png", xs, LinRange(0, 1, 1024),
+quasi2d_visualize_rays(path_prefix * "lattice_rot_sim.png", xs, ys,
     rot_lattice,
-    triple_y=true
 )
-
-rand_dot_potential = random_dot_potential()
-
-quasi2d_visualize_rays(path_prefix * "rand_dots_sim.png", xs,
-    ys, rand_dot_potential, triple_y=true)
+for degree ∈ 1:max_degree
+    quasi2d_visualize_rays(path_prefix * "int_$(degree)_rot_sim.png", xs,
+        LinRange(0, 1, 1024),
+        RotatedPotential(pi / 10, int_potentials[degree]),
+    )
+end
