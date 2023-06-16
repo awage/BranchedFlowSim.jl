@@ -33,7 +33,7 @@ struct FermiDotPotential
     v0::Float64
     function FermiDotPotential(radius, v0, softness=0.2)
         α = softness * radius
-        return new(radius, α, 1/α, v0)
+        return new(radius, α, 1 / α, v0)
     end
 end
 
@@ -48,7 +48,7 @@ function force(V::FermiDotPotential, x::Real, y::Real)::SVector{2,Float64}
         return SVector(0.0, 0.0)
     end
     z = exp(V.inv_α * (-V.radius + d))
-    return SVector(x, y) * (V.v0 * z *V.inv_α/ (d * (1 + z)^2))
+    return SVector(x, y) * (V.v0 * z * V.inv_α / (d * (1 + z)^2))
 end
 
 """
@@ -56,19 +56,19 @@ LatticePotential
 
 """
 struct LatticePotential{DotPotential}
-    A::SMatrix{2,2,Float64, 4}
-    A_inv::SMatrix{2,2,Float64, 4}
+    A::SMatrix{2,2,Float64,4}
+    A_inv::SMatrix{2,2,Float64,4}
     dot_potential::DotPotential
     offset::SVector{2,Float64}
-    four_offsets::SVector{4, SVector{2, Float64}}
+    four_offsets::SVector{4,SVector{2,Float64}}
     function LatticePotential(A, radius, v0; offset=[0, 0], softness=0.2)
         A = SMatrix{2,2}(A)
         dot = FermiDotPotential(radius, v0, softness)
-        fo = [ SVector(0.0, 0.0), A[:, 1], A[:, 2], A[:, 1] + A[:, 2]]
+        fo = [SVector(0.0, 0.0), A[:, 1], A[:, 2], A[:, 1] + A[:, 2]]
         return new{FermiDotPotential}(
             A,
             SMatrix{2,2}(inv(A)),
-             dot, SVector{2,Float64}(offset), fo)
+            dot, SVector{2,Float64}(offset), fo)
     end
 end
 
@@ -87,9 +87,9 @@ end
 function (V::LatticePotential)(x::Real, y::Real)::Float64
     # Find 4 closest lattice vectors
     r = SVector(x, y) - V.offset
-    a::SVector{2, Float64} = V.A_inv * r
+    a::SVector{2,Float64} = V.A_inv * r
     # ind = SVector{2, Float64}(floor(a[1]), floor(a[2]))
-    ind::SVector{2, Float64} = floor.(a)
+    ind::SVector{2,Float64} = floor.(a)
     v = 0.0
     R0 = V.A * ind
     for offset ∈ V.four_offsets
@@ -101,20 +101,20 @@ end
 
 function force(V::LatticePotential, x::Real, y::Real)::SVector{2,Float64}
     # Find 4 closest lattice vectors
-    r = SVector{2, Float64}(x - V.offset[1], y - V.offset[2])
-    a = (V.A_inv*r)::SVector{2, Float64}
+    r = SVector{2,Float64}(x - V.offset[1], y - V.offset[2])
+    a = (V.A_inv * r)::SVector{2,Float64}
     # ind = SVector{2, Float64}(floor(a[1]), floor(a[2]))
-    ind::SVector{2, Float64} = floor.(a)
-    F::SVector{2, Float64} = SVector(0.0, 0.0)
-    R0::SVector{2, Float64} = V.A * ind
+    ind::SVector{2,Float64} = floor.(a)
+    F::SVector{2,Float64} = SVector(0.0, 0.0)
+    R0::SVector{2,Float64} = V.A * ind
     for offset ∈ V.four_offsets
         rR::SVector{2,Float64} = r - (R0 + offset)
-        F += @inline force(V.dot_potential, rR[1], rR[2])::SVector{2, Float64}
+        F += @inline force(V.dot_potential, rR[1], rR[2])::SVector{2,Float64}
     end
     return F
 end
 
-struct PeriodicGridPotential{Interpolation <: AbstractInterpolation}
+struct PeriodicGridPotential{Interpolation<:AbstractInterpolation}
     itp::Interpolation
     """
     PeriodicGridPotential(xs, ys, arr)
@@ -154,7 +154,7 @@ end
 Generic implementation of `force` function using numeric differentiation.
 Should only be used for testing.
 """
-function force_diff(V, x::Real, y::Real)::SVector{2, Float64}
+function force_diff(V, x::Real, y::Real)::SVector{2,Float64}
     h = 1e-6
     return -SVector(
         (@inline V(x + h, y) - @inline V(x - h, y)) / (2 * h),
@@ -168,13 +168,13 @@ end
 Generic implementation of `force` function for potentials defined as plain
 functions. Uses numerical differentiation
 """
-function force(V::Function, x::Real, y::Real)::SVector{2, Float64}
+function force(V::Function, x::Real, y::Real)::SVector{2,Float64}
     return force_diff(V, x, y)
 end
 
 function force_y(V::Function, x::Real, y::Real)::Float64
     h = 1e-6
-    return - (@inline V(x, y + h) - @inline V(x, y - h)) / (2 * h)
+    return -(@inline V(x, y + h) - @inline V(x, y - h)) / (2 * h)
 end
 
 function force_x(V::Function, x::Real, y::Real)::Float64
@@ -226,8 +226,18 @@ function get_dynamic_rays(ray_y, ray_py, maxd)
     return new_ray_y, new_ray_py
 end
 
-function quasi2d_num_branches(num_rays, dt, ts, potential)
-    ray_y = Vector(LinRange(0, 1, num_rays+1)[1:num_rays])
+function quasi2d_num_branches(num_rays, dt, ts, potential;
+    return_rays = false)
+    ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:num_rays])
+    return quasi2d_num_branches(ray_y, dt, ts, potential; return_rays=return_rays)
+end
+
+function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
+    ts::AbstractVector{<:Real}, potential; return_rays=false)
+    @assert ispotential(potential)
+
+    ray_y = Vector{Float64}(ray_y)
+    num_rays = length(ray_y)
     ray_py = zeros(num_rays)
     num_branches = zeros(length(ts))
     ti = 1
@@ -240,48 +250,53 @@ function quasi2d_num_branches(num_rays, dt, ts, potential)
         x += dt
         if ts[ti] <= x
             # Count branches
-            caustics = count_zero_crossing(ray_y[2:end] - ray_y[1:end-1])
+            # caustics = count_zero_crossing(ray_y[2:end] - ray_y[1:end-1])
+            caustics = 0
+            for j ∈ 2:num_rays-1
+                if sign(ray_y[j] - ray_y[j-1]) != sign(ray_y[j+1] - ray_y[j])
+                    caustics += 1
+                end
+            end
             num_branches[ti] = caustics / 2
             ti += 1
         end
     end
-    return num_branches
+    if return_rays
+        return num_branches, ray_y, ray_py
+    else
+        return num_branches
+    end
 end
 
 """
     quasi2d_visualize_rays(path, xs, ys, potential;
-        dynamic_rays=false,
         triple_y=false,
         height=(if triple_y 3*length(ys) else length(ys) end)
      )
 
 TBW
 """
-function quasi2d_visualize_rays(path, xs, ys, potential;
-    dynamic_rays=false,
+function quasi2d_visualize_rays(path, num_rays, sim_width, potential;
     triple_y=false
 )
-    dt = xs[2] - xs[1]
-    dy = ys[2] - ys[1]
-    sim_height = dy * length(ys)
-    sim_width = dt * length(xs)
+    pixel_scale = 600
+    sim_height = 1
     height = round(Int,
         if triple_y
-            3 * length(xs) * sim_height / sim_width
+            3 * pixel_scale
         else
-            sim_height * length(xs) / sim_width
+            pixel_scale
         end
     )
-    image = zeros(height, length(xs))
+    width = round(Int, sim_width * pixel_scale)
+    xs = LinRange(0, sim_width, width)
+    dt = xs[2] - xs[1]
+    image = zeros(height, width)
     # Height of one pixel in simulation length units
-    pixel_h = if triple_y
-        3 * sim_height / height
-    else
-        sim_height / height
-    end
-    sim_pixels = sim_height / pixel_h
-    ray_y = Vector(ys)
-    ray_py = zeros(length(ys))
+    pixel_h = 1 / pixel_scale
+    ray_y = Vector(LinRange(0, 1, num_rays+1)[1:end-1])
+    ypixels = LinRange(0, ray_y[end], height)
+    ray_py = zeros(num_rays)
     for (xi, x) ∈ enumerate(xs)
         # kick
         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
@@ -297,15 +312,10 @@ function quasi2d_visualize_rays(path, xs, ys, potential;
                 image[yi, xi] += 1
             end
         end
-        if dynamic_rays && (xi % 10 == 0)
-            maxd = 10 * dy
-            ray_y, ray_py = get_dynamic_rays(ray_y, ray_py, maxd)
-        end
     end
     scene = Scene(camera=campixel!, resolution=size(image'))
-    ypixels = LinRange(ys[1], ys[end], height)
     if triple_y
-        ypixels = LinRange(ys[1] - sim_height, ys[end] + sim_height, height)
+        ypixels = LinRange(ypixels[1] - sim_height, ypixels[end] + sim_height, height)
     end
     pot_values = [
         potential(x, y) for x ∈ xs, y ∈ ypixels
@@ -314,7 +324,7 @@ function quasi2d_visualize_rays(path, xs, ys, potential;
     heatmap!(scene, image'; colormap=[
             RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
         ],
-        colorrange=(0, 15 * length(ys) / sim_pixels)
+        colorrange=(0, 15 * num_rays / pixel_scale)
     )
     save(path, scene)
 end
@@ -326,8 +336,8 @@ function grid_eval(xs, ys, fun)
 end
 
 struct RotatedPotential{OrigPotential}
-    A::SMatrix{2,2,Float64, 4}
-    A_inv::SMatrix{2,2,Float64, 4}
+    A::SMatrix{2,2,Float64,4}
+    A_inv::SMatrix{2,2,Float64,4}
     V::OrigPotential
     function RotatedPotential(θ::Real, V)
         rot = rotation_matrix(θ)
@@ -357,8 +367,8 @@ struct RepeatedPotential{DotPotential}
     grid_w::Int64
     grid_h::Int64
 
-    function RepeatedPotential(locations :: AbstractMatrix, 
-        dot_potential, potential_size :: Real)
+    function RepeatedPotential(locations::AbstractMatrix,
+        dot_potential, potential_size::Real)
         min_x, max_x = extrema(locations[1, :])
         min_y, max_y = extrema(locations[2, :])
         # XXX: Explain this math
@@ -431,15 +441,15 @@ end
 
 function (V::CosSeriesPotential)(x, y)
     len = size(V.w)[1]
-    xcos = MVector{len, Float64}(undef)
-    ycos = MVector{len, Float64}(undef)
+    xcos = MVector{len,Float64}(undef)
+    ycos = MVector{len,Float64}(undef)
     xcos[1] = ycos[1] = 1.0
     # TODO: Optimize this. Not as important as `force` is called much more
     # often.
     for k ∈ 2:len
-        kk = (k-1)*V.k
-        xcos[k] = cos(kk*x)
-        ycos[k] = cos(kk*y)
+        kk = (k - 1) * V.k
+        xcos[k] = cos(kk * x)
+        ycos[k] = cos(kk * y)
     end
     xycos = ycos * transpose(xcos)
     return sum(
@@ -454,17 +464,17 @@ function force(V::CosSeriesPotential, x, y)
     len = size(V.w)[1]
     # Following arrays will have values like
     # xcos[i] = cos((i-1)*k*x) and so on.
-    xcos = MVector{len, Float64}(undef)
-    ycos = MVector{len, Float64}(undef)
-    xsin = MVector{len, Float64}(undef)
-    ysin = MVector{len, Float64}(undef)
+    xcos = MVector{len,Float64}(undef)
+    ycos = MVector{len,Float64}(undef)
+    xsin = MVector{len,Float64}(undef)
+    ysin = MVector{len,Float64}(undef)
     xcos[1] = ycos[1] = 1.0
     xsin[1] = ysin[1] = 0.0
 
     # Sin and cos only need to be computed once, after that we can use the
     # sum angle formula to compute the rest.
-    sinkx, coskx = sincos(V.k*x)
-    sinky, cosky = sincos(V.k*y)
+    sinkx, coskx = sincos(V.k * x)
+    sinky, cosky = sincos(V.k * y)
     xcos[2] = coskx
     ycos[2] = cosky
     xsin[2] = sinkx
@@ -472,49 +482,49 @@ function force(V::CosSeriesPotential, x, y)
 
     for k ∈ 3:len
         # Angle sum formulas applied here
-        xcos[k] = xcos[k-1]*coskx - xsin[k-1]*sinkx
-        ycos[k] = ycos[k-1]*cosky - ysin[k-1]*sinky
-        xsin[k] = xsin[k-1]*coskx + xcos[k-1]*sinkx
-        ysin[k] = ysin[k-1]*cosky + ycos[k-1]*sinky
+        xcos[k] = xcos[k-1] * coskx - xsin[k-1] * sinkx
+        ycos[k] = ycos[k-1] * cosky - ysin[k-1] * sinky
+        xsin[k] = xsin[k-1] * coskx + xcos[k-1] * sinkx
+        ysin[k] = ysin[k-1] * cosky + ycos[k-1] * sinky
     end
     # Modify sin terms to compute the derivative
     for k ∈ 2:len
-        kk = (k-1)*V.k
+        kk = (k - 1) * V.k
         xsin[k] *= -kk
         ysin[k] *= -kk
     end
     F = SVector(0.0, 0.0)
     for i ∈ 1:len
         for j ∈ 1:len
-            c = V.w[i,j]
-            F += c * SVector(xsin[i]*ycos[j], ysin[i]*xcos[j])
+            c = V.w[i, j]
+            F += c * SVector(xsin[i] * ycos[j], ysin[i] * xcos[j])
         end
     end
     return -F
 end
 
-function fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0, softness = 0.2)
+function fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0; softness=0.2)
     pot = LatticePotential(lattice_a * I, dot_radius, v0, softness=softness)
     # Find coefficients numerically by doing FFT
     N = 128
-    xs = LinRange(0, lattice_a, N+1)[1:N]
+    xs = LinRange(0, lattice_a, N + 1)[1:N]
     g = grid_eval(xs, xs, pot)
     # Fourier coefficients
-    w = (2/length(g))*fft(g)
+    w = (2 / length(g)) * fft(g)
     # Convert from exp coefficients to cosine coefficients
     w = real(w[1:(degree+1), 1:(degree+1)])
-    w[1,1] /= 2
+    w[1, 1] /= 2
     w[2:end, 2:end] *= 2
     for i ∈ 1:degree
         for j ∈ 1:degree
-            if (i+j) > degree
-                w[1+i,1+j] = 0
+            if (i + j) > degree
+                w[1+i, 1+j] = 0
             end
         end
     end
-    k =  2pi/lattice_a
+    k = 2pi / lattice_a
     # Use statically sized arrays.
-    static_w = SMatrix{1+degree,1+degree,Float64,(1+degree)^2}(w)
+    static_w = SMatrix{1 + degree,1 + degree,Float64,(1 + degree)^2}(w)
     return CosSeriesPotential{typeof(static_w)}(static_w, k)
 end
 

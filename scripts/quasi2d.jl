@@ -15,39 +15,9 @@ function pixel_heatmap(path, data; kwargs...)
     save(path, scene)
 end
 
-function compare_shapes(ts, left_nb, right_nb, llabel, rlabel; same_axis=false)
-    fig = Figure(resolution=(800, 600))
-    rcolor = RGB(0.8, 0, 0)
-
-    # Scale such that midpoints are equal
-    llimits = (0.0, maximum(left_nb))
-    rlimits = llimits .* (right_nb[end÷2] / left_nb[end÷2])
-    xlimits = (0.0, sim_width)
-
-    axl = Axis(fig[1, 1],
-        xlabel=L"t", ylabel=L"N_b", title=LaTeXString("Number of branches"), limits=(xlimits, llimits))
-    if !same_axis
-        axr = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
-            yaxisposition=:right, ygridcolor=RGBAf(0.8, 0.0, 0.0, 0.12),
-            yticklabelcolor=rcolor, limits=(xlimits, rlimits))
-        hidespines!(axr)
-        hidexdecorations!(axr)
-    else
-        axr = axl
-    end
-
-    lines!(axl, ts, left_nb, label=llabel, linestyle=:dash)
-    lines!(axr, ts, right_nb, label=rlabel, linestyle=:dot,
-        color=rcolor)
-    axislegend(axl, position=:lt)
-    if !same_axis
-        axislegend(axr, position=:rb)
-    end
-    return fig
-end
-
 path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
+
 sim_height = 1
 sim_width = 4
 num_rays = 1024
@@ -61,14 +31,9 @@ softness = 0.2
 
 num_sims = 100
 
-Ny = num_rays
-Nx = round(Int, sim_width / dt)
-ys = LinRange(0, sim_height, Ny + 1)[1:end-1]
-xs = LinRange(0, sim_width, Nx + 1)[1:end-1]
 
 # Time steps to count branches.
-ts = LinRange(0, xs[end], 200)
-
+ts = LinRange(0, sim_width, 200)
 
 # Periodic potential
 lattice_a::Float64 = 0.2
@@ -76,15 +41,7 @@ dot_radius = 0.25 * lattice_a
 dot_v0 = 0.08 * 0.5
 
 function random_potential()
-    # Use a different discretization for the random potential, no need to
-    # match the number of rays
-    rand_N = 256
-    rNy = rand_N
-    rNx = round(Int, rand_N * (sim_width / sim_height))
-    rys = LinRange(0, sim_height, rNy + 1)[1:end-1]
-    rxs = LinRange(0, sim_width, rNx + 1)[1:end-1]
-    pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
-    return PeriodicGridPotential(xs, ys, pot_arr)
+    return correlated_random_potential(sim_width, sim_height, correlation_scale, v0)
 end
 
 function get_random_nb()::Vector{Float64}
@@ -92,7 +49,7 @@ function get_random_nb()::Vector{Float64}
     num_branches = zeros(length(ts), num_sims)
     Threads.@threads for i ∈ 1:num_sims
         potential = random_potential()
-        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential)
+        num_branches[:, i] = quasi2d_num_branches(num_rays, dt, ts, potential)
     end
     return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
 end
@@ -105,7 +62,7 @@ function get_lattice_mean_nb()::Vector{Float64}
         θ = angles[di]
         potential = LatticePotential(lattice_a * rotation_matrix(θ),
             dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
-        grid_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
+        grid_nb[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential) / sim_height
     end
     return vec(sum(grid_nb, dims=2) / length(angles))
 end
@@ -132,7 +89,7 @@ function get_nb_int(V)::Vector{Float64}
         θ = angles[di]
         potential = RotatedPotential(θ, V)
         # tys = LinRange(0, 1, 2num_rays)
-        int_nb_arr[:, di] = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
+        int_nb_arr[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential) / sim_height
     end
     return vec(sum(int_nb_arr, dims=2) / length(angles))
 end
@@ -161,7 +118,7 @@ function get_nb_rand_dots()::Vector{Float64}
     num_branches = zeros(length(ts), num_sims)
     Threads.@threads for i ∈ 1:num_sims
         potential = random_dot_potential()
-        num_branches[:, i] = quasi2d_num_branches(xs, ys, ts, potential)
+        num_branches[:, i] = quasi2d_num_branches(num_rays, dt, ts, potential)
     end
     return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
 end
@@ -192,6 +149,10 @@ save(path_prefix * "branches.png", fig, px_per_unit=2)
 display(fig)
 
 ## Visualize simulations
+Ny = num_rays
+Nx = round(Int, sim_width / dt)
+ys = LinRange(0, sim_height, Ny + 1)[1:end-1]
+xs = LinRange(0, sim_width, Nx + 1)[1:end-1]
 rand_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
 rand_potential = PeriodicGridPotential(xs, ys, rand_arr)
 quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs, ys, rand_potential)

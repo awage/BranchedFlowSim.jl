@@ -13,7 +13,7 @@ using ColorTypes
 path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
-sim_width = 4
+sim_width = 6
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (1/2).
 ϵ_percent = 8
@@ -37,25 +37,31 @@ function get_lattice_mean_nb(num_rays, dt)::Vector{Float64}
         θ = angles[di]
         potential = LatticePotential(lattice_a * rotation_matrix(θ),
             dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
-        grid_nb[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential) / sim_height
+        grid_nb[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential)
     end
     return vec(mean(grid_nb, dims=2))
 end
 
+num_sims = 50
+@time "generated random potentials" rand_potentials = [
+    correlated_random_potential(sim_width, sim_height, correlation_scale, v0)
+    for i ∈ 1:num_sims
+]
+
 function get_rand_nb(num_rays, dt)::Vector{Float64}
-    num_sims = 50
+    num_sims = length(rand_potentials)
     correlation_scale = 0.1
     nb = zeros(length(ts), num_sims)
     Threads.@threads for di ∈ 1:num_sims
-        potential = correlated_random_potential(sim_width, sim_height, correlation_scale, v0)
-        nb[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential) / sim_height
+        nb[:, di] = quasi2d_num_branches(num_rays, dt, ts, rand_potentials[di])
     end
     return vec(mean(nb, dims=2))
 end
 
 ## Actually evaluate
 
-num_rays = [500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
+num_rays = [2000, 4000, 8000, 16000, 32000, 64000, 128000, 256000]
+# num_rays = [500, 1000, 2000, 4000, 8000, 16000, 32000, 64000]
 dt = [0.01]
 
 params = [(n, d) for n ∈ num_rays, d ∈ dt]
@@ -64,22 +70,25 @@ params = [(n, d) for n ∈ num_rays, d ∈ dt]
     @time "lattice sim $n $d" get_lattice_mean_nb(n, d)
     for (n, d) ∈ params
 ]
-@time "random sims" nb_rand = [
-    @time "random sim $n $d" get_rand_nb(n, d)
-    for (n, d) ∈ params
-]
+
+# @time "random sims" nb_rand = [
+#     @time "random sim $n $d" get_rand_nb(n, d)
+#     for (n, d) ∈ params
+# ]
 
 ## Plot
-
 data_title_fname = [
-    (nb_lattice, LaTeXString("Number of branches, periodic lattice, \$a=$lattice_a\$"), "params_lattice.png"),
-    (nb_rand, LaTeXString("Number of branches, correlated random, \$l_c=0.1\$"), "params_rand.png")
+    (nb_lattice,
+        LaTeXString("Number of branches, periodic lattice, \$a=$lattice_a\$"),
+        "params_lattice.png"),
+    # (nb_rand, LaTeXString("Number of branches, correlated random, \$l_c=0.1\$"), "params_rand.png")
 ]
 for (data, title, fname) ∈ data_title_fname
     fig = Figure(resolution=(1024, 768))
     ax = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
         title=title,
-        limits=((0, sim_width), (0, nothing)), yticks=Vector(0:50:1000)
+        limits=((0, sim_width), (0, nothing)),
+        yticks=Vector(0:500:30000)
     )
 
     linestyles = [:solid, :dash, :dot]
