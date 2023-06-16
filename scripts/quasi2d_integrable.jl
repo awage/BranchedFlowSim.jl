@@ -46,7 +46,7 @@ function get_lattice_mean_nb()::Vector{Float64}
         θ = angles[di]
         potential = LatticePotential(lattice_a * rotation_matrix(θ),
             dot_radius, dot_v0; offset=[lattice_a / 2, 0], softness=softness)
-        grid_nb[:, di] = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
+        grid_nb[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential) / sim_height
     end
     return vec(sum(grid_nb, dims=2) / length(angles))
 end
@@ -72,7 +72,7 @@ function get_nb_int(V)::Vector{Float64}
         θ = angles[di]
         potential = RotatedPotential(θ, V)
         # tys = LinRange(0, 1, 2num_rays)
-        int_nb_arr[:, di] = quasi2d_num_branches(xs, ys, ts, potential) / sim_height
+        int_nb_arr[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential) / sim_height
     end
     return vec(sum(int_nb_arr, dims=2) / length(angles))
 end

@@ -10,7 +10,7 @@ using Interpolations
 export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
 export RepeatedPotential
 export CosSeriesPotential
-export fermi_dot_lattice_cos_series
+export fermi_dot_lattice_cos_series, correlated_random_potential
 export rotation_matrix, force, force_x, force_y
 export quasi2d_num_branches, quasi2d_visualize_rays
 export grid_eval
@@ -114,8 +114,8 @@ function force(V::LatticePotential, x::Real, y::Real)::SVector{2,Float64}
     return F
 end
 
-struct PeriodicGridPotential
-    itp::AbstractInterpolation
+struct PeriodicGridPotential{Interpolation <: AbstractInterpolation}
+    itp::Interpolation
     """
     PeriodicGridPotential(xs, ys, arr)
 
@@ -125,7 +125,7 @@ Note: `arr` is indexed as arr[y,x].
         itp = interpolate(transpose(arr), BSpline(Cubic(Periodic(OnCell()))))
         itp = extrapolate(itp, Periodic(OnCell()))
         itp = scale(itp, xs, ys)
-        return new(itp)
+        return new{typeof(itp)}(itp)
     end
 end
 
@@ -226,19 +226,18 @@ function get_dynamic_rays(ray_y, ray_py, maxd)
     return new_ray_y, new_ray_py
 end
 
-function quasi2d_num_branches(xs, ys, ts, potential)
-    dx = xs[2] - xs[1]
-    dt = dx
-    orig_dy = ys[2] - ys[1]
-    ray_y = Vector(ys)
-    ray_py = zeros(length(ys))
+function quasi2d_num_branches(num_rays, dt, ts, potential)
+    ray_y = Vector(LinRange(0, 1, num_rays+1)[1:num_rays])
+    ray_py = zeros(num_rays)
     num_branches = zeros(length(ts))
     ti = 1
-    for (xi, x) ∈ enumerate(xs)
+    x = 0.0
+    while ti <= length(ts)
         # kick
         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
         # drift
         ray_y .+= dt .* ray_py
+        x += dt
         if ts[ti] <= x
             # Count branches
             caustics = count_zero_crossing(ray_y[2:end] - ray_y[1:end-1])
@@ -517,4 +516,16 @@ function fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0, softnes
     # Use statically sized arrays.
     static_w = SMatrix{1+degree,1+degree,Float64,(1+degree)^2}(w)
     return CosSeriesPotential{typeof(static_w)}(static_w, k)
+end
+
+function correlated_random_potential(width, height, correlation_scale, v0)
+    # To generate the potential array, use a certain number dots per one correlation
+    # scale.
+    rand_N = 16 / v0
+    rNy = round(Int, rand_N * height)
+    rNx = round(Int, rand_N * width)
+    ys = LinRange(0, height, rNy + 1)[1:end-1]
+    xs = LinRange(0, width, rNx + 1)[1:end-1]
+    pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
+    return PeriodicGridPotential(xs, ys, pot_arr)
 end
