@@ -13,7 +13,7 @@ using ColorTypes
 path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
-sim_width = 4
+sim_width = 3
 num_rays = 1024
 dt = 1/512
 # num_rays = 512
@@ -77,60 +77,12 @@ function get_nb_int(V)::Vector{Float64}
     return vec(sum(int_nb_arr, dims=2) / length(angles))
 end
 
-struct CosSeriesPotential{MatrixType}
-    w::MatrixType
-    k::Float64
-end
-
-function (V::CosSeriesPotential)(x, y)
-    len = size(V.w)[1]
-    xcos = MVector{len, Float64}(undef)
-    ycos = MVector{len, Float64}(undef)
-    xcos[1] = ycos[1] = 1.0
-    for k ∈ 2:len
-        kk = (k-1)*V.k
-        xcos[k] = cos(kk*x)
-        ycos[k] = cos(kk*y)
-    end
-    xycos = ycos * transpose(xcos)
-    return sum(
-        V.w .* xycos
-    )
-end
-
-function BranchedFlowSim.force(V::CosSeriesPotential, x, y)
-    # TODO: This can be greatly optimized
-    return BranchedFlowSim.force_diff(V, x, y)
-end
-
 function potential_label(degree)
     lbl = L"\sum_{n+m\le%$(degree)}a_{nm}\cos(nkx)\cos(mky)"
 end
 
 function make_integrable_potential(degree)
-    pot = LatticePotential(lattice_a * rotation_matrix(0),
-    dot_radius, v0)
-    # Find coefficients numerically by doing FFT
-    N = 128
-    xs = LinRange(0, lattice_a, N+1)[1:N]
-    g = grid_eval(xs, xs, pot)
-    # Fourier coefficients
-    w = (2/length(g))*fft(g)
-    # Convert from exp coefficients to cosine coefficients
-    w = real(w[1:(degree+1), 1:(degree+1)])
-    w[1,1] /= 2
-    w[2:end, 2:end] *= 2
-    for i ∈ 1:degree
-        for j ∈ 1:degree
-            if (i+j) > degree
-                w[1+i,1+j] = 0
-            end
-        end
-    end
-    k =  2pi/lattice_a
-    # Use statically sized arrays.
-    static_w = SMatrix{1+degree,1+degree,Float64,(1+degree)^2}(w)
-    return CosSeriesPotential{typeof(static_w)}(static_w, k)
+    return fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0)
 end
 
 ## Actually evaluate
@@ -144,7 +96,9 @@ int_potentials = [make_integrable_potential(degree) for degree ∈ 1:max_degree]
 
 fig = Figure(resolution=(1024, 768))
 ax = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
-    title=LaTeXString("Number of branches"), limits=((0, sim_width), (0, nothing)))
+    title=LaTeXString("Number of branches, $num_rays rays dt=$dt"), limits=((0, sim_width), (0, nothing)),
+    yticks=Vector(0:100:1000)
+    )
 
 lines!(ax, ts, nb_lattice, label=L"periodic lattice, $a=%$(lattice_a)$ (mean)")
 for degree ∈ 1:max_degree

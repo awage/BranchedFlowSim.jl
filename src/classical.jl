@@ -3,11 +3,14 @@
 # for branch counting.
 using LinearAlgebra
 using StaticArrays
+using FFTW
 using Makie
 using Interpolations
 
 export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
 export RepeatedPotential
+export CosSeriesPotential
+export fermi_dot_lattice_cos_series
 export rotation_matrix, force, force_x, force_y
 export quasi2d_num_branches, quasi2d_visualize_rays
 export grid_eval
@@ -59,10 +62,11 @@ struct LatticePotential{DotPotential}
     offset::SVector{2,Float64}
     four_offsets::SVector{4, SVector{2, Float64}}
     function LatticePotential(A, radius, v0; offset=[0, 0], softness=0.2)
+        A = SMatrix{2,2}(A)
         dot = FermiDotPotential(radius, v0, softness)
         fo = [ SVector(0.0, 0.0), A[:, 1], A[:, 2], A[:, 1] + A[:, 2]]
         return new{FermiDotPotential}(
-            SMatrix{2,2}(A),
+            A,
             SMatrix{2,2}(inv(A)),
              dot, SVector{2,Float64}(offset), fo)
     end
@@ -322,10 +326,10 @@ function grid_eval(xs, ys, fun)
     ]
 end
 
-struct RotatedPotential{DotPotential}
+struct RotatedPotential{OrigPotential}
     A::SMatrix{2,2,Float64, 4}
     A_inv::SMatrix{2,2,Float64, 4}
-    V::DotPotential
+    V::OrigPotential
     function RotatedPotential(θ::Real, V)
         rot = rotation_matrix(θ)
         return new{typeof(V)}(rot, inv(rot), V)
@@ -416,4 +420,101 @@ function force(V::RepeatedPotential, x::Real, y::Real)::SVector{2,Float64}
         F += @inline force(V.dot_potential, x - rx, y - ry)
     end
     return F
+end
+
+struct CosSeriesPotential{MatrixType}
+    w::MatrixType
+    k::Float64
+end
+
+# function compute_sincos_kx(n, k, x)
+# end
+
+function (V::CosSeriesPotential)(x, y)
+    len = size(V.w)[1]
+    xcos = MVector{len, Float64}(undef)
+    ycos = MVector{len, Float64}(undef)
+    xcos[1] = ycos[1] = 1.0
+    # TODO: Optimize this. Not as important as `force` is called much more
+    # often.
+    for k ∈ 2:len
+        kk = (k-1)*V.k
+        xcos[k] = cos(kk*x)
+        ycos[k] = cos(kk*y)
+    end
+    xycos = ycos * transpose(xcos)
+    return sum(
+        V.w .* xycos
+    )
+end
+
+function force(V::CosSeriesPotential, x, y)
+    # Uncomment for debug 
+    # return BranchedFlowSim.force_diff(V, x, y)
+    # Compute gradient
+    len = size(V.w)[1]
+    # Following arrays will have values like
+    # xcos[i] = cos((i-1)*k*x) and so on.
+    xcos = MVector{len, Float64}(undef)
+    ycos = MVector{len, Float64}(undef)
+    xsin = MVector{len, Float64}(undef)
+    ysin = MVector{len, Float64}(undef)
+    xcos[1] = ycos[1] = 1.0
+    xsin[1] = ysin[1] = 0.0
+
+    # Sin and cos only need to be computed once, after that we can use the
+    # sum angle formula to compute the rest.
+    sinkx, coskx = sincos(V.k*x)
+    sinky, cosky = sincos(V.k*y)
+    xcos[2] = coskx
+    ycos[2] = cosky
+    xsin[2] = sinkx
+    ysin[2] = sinky
+
+    for k ∈ 3:len
+        # Angle sum formulas applied here
+        xcos[k] = xcos[k-1]*coskx - xsin[k-1]*sinkx
+        ycos[k] = ycos[k-1]*cosky - ysin[k-1]*sinky
+        xsin[k] = xsin[k-1]*coskx + xcos[k-1]*sinkx
+        ysin[k] = ysin[k-1]*cosky + ycos[k-1]*sinky
+    end
+    # Modify sin terms to compute the derivative
+    for k ∈ 2:len
+        kk = (k-1)*V.k
+        xsin[k] *= -kk
+        ysin[k] *= -kk
+    end
+    F = SVector(0.0, 0.0)
+    for i ∈ 1:len
+        for j ∈ 1:len
+            c = V.w[i,j]
+            F += c * SVector(xsin[i]*ycos[j], ysin[i]*xcos[j])
+        end
+    end
+    return -F
+end
+
+function fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0, softness = 0.2)
+    pot = LatticePotential(lattice_a * I, dot_radius, v0, softness=softness)
+    # Find coefficients numerically by doing FFT
+    N = 128
+    xs = LinRange(0, lattice_a, N+1)[1:N]
+    g = grid_eval(xs, xs, pot)
+    # Fourier coefficients
+    w = (2/length(g))*fft(g)
+    # Convert from exp coefficients to cosine coefficients
+    w = real(w[1:(degree+1), 1:(degree+1)])
+    w[1,1] /= 2
+    w[2:end, 2:end] *= 2
+    for i ∈ 1:degree
+        for j ∈ 1:degree
+            if (i+j) > degree
+                w[1+i,1+j] = 0
+            end
+        end
+    end
+    k =  2pi/lattice_a
+    # Use statically sized arrays.
+    static_w = SMatrix{1+degree,1+degree,Float64,(1+degree)^2}(w)
+    return CosSeriesPotential{typeof(static_w)}(static_w, k)
 end
