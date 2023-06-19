@@ -19,9 +19,9 @@ path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 
 sim_height = 1
-sim_width = 4
+sim_width = 6
 num_rays = 1024
-dt = 1/512
+dt = 1 / 512
 # num_rays = 512
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (1/2).
@@ -69,7 +69,7 @@ end
 
 # Integrable potential
 function integrable_pot(x::Real, y::Real)::Float64
-    (v0/4) * (2 + cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
+    (v0 / 4) * (2 + cos(2pi * x / lattice_a) + cos(2pi * y / lattice_a))
 end
 
 function integrable_pot2(x::Real, y::Real)::Float64
@@ -77,8 +77,8 @@ function integrable_pot2(x::Real, y::Real)::Float64
     a1 = 0.2632722982611676
     a2 = 2 * 0.1491129866125936
     k = 2pi / lattice_a
-    return v0 * (a0+a1*(cos(k * x) + cos(k * y))
-                + a2 * cos(k * x)*cos(k*y))
+    return v0 * (a0 + a1 * (cos(k * x) + cos(k * y))
+                 + a2 * cos(k * x) * cos(k * y))
 end
 
 function get_nb_int(V)::Vector{Float64}
@@ -95,7 +95,7 @@ function get_nb_int(V)::Vector{Float64}
 end
 
 function random_dot_potential()
-    y_extra = 2
+    y_extra = sim_width
     xmin = -1
     xmax = sim_width + 1
     ymin = -y_extra
@@ -149,35 +149,31 @@ save(path_prefix * "branches.png", fig, px_per_unit=2)
 display(fig)
 
 ## Visualize simulations
-Ny = num_rays
-Nx = round(Int, sim_width / dt)
-ys = LinRange(0, sim_height, Ny + 1)[1:end-1]
-xs = LinRange(0, sim_width, Nx + 1)[1:end-1]
 rand_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
 rand_potential = PeriodicGridPotential(xs, ys, rand_arr)
-quasi2d_visualize_rays(path_prefix * "rand_sim.png", xs, ys, rand_potential)
-quasi2d_visualize_rays(path_prefix * "int_sim.png", xs, ys, integrable_pot)
+quasi2d_visualize_rays(path_prefix * "rand_sim.png", num_rays, sim_width, rand_potential)
+quasi2d_visualize_rays(path_prefix * "int_sim.png", num_rays, sim_width, integrable_pot)
 potential = LatticePotential(lattice_a * rotation_matrix(0),
     dot_radius, v0, offset=[0, 0])
 lattice_mat = lattice_a * rotation_matrix(-pi / 10)
 rot_lattice = LatticePotential(lattice_mat, dot_radius, v0)
-quasi2d_visualize_rays(path_prefix * "lattice_sim.png", xs, ys,
+quasi2d_visualize_rays(path_prefix * "lattice_sim.png", num_rays, sim_width,
     potential
 )
-quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", xs, LinRange(0, 1, 1024),
+quasi2d_visualize_rays(path_prefix * "int_rot_sim.png", num_rays, sim_width,
     RotatedPotential(pi / 10, integrable_pot),
     triple_y=true
 )
-quasi2d_visualize_rays(path_prefix * "int2_rot_sim.png", xs, LinRange(0, 1, 1024),
+quasi2d_visualize_rays(path_prefix * "int2_rot_sim.png", num_rays, sim_width,
     RotatedPotential(pi / 10, integrable_pot2),
     triple_y=true
 )
-quasi2d_visualize_rays(path_prefix * "lattice_rot_sim.png", xs, LinRange(0, 1, 1024),
+quasi2d_visualize_rays(path_prefix * "lattice_rot_sim.png", num_rays, sim_width,
     rot_lattice,
     triple_y=true
 )
 
 rand_dot_potential = random_dot_potential()
 
-quasi2d_visualize_rays(path_prefix * "rand_dots_sim.png", xs,
-    ys, rand_dot_potential, triple_y=true)
+quasi2d_visualize_rays(path_prefix * "rand_dots_sim.png", num_rays, sim_width,
+    rand_dot_potential, triple_y=true)

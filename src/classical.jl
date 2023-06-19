@@ -208,133 +208,6 @@ function count_zero_crossing(fx)
     return c
 end
 
-function get_dynamic_rays(ray_y, ray_py, maxd)
-    new_ray_y = [ray_y[1]]
-    new_ray_py = [ray_py[1]]
-    sizehint!(new_ray_y, length(ray_y))
-    sizehint!(new_ray_py, length(ray_py))
-    for j ∈ 2:length(ray_y)
-        if abs(ray_y[j] - ray_y[j-1]) > maxd
-            # Add new ray with mean values
-            push!(new_ray_y, (ray_y[j-1] + ray_y[j]) / 2)
-            push!(new_ray_py, (ray_py[j-1] + ray_py[j]) / 2)
-            #          println("new ray!, t=$x, y=$(new_ray_y[end])")
-        end
-        push!(new_ray_y, ray_y[j])
-        push!(new_ray_py, ray_py[j])
-    end
-    return new_ray_y, new_ray_py
-end
-
-function quasi2d_num_branches(num_rays, dt, ts, potential;
-    return_rays = false)
-    ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:num_rays])
-    return quasi2d_num_branches(ray_y, dt, ts, potential; return_rays=return_rays)
-end
-
-function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
-    ts::AbstractVector{<:Real}, potential; return_rays=false)
-    @assert ispotential(potential)
-
-    ray_y = Vector{Float64}(ray_y)
-    num_rays = length(ray_y)
-    ray_py = zeros(num_rays)
-    num_branches = zeros(length(ts))
-    ti = 1
-    x = 0.0
-    while ti <= length(ts)
-        # kick
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # drift
-        ray_y .+= dt .* ray_py
-        x += dt
-        if ts[ti] <= x
-            # Count branches
-            # caustics = count_zero_crossing(ray_y[2:end] - ray_y[1:end-1])
-            caustics = 0
-            for j ∈ 2:num_rays-1
-                if sign(ray_y[j] - ray_y[j-1]) != sign(ray_y[j+1] - ray_y[j])
-                    caustics += 1
-                end
-            end
-            num_branches[ti] = caustics / 2
-            ti += 1
-        end
-    end
-    if return_rays
-        return num_branches, ray_y, ray_py
-    else
-        return num_branches
-    end
-end
-
-"""
-    quasi2d_visualize_rays(path, xs, ys, potential;
-        triple_y=false,
-        height=(if triple_y 3*length(ys) else length(ys) end)
-     )
-
-TBW
-"""
-function quasi2d_visualize_rays(path, num_rays, sim_width, potential;
-    triple_y=false
-)
-    pixel_scale = 600
-    sim_height = 1
-    height = round(Int,
-        if triple_y
-            3 * pixel_scale
-        else
-            pixel_scale
-        end
-    )
-    width = round(Int, sim_width * pixel_scale)
-    xs = LinRange(0, sim_width, width)
-    dt = xs[2] - xs[1]
-    image = zeros(height, width)
-    # Height of one pixel in simulation length units
-    pixel_h = 1 / pixel_scale
-    ray_y = Vector(LinRange(0, 1, num_rays+1)[1:end-1])
-    ypixels = LinRange(0, ray_y[end], height)
-    ray_py = zeros(num_rays)
-    for (xi, x) ∈ enumerate(xs)
-        # kick
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # drift
-        ray_y .+= dt .* ray_py
-        # Collect
-        for y ∈ ray_y
-            yi = 1 + round(Int, y / pixel_h)
-            if triple_y
-                yi += height ÷ 3
-            end
-            if yi >= 1 && yi <= height
-                image[yi, xi] += 1
-            end
-        end
-    end
-    scene = Scene(camera=campixel!, resolution=size(image'))
-    if triple_y
-        ypixels = LinRange(ypixels[1] - sim_height, ypixels[end] + sim_height, height)
-    end
-    pot_values = [
-        potential(x, y) for x ∈ xs, y ∈ ypixels
-    ]
-    heatmap!(scene, pot_values; colormap=:Greens_3)
-    heatmap!(scene, image'; colormap=[
-            RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
-        ],
-        colorrange=(0, 15 * num_rays / pixel_scale)
-    )
-    save(path, scene)
-end
-
-function grid_eval(xs, ys, fun)
-    return [
-        fun(x, y) for y ∈ ys, x ∈ xs
-    ]
-end
-
 struct RotatedPotential{OrigPotential}
     A::SMatrix{2,2,Float64,4}
     A_inv::SMatrix{2,2,Float64,4}
@@ -538,4 +411,113 @@ function correlated_random_potential(width, height, correlation_scale, v0)
     xs = LinRange(0, width, rNx + 1)[1:end-1]
     pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
     return PeriodicGridPotential(xs, ys, pot_arr)
+end
+
+function quasi2d_num_branches(num_rays, dt, ts, potential;
+    return_rays = false)
+    ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:num_rays])
+    return quasi2d_num_branches(ray_y, dt, ts, potential; return_rays=return_rays)
+end
+
+function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
+    ts::AbstractVector{<:Real}, potential; return_rays=false)
+    @assert ispotential(potential)
+
+    ray_y = Vector{Float64}(ray_y)
+    num_rays = length(ray_y)
+    ray_py = zeros(num_rays)
+    num_branches = zeros(length(ts))
+    ti = 1
+    x = 0.0
+    while ti <= length(ts)
+        # kick
+        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+        # drift
+        ray_y .+= dt .* ray_py
+        x += dt
+        if ts[ti] <= x
+            # Count branches
+            # caustics = count_zero_crossing(ray_y[2:end] - ray_y[1:end-1])
+            caustics = 0
+            for j ∈ 2:num_rays-1
+                if sign(ray_y[j] - ray_y[j-1]) != sign(ray_y[j+1] - ray_y[j])
+                    caustics += 1
+                end
+            end
+            num_branches[ti] = caustics / 2
+            ti += 1
+        end
+    end
+    if return_rays
+        return num_branches, ray_y, ray_py
+    else
+        return num_branches
+    end
+end
+
+"""
+    quasi2d_visualize_rays(path, xs, ys, potential;
+        triple_y=false,
+        height=(if triple_y 3*length(ys) else length(ys) end)
+     )
+
+TBW
+"""
+function quasi2d_visualize_rays(path, num_rays, sim_width, potential;
+    triple_y=false
+)
+    pixel_scale = 600
+    sim_height = 1
+    height = round(Int,
+        if triple_y
+            3 * pixel_scale
+        else
+            pixel_scale
+        end
+    )
+    width = round(Int, sim_width * pixel_scale)
+    xs = LinRange(0, sim_width, width)
+    dt = xs[2] - xs[1]
+    image = zeros(height, width)
+    # Height of one pixel in simulation length units
+    pixel_h = 1 / pixel_scale
+    ray_y = Vector(LinRange(0, 1, num_rays+1)[1:end-1])
+    ypixels = LinRange(0, ray_y[end], height)
+    ray_py = zeros(num_rays)
+    for (xi, x) ∈ enumerate(xs)
+        # kick
+        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+        # drift
+        ray_y .+= dt .* ray_py
+        # Collect
+        for y ∈ ray_y
+            yi = 1 + round(Int, y / pixel_h)
+            if triple_y
+                yi += height ÷ 3
+            end
+            if yi >= 1 && yi <= height
+                image[yi, xi] += 1
+            end
+        end
+    end
+    scene = Scene(camera=campixel!, resolution=size(image'))
+    if triple_y
+        ypixels = LinRange(ypixels[1] - sim_height, ypixels[end] + sim_height, height)
+    end
+    pot_values = [
+        potential(x, y) for x ∈ xs, y ∈ ypixels
+    ]
+    heatmap!(scene, pot_values; colormap=:Greens_3)
+    heatmap!(scene, image'; colormap=[
+            RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
+        ],
+        colorrange=(0, 15 * num_rays / pixel_scale)
+    )
+    save(path, scene)
+end
+
+function grid_eval(xs, ys, fun)
+    return [
+        fun(x, y) for y ∈ ys, x ∈ xs
+    ]
 end

@@ -45,12 +45,14 @@ params = [(n, d) for n ∈ num_rays, d ∈ dt]
 ]
 
 ## Dynamic stuff
+#=
 start_rays = 1024
 ray_y = Vector{Float64}(LinRange(0, 1, start_rays + 1)[1:end-1])
 threshold = 0.005
 @time "dynamic stuff" begin
     end_t = 1
     while end_t < sim_width
+        global end_t
         _, final_ray_y, _ = quasi2d_num_branches(ray_y, dt[1], [end_t], potential, return_rays=true)
         new_ray_y = Vector{Float64}()
         push!(new_ray_y, ray_y[1])
@@ -70,7 +72,14 @@ threshold = 0.005
     end
 end
 dyn_branches = quasi2d_num_branches(ray_y, dt[1], ts, potential)
+=#
 
+## 
+
+@time "all rand rays" rand_rays_nb= [
+    @time "rand rays $n $d" quasi2d_num_branches(sort(rand(n)), d, ts, potential)
+    for (n, d) ∈ params
+]
 
 ## Plot
 data, title, fname = (nb_lattice,
@@ -82,13 +91,18 @@ ax = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
     limits=((0, sim_width), (0, nothing)), yticks=Vector(0:100:3000)
 )
 
+colors = Makie.wong_colors()
+ci = 1
 for r ∈ 1:size(params)[1]
     for c ∈ 1:size(params)[2]
         n, d = params[r, c]
-        lines!(ax, ts, data[r, c], label=L"n=%$n,\, dt=%$d")
+        color = colors[ci]
+        ci = 1 + ci%length(colors)
+        lines!(ax, ts, data[r, c], color=color, label=L"n=%$n,\, dt=%$d")
+        lines!(ax, ts, rand_rays_nb[r, c], color=color, label=L"n=%$n,\, dt=%$d (rand)", linestyle=:dash)
     end
 end
-lines!(ax, ts, dyn_branches, label=L"dynamic, $n=%$(length(ray_y))$")
+# lines!(ax, ts, dyn_branches, label=L"dynamic, $n=%$(length(ray_y))$")
 
 axislegend(ax, position=:lt)
 save(path_prefix * fname, fig, px_per_unit=2)
