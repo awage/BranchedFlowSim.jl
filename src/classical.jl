@@ -7,9 +7,12 @@ using FFTW
 using Makie
 using Interpolations
 
+export AbstractPotential
 export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
 export RepeatedPotential
 export CosSeriesPotential
+export FunctionPotential
+
 export fermi_dot_lattice_cos_series, correlated_random_potential
 export rotation_matrix, force, force_x, force_y
 export quasi2d_num_branches, quasi2d_visualize_rays
@@ -26,7 +29,11 @@ function ispotential(v)
     return applicable(v, 1.2, 2.3) && applicable(force, v, 1.2, 2.3)
 end
 
-struct FermiDotPotential
+# NOTE: AbstractPotential is used as a subtype for potentials with custom force functions,
+abstract type AbstractPotential end;
+# This is the most abstract potential 
+
+struct FermiDotPotential <: AbstractPotential
     radius::Float64
     α::Float64
     inv_α::Float64
@@ -55,7 +62,7 @@ end
 LatticePotential
 
 """
-struct LatticePotential{DotPotential}
+struct LatticePotential{DotPotential <: AbstractPotential} <: AbstractPotential
     A::SMatrix{2,2,Float64,4}
     A_inv::SMatrix{2,2,Float64,4}
     dot_potential::DotPotential
@@ -114,7 +121,7 @@ function force(V::LatticePotential, x::Real, y::Real)::SVector{2,Float64}
     return F
 end
 
-struct PeriodicGridPotential{Interpolation<:AbstractInterpolation}
+struct PeriodicGridPotential{Interpolation<:AbstractInterpolation} <: AbstractPotential
     itp::Interpolation
     """
     PeriodicGridPotential(xs, ys, arr)
@@ -208,7 +215,7 @@ function count_zero_crossing(fx)
     return c
 end
 
-struct RotatedPotential{OrigPotential}
+struct RotatedPotential{OrigPotential <: AbstractPotential} <: AbstractPotential
     A::SMatrix{2,2,Float64,4}
     A_inv::SMatrix{2,2,Float64,4}
     V::OrigPotential
@@ -230,7 +237,7 @@ function force(V::RotatedPotential, x::Real, y::Real)::SVector{2,Float64}
 end
 
 
-struct RepeatedPotential{DotPotential}
+struct RepeatedPotential{DotPotential} <: AbstractPotential
     dot_potential::DotPotential
     potential_size::Float64
     locations::Matrix{Float64}
@@ -304,7 +311,7 @@ function force(V::RepeatedPotential, x::Real, y::Real)::SVector{2,Float64}
     return F
 end
 
-struct CosSeriesPotential{MatrixType}
+struct CosSeriesPotential{MatrixType} <: AbstractPotential
     w::MatrixType
     k::Float64
 end
@@ -413,16 +420,14 @@ function correlated_random_potential(width, height, correlation_scale, v0)
     return PeriodicGridPotential(xs, ys, pot_arr)
 end
 
-function quasi2d_num_branches(num_rays, dt, ts, potential;
-    return_rays = false)
+function quasi2d_num_branches(num_rays, dt, ts, potential :: AbstractPotential;
+    return_rays=false)
     ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:num_rays])
     return quasi2d_num_branches(ray_y, dt, ts, potential; return_rays=return_rays)
 end
 
 function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
-    ts::AbstractVector{<:Real}, potential; return_rays=false)
-    @assert ispotential(potential)
-
+    ts::AbstractVector{<:Real}, potential :: AbstractPotential; return_rays=false)
     ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
     ray_py = zeros(num_rays)
@@ -455,6 +460,13 @@ function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
     end
 end
 
+function quasi2d_intensity(ray_y::AbstractVector{<:Real},
+    dt::Real,
+    ys::AbstractVector{<:Real},
+    ts::AbstractVector{<:Real},
+    potential)
+end
+
 """
     quasi2d_visualize_rays(path, xs, ys, potential;
         triple_y=false,
@@ -481,7 +493,7 @@ function quasi2d_visualize_rays(path, num_rays, sim_width, potential;
     image = zeros(height, width)
     # Height of one pixel in simulation length units
     pixel_h = 1 / pixel_scale
-    ray_y = Vector(LinRange(0, 1, num_rays+1)[1:end-1])
+    ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:end-1])
     ypixels = LinRange(0, ray_y[end], height)
     ray_py = zeros(num_rays)
     for (xi, x) ∈ enumerate(xs)
@@ -520,4 +532,23 @@ function grid_eval(xs, ys, fun)
     return [
         fun(x, y) for y ∈ ys, x ∈ xs
     ]
+end
+
+struct FunctionPotential{F} <: AbstractPotential
+    f::F
+end
+
+function (V::FunctionPotential)(x::Real, y::Real)::Float64
+    return V.f(x,y)
+end
+
+function force(V::FunctionPotential, x::Real, y::Real)::SVector{2,Float64}
+    return force_diff(V.f, x, y)
+end
+
+function Base.convert(::Type{AbstractPotential}, fun::Function)
+    if !applicable(fun, 1.2, 3.14)
+        throw(DomainError(fun, "Is not a function taking 2 floats"))
+    end
+    return FunctionPotential{typeof(fun)}(fun)
 end

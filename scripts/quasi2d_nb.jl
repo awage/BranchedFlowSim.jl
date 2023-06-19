@@ -13,7 +13,7 @@ path_prefix = "outputs/quasi2d/"
 mkpath(path_prefix)
 sim_height = 1
 sim_width = 8
-num_rays = 200000
+num_rays = 4000
 dt = 0.01
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (E=1/2).
