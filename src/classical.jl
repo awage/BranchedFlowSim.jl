@@ -6,6 +6,7 @@ using StaticArrays
 using FFTW
 using Makie
 using Interpolations
+using KernelDensity
 
 export AbstractPotential
 export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
@@ -15,7 +16,7 @@ export FunctionPotential
 
 export fermi_dot_lattice_cos_series, correlated_random_potential
 export rotation_matrix, force, force_x, force_y
-export quasi2d_num_branches, quasi2d_visualize_rays
+export quasi2d_num_branches, quasi2d_visualize_rays, quasi2d_intensity
 export grid_eval
 
 """
@@ -420,6 +421,28 @@ function correlated_random_potential(width, height, correlation_scale, v0)
     return PeriodicGridPotential(xs, ys, pot_arr)
 end
 
+struct FunctionPotential{F} <: AbstractPotential
+    f::F
+end
+
+function (V::FunctionPotential)(x::Real, y::Real)::Float64
+    return V.f(x,y)
+end
+
+function force(V::FunctionPotential, x::Real, y::Real)::SVector{2,Float64}
+    return force_diff(V.f, x, y)
+end
+
+function Base.convert(::Type{AbstractPotential}, fun::Function)
+    if !applicable(fun, 1.2, 3.14)
+        throw(DomainError(fun, "Is not a function taking 2 floats"))
+    end
+    return FunctionPotential{typeof(fun)}(fun)
+end
+
+# END OF POTENTIALS
+# TODO: Move rest to quasi2d.jl perhaps?
+
 function quasi2d_num_branches(num_rays, dt, ts, potential :: AbstractPotential;
     return_rays=false)
     ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:num_rays])
@@ -460,11 +483,44 @@ function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
     end
 end
 
-function quasi2d_intensity(ray_y::AbstractVector{<:Real},
+function quasi2d_intensity(num_rays, dt, xs, ys, potential, b = 0.0030)
+    h = length(ys) * (ys[2] - ys[1])
+    T = xs[end] - xs[1]
+    # Make rays start from a region 3 times ys, so that we can measure
+    # intensity in the middle.
+    extra = T * h / 2
+    ray_y = LinRange(ys[1] - extra, ys[end] + extra, num_rays)
+    return quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (1 + 2extra/h)
+end
+
+function quasi2d_intensity(
+    ray_y::AbstractVector{<:Real},
     dt::Real,
+    xs::AbstractVector{<:Real},
     ys::AbstractVector{<:Real},
-    ts::AbstractVector{<:Real},
-    potential)
+    potential,
+    b = 0.0030
+    )
+    ray_y = Vector{Float64}(ray_y)
+    num_rays = length(ray_y)
+    ray_py = zeros(num_rays)
+    xi = 1
+    x = 0.0
+    intensity = zeros(length(ys), length(xs))
+    while xi <= length(xs)
+        # kick
+        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+        # drift
+        ray_y .+= dt .* ray_py
+        x += dt
+        if xs[xi] <= x
+            # Compute intensity
+            density = kde(ray_y, bandwidth=b, npoints=16*1024)
+            intensity[:,xi] = pdf(density, ys)
+            xi += 1
+        end
+    end
+    return intensity
 end
 
 """
@@ -532,23 +588,4 @@ function grid_eval(xs, ys, fun)
     return [
         fun(x, y) for y ∈ ys, x ∈ xs
     ]
-end
-
-struct FunctionPotential{F} <: AbstractPotential
-    f::F
-end
-
-function (V::FunctionPotential)(x::Real, y::Real)::Float64
-    return V.f(x,y)
-end
-
-function force(V::FunctionPotential, x::Real, y::Real)::SVector{2,Float64}
-    return force_diff(V.f, x, y)
-end
-
-function Base.convert(::Type{AbstractPotential}, fun::Function)
-    if !applicable(fun, 1.2, 3.14)
-        throw(DomainError(fun, "Is not a function taking 2 floats"))
-    end
-    return FunctionPotential{typeof(fun)}(fun)
 end
