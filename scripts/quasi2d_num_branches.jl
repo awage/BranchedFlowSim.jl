@@ -25,7 +25,7 @@ softness = 0.2
 num_sims = 100
 
 # Time steps to count branches.
-ts = LinRange(0, sim_width, round(Int, 50*sim_width))
+ts = LinRange(0, sim_width, round(Int, 50 * sim_width))
 
 # Periodic potential
 lattice_a::Float64 = 0.2
@@ -98,7 +98,7 @@ complex_int = begin
 end
 
 function random_dot_potential()
-    y_extra = 4 
+    y_extra = 4
     xmin = -1
     xmax = sim_width + 1
     ymin = -y_extra
@@ -154,9 +154,9 @@ for (di, degree) ∈ enumerate(degrees)
     )
 end
 # Place this weird potential at the end
-push!(nb_data, 
+push!(nb_data,
     (String(L"$\sum_{n=0}^%$(complex_int_degree) c_n(\cos(nkx)+\cos(nky))$"),
-     nb_cint))
+        nb_cint))
 
 # 
 labels = [x[1] for x ∈ nb_data]
@@ -181,22 +181,34 @@ include("quasi2d_num_branches_plot.jl")
 ## Visualize simulations
 if true
     vis_rays = 2048
-    θ = pi/5
+    θ = pi / 5
     lattice_mat = lattice_a * rotation_matrix(-θ)
     rot_lattice = LatticePotential(lattice_mat, dot_radius, v0)
     quasi2d_visualize_rays(path_prefix * "lattice_rot_sim.png", vis_rays, sim_width,
         rot_lattice,
-        triple_y = true
+        triple_y=true
+    )
+    quasi2d_visualize_rays(path_prefix * "lattice_sim.png", vis_rays, sim_width,
+        LatticePotential(lattice_a*I, dot_radius, v0),
+        triple_y=true
     )
     quasi2d_visualize_rays(path_prefix * "cint_rot_sim.png", vis_rays, sim_width,
         RotatedPotential(θ, complex_int),
-            triple_y = true
+        triple_y=true
     )
     for (di, degree) ∈ enumerate(degrees)
         quasi2d_visualize_rays(path_prefix * "int_$(degree)_rot_sim.png",
             vis_rays, sim_width,
             RotatedPotential(θ, int_potentials[di]),
-            triple_y = true
+            triple_y=true
+        )
+        quasi2d_visualize_rays(path_prefix * "int_$(degree)_sim.png",
+            vis_rays, sim_width,
+            int_potentials[di],
+            triple_y=true
         )
     end
+    rand_potential = random_potential()
+    quasi2d_visualize_rays(path_prefix * "rand_sim.png", num_rays, sim_width, rand_potential,
+        triple_y=true)
 end

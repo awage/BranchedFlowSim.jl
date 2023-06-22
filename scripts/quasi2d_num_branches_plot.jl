@@ -32,7 +32,7 @@ for (setname, indices) ∈ datasets
             xmax = 2
         end
         included_ts = ts .≤ xmax
-        fig = Figure(resolution=(800, 600))
+        fig = Figure(resolution=(1024, 576))
         ax = Axis(fig[1, 1]; xlabel=LaTeXString("time (a.u.)"), ylabel=L"Number of branches $N_b$",
             title=LaTeXString("Number of branches, $num_rays rays, quasi-2D (\$p_x=1\$)"),
             limits=((0, xmax), (0, nothing)),

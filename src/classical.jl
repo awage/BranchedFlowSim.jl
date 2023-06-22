@@ -63,7 +63,7 @@ end
 LatticePotential
 
 """
-struct LatticePotential{DotPotential <: AbstractPotential} <: AbstractPotential
+struct LatticePotential{DotPotential<:AbstractPotential} <: AbstractPotential
     A::SMatrix{2,2,Float64,4}
     A_inv::SMatrix{2,2,Float64,4}
     dot_potential::DotPotential
@@ -216,7 +216,17 @@ function count_zero_crossing(fx)
     return c
 end
 
-struct RotatedPotential{OrigPotential <: AbstractPotential} <: AbstractPotential
+function count_branches(ray_y)
+    caustics = 0
+    for j ∈ 2:length(ray_y)-1
+        if sign(ray_y[j] - ray_y[j-1]) != sign(ray_y[j+1] - ray_y[j])
+            caustics += 1
+        end
+    end
+    return caustics / 2
+end
+
+struct RotatedPotential{OrigPotential<:AbstractPotential} <: AbstractPotential
     A::SMatrix{2,2,Float64,4}
     A_inv::SMatrix{2,2,Float64,4}
     V::OrigPotential
@@ -426,7 +436,7 @@ struct FunctionPotential{F} <: AbstractPotential
 end
 
 function (V::FunctionPotential)(x::Real, y::Real)::Float64
-    return V.f(x,y)
+    return V.f(x, y)
 end
 
 function force(V::FunctionPotential, x::Real, y::Real)::SVector{2,Float64}
@@ -443,14 +453,14 @@ end
 # END OF POTENTIALS
 # TODO: Move rest to quasi2d.jl perhaps?
 
-function quasi2d_num_branches(num_rays, dt, ts, potential :: AbstractPotential;
+function quasi2d_num_branches(num_rays, dt, ts, potential::AbstractPotential;
     return_rays=false)
     ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:num_rays])
     return quasi2d_num_branches(ray_y, dt, ts, potential; return_rays=return_rays)
 end
 
 function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
-    ts::AbstractVector{<:Real}, potential :: AbstractPotential; return_rays=false)
+    ts::AbstractVector{<:Real}, potential::AbstractPotential; return_rays=false)
     ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
     ray_py = zeros(num_rays)
@@ -464,15 +474,7 @@ function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
         ray_y .+= dt .* ray_py
         x += dt
         if ts[ti] <= x
-            # Count branches
-            # caustics = count_zero_crossing(ray_y[2:end] - ray_y[1:end-1])
-            caustics = 0
-            for j ∈ 2:num_rays-1
-                if sign(ray_y[j] - ray_y[j-1]) != sign(ray_y[j+1] - ray_y[j])
-                    caustics += 1
-                end
-            end
-            num_branches[ti] = caustics / 2
+            num_branches[ti] = count_branches(ray_y)
             ti += 1
         end
     end
@@ -483,14 +485,14 @@ function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
     end
 end
 
-function quasi2d_intensity(num_rays, dt, xs, ys, potential, b = 0.0030)
+function quasi2d_intensity(num_rays, dt, xs, ys, potential; b=0.0030)
     h = length(ys) * (ys[2] - ys[1])
     T = xs[end] - xs[1]
     # Make rays start from a region 3 times ys, so that we can measure
     # intensity in the middle.
     extra = T * h / 2
     ray_y = LinRange(ys[1] - extra, ys[end] + extra, num_rays)
-    return quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (1 + 2extra/h)
+    return quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (1 + 2extra / h)
 end
 
 function quasi2d_intensity(
@@ -499,8 +501,10 @@ function quasi2d_intensity(
     xs::AbstractVector{<:Real},
     ys::AbstractVector{<:Real},
     potential,
-    b = 0.0030
-    )
+    b=0.0030
+)
+    y_start = ys[1]
+    y_end = ys[1] + length(ys) * (ys[2]-ys[1])
     ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
     ray_py = zeros(num_rays)
@@ -515,8 +519,8 @@ function quasi2d_intensity(
         x += dt
         if xs[xi] <= x
             # Compute intensity
-            density = kde(ray_y, bandwidth=b, npoints=16*1024)
-            intensity[:,xi] = pdf(density, ys)
+            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=(y_start, y_end))
+            intensity[:, xi] = pdf(density, ys)
             xi += 1
         end
     end

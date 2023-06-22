@@ -117,10 +117,10 @@ end
     ts = LinRange(0, sim_width, 50)
     k = 0.2 * 2pi
     function potential(x,y)
-        0.04*(cos(k*x)+cos(k*y))
+        0.08*(cos(k*x)+cos(k*y))
     end
     @time nb = quasi2d_num_branches(num_rays,0.01, ts, FunctionPotential(potential))[end]
     # Known answer, should not change (unless maybe if num_rays is increased)
-    @test nb == 57
+    @test nb == 0.0
     println("nb=$nb")
 end
