@@ -12,7 +12,7 @@ using JLD2
 
 GC.gc()
 # Store results in a separate directory depending on the number of rays
-num_rays = 20000
+num_rays = 200000
 path_prefix = "outputs/quasi2d/$num_rays/"
 mkpath(path_prefix)
 latest_path = "outputs/quasi2d/latest"
@@ -21,7 +21,6 @@ symlink("$num_rays/", latest_path)
 
 sim_height = 1
 sim_width = 6
-num_rays = 20000
 dt = 0.01
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (E=1/2).

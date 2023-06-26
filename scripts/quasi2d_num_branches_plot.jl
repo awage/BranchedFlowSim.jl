@@ -1,8 +1,9 @@
 using CairoMakie
 using LaTeXStrings
 using Makie
-using HDF5
 using CurveFit
+using FileIO
+using HDF5
 
 path_prefix = "outputs/quasi2d/latest/"
 
