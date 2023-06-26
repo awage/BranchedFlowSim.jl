@@ -14,6 +14,11 @@ end
 
 function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
     ts::AbstractVector{<:Real}, potential::AbstractPotential; return_rays=false)
+
+    # HACK: This uses a lot of memory. Run GC here to try
+    # limit memory use before big allocations.
+    GC.gc(full=false)
+
     ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
     ray_py = zeros(num_rays)
@@ -145,6 +150,7 @@ end
 
 function quasi2d_num_branches_parallel(
     num_rays, dt, ts, potentials, progress_text="")
+
     p = Progress(length(potentials), progress_text)
     nb_arr = zeros(length(ts), length(potentials))
     Threads.@threads for i ∈ 1:length(potentials)

@@ -110,7 +110,6 @@ for (setname, fnames) ∈ datasets
             fname = "$(setname)_branches$(scalename).$ext"
             save(path_prefix * fname, fig, px_per_unit=2)
         end
-        display(fig)
 
         # Exponential fit
         exp_ts = (ts .≥ 2) .&& (ts .≤ 4)
@@ -127,7 +126,6 @@ for (setname, fnames) ∈ datasets
             fname = "$(setname)_branches_exp$(scalename).$ext"
             save(path_prefix * fname, fig, px_per_unit=2)
         end
-        display(fig)
 
         # Scale all lines to make the exponential part match
         fig = Figure(resolution=(800, 600))
@@ -150,6 +148,5 @@ for (setname, fnames) ∈ datasets
             fname = "$(setname)_branches_expfit$scalename.$ext"
             save(path_prefix * fname, fig, px_per_unit=2)
         end
-        display(fig)
     end
 end
