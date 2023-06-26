@@ -16,6 +16,10 @@ s = ArgParseSettings()
         help = "number of rays"
         arg_type = Int
         default = 10000
+    "-T",
+        help = "end time"
+        arg_type = Float
+        default = 6
 end
 
 parsed_args = parse_args(ARGS, s)
@@ -30,7 +34,7 @@ rm(latest_path, force=true)
 symlink("$num_rays/", latest_path)
 
 sim_height = 1
-sim_width = 6
+sim_width = parsed_args["T"]
 dt = 0.01
 correlation_scale = 0.1
 # To match Metzger, express potential as percents from particle energy (E=1/2).
