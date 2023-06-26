@@ -230,7 +230,7 @@ struct RotatedPotential{OrigPotential<:AbstractPotential} <: AbstractPotential
     A::SMatrix{2,2,Float64,4}
     A_inv::SMatrix{2,2,Float64,4}
     V::OrigPotential
-    function RotatedPotential(θ::Real, V)
+    function RotatedPotential(θ::Real, V :: AbstractPotential)
         rot = rotation_matrix(θ)
         return new{typeof(V)}(rot, inv(rot), V)
     end

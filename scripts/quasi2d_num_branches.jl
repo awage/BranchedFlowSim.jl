@@ -174,7 +174,7 @@ quasi2d_compute_and_save_num_branches(
 include("quasi2d_num_branches_plot.jl")
 
 ## Visualize simulations
-if false
+if true
     vis_rays = 2048
     θ = pi / 5
     lattice_mat = lattice_a * rotation_matrix(-θ)
@@ -194,12 +194,12 @@ if false
     for (di, degree) ∈ enumerate(degrees)
         quasi2d_visualize_rays(path_prefix * "int_$(degree)_rot_sim.png",
             vis_rays, sim_width,
-            RotatedPotential(θ, int_potentials[di]),
+            RotatedPotential(θ, int_pots[di][1]),
             triple_y=true
         )
         quasi2d_visualize_rays(path_prefix * "int_$(degree)_sim.png",
             vis_rays, sim_width,
-            int_potentials[di],
+            int_pots[di][1],
             triple_y=true
         )
     end
