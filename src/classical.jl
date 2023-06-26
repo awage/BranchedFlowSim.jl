@@ -419,7 +419,10 @@ function fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0; softnes
     return CosSeriesPotential{typeof(static_w)}(static_w, k)
 end
 
-function correlated_random_potential(width, height, correlation_scale, v0)
+function correlated_random_potential(width,
+     height,
+     correlation_scale,
+     v0, seed=rand(UInt))
     # To generate the potential array, use a certain number dots per one correlation
     # scale.
     rand_N = 16 / v0
@@ -427,7 +430,7 @@ function correlated_random_potential(width, height, correlation_scale, v0)
     rNx = round(Int, rand_N * width)
     ys = LinRange(0, height, rNy + 1)[1:end-1]
     xs = LinRange(0, width, rNx + 1)[1:end-1]
-    pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale)
+    pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale, seed)
     return PeriodicGridPotential(xs, ys, pot_arr)
 end
 

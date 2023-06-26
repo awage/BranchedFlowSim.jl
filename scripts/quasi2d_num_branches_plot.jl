@@ -44,6 +44,15 @@ datasets = [
         "nb_fermi_rand.h5",
         "nb_int_1.h5",
     ]),
+    ("cos", [
+        "nb_lattice.h5",
+        "nb_int_1.h5",
+        "nb_int_2.h5",
+        "nb_int_3.h5",
+        "nb_int_4.h5",
+        "nb_int_5.h5",
+        "nb_int_6.h5",
+    ]),
 ]
 
 for (setname, fnames) ∈ datasets
@@ -144,5 +153,4 @@ for (setname, fnames) ∈ datasets
         display(fig)
 
     end
-
 end
