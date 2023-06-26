@@ -8,11 +8,21 @@ using LinearAlgebra
 using StaticArrays
 using Makie
 using ColorTypes
-using JLD2
+using ArgParse
+
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--num_rays", "-n"
+        help = "number of rays"
+        arg_type = Int
+        default = 10000
+end
+
+parsed_args = parse_args(ARGS, s)
 
 GC.gc()
 # Store results in a separate directory depending on the number of rays
-num_rays = 200000
+num_rays = parsed_args["num_rays"]
 path_prefix = "outputs/quasi2d/$num_rays/"
 mkpath(path_prefix)
 latest_path = "outputs/quasi2d/latest"

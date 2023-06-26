@@ -151,6 +151,5 @@ for (setname, fnames) ∈ datasets
             save(path_prefix * fname, fig, px_per_unit=2)
         end
         display(fig)
-
     end
 end
