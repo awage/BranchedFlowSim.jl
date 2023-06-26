@@ -17,7 +17,7 @@ function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
 
     # HACK: This uses a lot of memory. Run GC here to try
     # limit memory use before big allocations.
-    GC.gc(full=false)
+    GC.gc(false)
 
     ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
