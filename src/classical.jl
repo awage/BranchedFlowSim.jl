@@ -16,7 +16,6 @@ export FunctionPotential
 
 export fermi_dot_lattice_cos_series, correlated_random_potential
 export rotation_matrix, force, force_x, force_y
-export quasi2d_num_branches, quasi2d_visualize_rays, quasi2d_intensity
 export grid_eval
 
 """
@@ -30,7 +29,8 @@ function ispotential(v)
     return applicable(v, 1.2, 2.3) && applicable(force, v, 1.2, 2.3)
 end
 
-# NOTE: AbstractPotential is used as a subtype for potentials with custom force functions,
+# NOTE: AbstractPotential is used as a subtype for potentials with custom force
+# functions,
 abstract type AbstractPotential end;
 # This is the most abstract potential 
 
@@ -453,140 +453,6 @@ end
 # END OF POTENTIALS
 # TODO: Move rest to quasi2d.jl perhaps?
 
-function quasi2d_num_branches(num_rays, dt, ts, potential::AbstractPotential;
-    return_rays=false)
-    ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:num_rays])
-    return quasi2d_num_branches(ray_y, dt, ts, potential; return_rays=return_rays)
-end
-
-function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
-    ts::AbstractVector{<:Real}, potential::AbstractPotential; return_rays=false)
-    ray_y = Vector{Float64}(ray_y)
-    num_rays = length(ray_y)
-    ray_py = zeros(num_rays)
-    num_branches = zeros(length(ts))
-    ti = 1
-    x = 0.0
-    while ti <= length(ts)
-        # kick
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # drift
-        ray_y .+= dt .* ray_py
-        x += dt
-        if ts[ti] <= x
-            num_branches[ti] = count_branches(ray_y)
-            ti += 1
-        end
-    end
-    if return_rays
-        return num_branches, ray_y, ray_py
-    else
-        return num_branches
-    end
-end
-
-function quasi2d_intensity(num_rays, dt, xs, ys, potential; b=0.0030)
-    h = length(ys) * (ys[2] - ys[1])
-    T = xs[end] - xs[1]
-    # Make rays start from a region 3 times ys, so that we can measure
-    # intensity in the middle.
-    extra = T * h / 2
-    ray_y = LinRange(ys[1] - extra, ys[end] + extra, num_rays)
-    return quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (1 + 2extra / h)
-end
-
-function quasi2d_intensity(
-    ray_y::AbstractVector{<:Real},
-    dt::Real,
-    xs::AbstractVector{<:Real},
-    ys::AbstractVector{<:Real},
-    potential,
-    b=0.0030
-)
-    y_start = ys[1]
-    y_end = ys[1] + length(ys) * (ys[2]-ys[1])
-    ray_y = Vector{Float64}(ray_y)
-    num_rays = length(ray_y)
-    ray_py = zeros(num_rays)
-    xi = 1
-    x = 0.0
-    intensity = zeros(length(ys), length(xs))
-    while xi <= length(xs)
-        # kick
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # drift
-        ray_y .+= dt .* ray_py
-        x += dt
-        if xs[xi] <= x
-            # Compute intensity
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=(y_start, y_end))
-            intensity[:, xi] = pdf(density, ys)
-            xi += 1
-        end
-    end
-    return intensity
-end
-
-"""
-    quasi2d_visualize_rays(path, xs, ys, potential;
-        triple_y=false,
-        height=(if triple_y 3*length(ys) else length(ys) end)
-     )
-
-TBW
-"""
-function quasi2d_visualize_rays(path, num_rays, sim_width, potential;
-    triple_y=false
-)
-    pixel_scale = 600
-    sim_height = 1
-    height = round(Int,
-        if triple_y
-            3 * pixel_scale
-        else
-            pixel_scale
-        end
-    )
-    width = round(Int, sim_width * pixel_scale)
-    xs = LinRange(0, sim_width, width)
-    dt = xs[2] - xs[1]
-    image = zeros(height, width)
-    # Height of one pixel in simulation length units
-    pixel_h = 1 / pixel_scale
-    ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:end-1])
-    ypixels = LinRange(0, ray_y[end], height)
-    ray_py = zeros(num_rays)
-    for (xi, x) ∈ enumerate(xs)
-        # kick
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # drift
-        ray_y .+= dt .* ray_py
-        # Collect
-        for y ∈ ray_y
-            yi = 1 + round(Int, y / pixel_h)
-            if triple_y
-                yi += height ÷ 3
-            end
-            if yi >= 1 && yi <= height
-                image[yi, xi] += 1
-            end
-        end
-    end
-    scene = Scene(camera=campixel!, resolution=size(image'))
-    if triple_y
-        ypixels = LinRange(ypixels[1] - sim_height, ypixels[end] + sim_height, height)
-    end
-    pot_values = [
-        potential(x, y) for x ∈ xs, y ∈ ypixels
-    ]
-    heatmap!(scene, pot_values; colormap=:Greens_3)
-    heatmap!(scene, image'; colormap=[
-            RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
-        ],
-        colorrange=(0, 15 * num_rays / pixel_scale)
-    )
-    save(path, scene)
-end
 
 function grid_eval(xs, ys, fun)
     return [

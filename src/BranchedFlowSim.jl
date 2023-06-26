@@ -30,6 +30,7 @@ include("colorschemes.jl")
 include("potentials.jl")
 # TODO: Figure out if this file should be in potentials.jl
 include("classical.jl")
+include("quasi2d.jl")
 
 default_colorscheme = complex_berlin
 
