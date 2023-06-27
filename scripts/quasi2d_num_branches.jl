@@ -13,9 +13,23 @@ s = ArgParseSettings()
         help = "end time"
         arg_type = Float64
         default = 6.0
+    "--v0"
+        help = "potential height. Default is 8% of energy."
+        arg_type = Float64
+        default = 0.04
+    "--potentials"
+        help = "comma-separated list of potentials to run"
+        arg_type = String
+        default = "rand,fermi_lattice,fermi_rand,cos_series,cint"
+    "--cos_max_degree"
+        help = "maximum degree for the cos_series potentials"
+        arg_type = Int
+        default = 6
 end
 
 parsed_args = parse_args(ARGS, s)
+
+potential_types = split(parsed_args["potentials"], ',')
 
 # Store results in a separate directory depending on the number of rays
 num_rays = parsed_args["num_rays"]
@@ -29,9 +43,7 @@ sim_height = 1
 sim_width = parsed_args["time"]
 dt = 0.01
 correlation_scale = 0.1
-# To match Metzger, express potential as percents from particle energy (E=1/2).
-ϵ_percent = 8
-v0::Float64 = ϵ_percent * 0.01 * 0.5
+v0::Float64 = parsed_args["v0"]
 softness = 0.2
 
 num_sims = 100
@@ -42,10 +54,10 @@ ts = LinRange(0, sim_width, round(Int, 50 * sim_width))
 # Periodic potential
 lattice_a = 0.2
 dot_radius = 0.25 * lattice_a
-dot_v0 = 0.08 * 0.5
+dot_v0 = v0
 
 num_angles = 50
-angles = LinRange(0, π / 2, num_angles+1)[1:end-1]
+angles = LinRange(0, π / 2, num_angles + 1)[1:end-1]
 
 function random_potential()
     return correlated_random_potential(sim_width, 3, correlation_scale, v0)
@@ -65,7 +77,7 @@ function random_dot_potential()
     xmax = sim_width + 1
     ymin = -y_extra
     ymax = sim_height + y_extra
-    return random_fermi_potential(xmin,xmax, ymin,ymax, lattice_a, dot_radius, v0)
+    return random_fermi_potential(xmin, xmax, ymin, ymax, lattice_a, dot_radius, v0)
 end
 
 ## Generate potentials
@@ -74,11 +86,11 @@ lattice_pots =
     [LatticePotential(lattice_a * rotation_matrix(θ),
         dot_radius, dot_v0; softness=softness)
      for θ ∈ angles]
-         
+
 rand_pots = [random_potential() for _ ∈ 1:num_sims]
 rand_dot_pots = [random_dot_potential() for _ ∈ 1:num_sims]
-    
-degrees = [1, 2, 3, 4, 5, 6]
+
+degrees = 1:parsed_args["cos_max_degree"]
 int_pots = [
     rotated_potentials(make_integrable_potential(degree))
     for degree ∈ degrees
@@ -119,28 +131,38 @@ end
 
 angles_vec = Vector(angles)
 
-quasi2d_compute_and_save_num_branches(
-    path_prefix*"nb_rand.h5", num_rays, dt, ts, rand_pots, 
-    (type="rand", v0=v0, correlation_scale=correlation_scale))
-quasi2d_compute_and_save_num_branches(
-    path_prefix*"nb_lattice.h5", num_rays, dt, ts, lattice_pots,
-    (type="fermi_lattice", v0=v0, lattice_a=lattice_a, softness=softness, angles=angles_vec)
-    )
-quasi2d_compute_and_save_num_branches(
-    path_prefix*"nb_fermi_rand.h5", num_rays, dt, ts, rand_dot_pots,
-    (type="fermi_rand", v0=v0, lattice_a=lattice_a, softness=softness)
-    )
-for (di, degree) ∈ enumerate(degrees)
-    pots = int_pots[di]
+if "rand" ∈ potential_types
     quasi2d_compute_and_save_num_branches(
-        path_prefix*"nb_int_$(degree).h5", num_rays, dt, ts, pots,
-        (type="cos_series", v0=v0, lattice_a=lattice_a, degree=degree, angles=angles_vec)
-        )
+        path_prefix * "nb_rand.h5", num_rays, dt, ts, rand_pots,
+        (type="rand", v0=v0, correlation_scale=correlation_scale))
 end
-quasi2d_compute_and_save_num_branches(
-    path_prefix*"nb_cint.h5", num_rays, dt, ts, cint_pots,
-    (type="cint", v0=v0, lattice_a=lattice_a, degree=complex_int_degree, angles=angles_vec)
+if "fermi_lattice" ∈ potential_types
+    quasi2d_compute_and_save_num_branches(
+        path_prefix * "nb_lattice.h5", num_rays, dt, ts, lattice_pots,
+        (type="fermi_lattice", v0=v0, lattice_a=lattice_a, softness=softness, angles=angles_vec)
     )
+end
+if "fermi_rand" ∈ potential_types
+    quasi2d_compute_and_save_num_branches(
+        path_prefix * "nb_fermi_rand.h5", num_rays, dt, ts, rand_dot_pots,
+        (type="fermi_rand", v0=v0, lattice_a=lattice_a, softness=softness)
+    )
+end
+if "cos_series" ∈ potential_types
+    for (di, degree) ∈ enumerate(degrees)
+        pots = int_pots[di]
+        quasi2d_compute_and_save_num_branches(
+            path_prefix * "nb_int_$(degree).h5", num_rays, dt, ts, pots,
+            (type="cos_series", v0=v0, lattice_a=lattice_a, degree=degree, angles=angles_vec)
+        )
+    end
+end
+if "cint" ∈ potential_types
+    quasi2d_compute_and_save_num_branches(
+        path_prefix * "nb_cint.h5", num_rays, dt, ts, cint_pots,
+        (type="cint", v0=v0, lattice_a=lattice_a, degree=complex_int_degree, angles=angles_vec)
+    )
+end
 
 # @time "rand sim" nb_rand = get_random_nb()
 # @time "lattice sim" nb_lattice = get_lattice_mean_nb()
