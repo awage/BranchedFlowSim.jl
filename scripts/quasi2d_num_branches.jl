@@ -87,8 +87,6 @@ lattice_pots =
         dot_radius, dot_v0; softness=softness)
      for θ ∈ angles]
 
-rand_pots = [random_potential() for _ ∈ 1:num_sims]
-rand_dot_pots = [random_dot_potential() for _ ∈ 1:num_sims]
 
 degrees = 1:parsed_args["cos_max_degree"]
 int_pots = [
@@ -100,30 +98,6 @@ complex_int_degree = 8
 complex_int = complex_separable_potential(complex_int_degree, lattice_a, dot_radius, v0; softness=softness)
 cint_pots = rotated_potentials(complex_int)
 
-# Compute average over all angles
-
-function get_random_nb()::Vector{Float64}
-    # Run simulations to count branches
-    num_branches = zeros(length(ts), num_sims)
-    p = Progress(num_sims, "random")
-    Threads.@threads for i ∈ 1:num_sims
-        potential = random_potential()
-        num_branches[:, i] = quasi2d_num_branches(num_rays, dt, ts, potential)
-        next!(p)
-    end
-    return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
-end
-
-function get_nb_rand_dots()::Vector{Float64}
-    # Run simulations to count branches
-    num_branches = zeros(length(ts), num_sims)
-    Threads.@threads for i ∈ 1:num_sims
-        potential = random_dot_potential()
-        num_branches[:, i] = quasi2d_num_branches(num_rays, dt, ts, potential)
-    end
-    return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
-end
-
 ## Actually evaluate
 
 # TODO: put data in a separate directory for easier copying
@@ -132,6 +106,7 @@ end
 angles_vec = Vector(angles)
 
 if "rand" ∈ potential_types
+    rand_pots = [random_potential() for _ ∈ 1:num_sims]
     quasi2d_compute_and_save_num_branches(
         path_prefix * "nb_rand.h5", num_rays, dt, ts, rand_pots,
         (type="rand", v0=v0, correlation_scale=correlation_scale))
@@ -143,6 +118,7 @@ if "fermi_lattice" ∈ potential_types
     )
 end
 if "fermi_rand" ∈ potential_types
+    rand_dot_pots = [random_dot_potential() for _ ∈ 1:num_sims]
     quasi2d_compute_and_save_num_branches(
         path_prefix * "nb_fermi_rand.h5", num_rays, dt, ts, rand_dot_pots,
         (type="fermi_rand", v0=v0, lattice_a=lattice_a, softness=softness)
