@@ -12,23 +12,49 @@ s = ArgParseSettings()
         help = "only plot until this time"
         arg_type = Float64
         default = 10000.0
-    "data_dir"
-        help = "directory with daa"
-        required = false
+    "--lin_time"
+        help = "for linear plots, only plot until this time"
+        arg_type = Float64
+        default = 2.0
+    "--data_dir"
+        help = "directory with input data"
+        arg_type = String
+        default = "outputs/quasi2d/latest/"
+    "--output_dir"
+        help = "directory to write output data, by default same as data_dir"
+    "--setname"
+        help = "Prefix for the generated files."
+        arg_type = String
+        default = "num"
+    "files"
+        help = "Input files to genererate the plot from"
+        arg_type = String
+        nargs = '*'
 end
 
 parsed_args = parse_args(ARGS, s)
 
 max_time = parsed_args["time"]
+lin_max_time = parsed_args["lin_time"]
+if lin_max_time <= 0
+    lin_max_time = 1e8
+end
 
-path_prefix = "outputs/quasi2d/latest/"
-if parsed_args["data_dir"] !== nothing
-    path_prefix = parsed_args["data_dir"]
+input_prefix = parsed_args["data_dir"]
+# Make sure the prefix ends in /
+if input_prefix[end] != '/'
+    input_prefix = input_prefix*"/"
+end
+
+output_prefix = input_prefix
+if parsed_args["output_dir"] !== nothing
+    output_prefix = parsed_args["output_dir"]
     # Make sure the prefix ends in /
-    if path_prefix[end] != "/"
-        path_prefix = path_prefix*"/"
+    if output_prefix[end] != '/'
+        output_prefix = output_prefix*"/"
     end
 end
+mkpath(output_prefix)
 
 # data = load(path_prefix * "nb_data.jld2")
 # ts = data["ts"]
@@ -65,14 +91,112 @@ function make_label(data)::LaTeXString
     error("Unknown/new potential type \"$type\"")
 end
 
+function generate_plots(output_prefix, setname, fnames)
+        data = [
+            load(n) for n ∈ fnames
+        ]
+        ts = data[1]["ts"]
+        num_rays = data[1]["num_rays"]
+        dt = data[1]["dt"]
+        # Parameters should be equal between all files
+        for d ∈ data
+            @assert d["dt"] == dt
+            @assert d["ts"] == ts
+            @assert d["num_rays"] == num_rays
+        end
+        labels = [make_label(d) for d ∈ data]
+        num_branches = hcat([d["nb_mean"] for d ∈ data]...)
+
+        for (scalename, scaleparams) ∈ [
+            ("", [])
+            ("_log", [:yticks => [1, 10, 100, 1000], :yscale => Makie.pseudolog10])
+        ]
+            xmax = min(ts[end], max_time)
+            if scalename == ""
+                # Only show the first part in linear scale
+                xmax = min(xmax, lin_max_time)
+            end
+            included_ts = ts .≤ xmax
+            fig = Figure(resolution=(1024, 576))
+            ax = Axis(fig[1, 1]; xlabel=LaTeXString("time (a.u.)"), ylabel=L"Number of branches $N_b$",
+                title=LaTeXString("Number of branches, $num_rays rays, quasi-2D (\$p_x=1\$)"),
+                limits=((0, xmax), (0, nothing)),
+                scaleparams...
+            )
+
+
+            ls = [:solid for i ∈ 1:length(data)]
+            # ls[1] = :dot
+            palette = vcat([RGBAf(0, 0, 0, 1)], Makie.wong_colors())
+            all_lines = []
+            for j ∈ 1:length(data)
+                label = labels[j]
+                nb = num_branches[:, j]
+                l = lines!(ax, ts[included_ts],
+                    nb[included_ts], label=LaTeXString(label),
+                    color=palette[j],
+                    linestyle=ls[j])
+                push!(all_lines, l)
+            end
+
+
+            # axislegend(ax, position=:lt)
+            fig[1, 2] = Legend(fig, ax, "", framevisible=false, padding=1.0)
+            for ext ∈ ["png", "pdf"]
+                fname = "$(setname)_branches$(scalename).$ext"
+                save(output_prefix* fname, fig, px_per_unit=2)
+            end
+
+            # Exponential fit
+            exp_ts = (ts .≥ 2) .&& (ts .≤ 4)
+            for j ∈ 1:length(data)
+                label = labels[j]
+                nb = num_branches[:, j]
+                a1, a2 = exp_fit(ts[exp_ts], nb[exp_ts])
+                lines!(ax, ts[included_ts],
+                    a1 * exp.(a2 * ts[included_ts]),
+                    linestyle=:dash, color=palette[j])
+            end
+
+            for ext ∈ ["png", "pdf"]
+                fname = "$(setname)_branches_exp$(scalename).$ext"
+                save(output_prefix* fname, fig, px_per_unit=2)
+            end
+
+            # Scale all lines to make the exponential part match
+            fig = Figure(resolution=(800, 600))
+            ax = Axis(fig[1, 1]; xlabel=L"t/a_2", ylabel=L"N_b/a_1",
+                limits=((0, xmax), (0, 1.5 * exp(xmax))),
+                scaleparams...
+            )
+            exp_ts = (ts .≥ 2) .&& (ts .≤ 4)
+            lines!(ax, ts[included_ts], exp.(ts[included_ts]), linestyle=:dash, color=:gray, label=L"e^t")
+            for j ∈ 1:length(data)
+                label = labels[j]
+                nb = num_branches[:, j]
+                a1, a2 = exp_fit(ts[exp_ts], nb[exp_ts])
+                lines!(ax, ts * a2, nb / a1, label=LaTeXString(label),
+                    color=palette[j])
+            end
+            fig[1, 2] = Legend(fig, ax, "", framevisible=false, padding=1.0)
+
+            for ext ∈ ["png", "pdf"]
+                fname = "$(setname)_branches_expfit$scalename.$ext"
+                save(output_prefix * fname, fig, px_per_unit=2)
+            end
+        end
+end
+
+apply_prefix(fs) = [input_prefix*f for f ∈ fs]
+
 datasets = [
-    ("num", [
+    ("num", apply_prefix([
         "nb_rand.h5",
         "nb_lattice.h5",
         "nb_fermi_rand.h5",
         "nb_int_1.h5",
-    ]),
-    ("cos", [
+    ])),
+    ("cos", apply_prefix([
         "nb_lattice.h5",
         "nb_int_1.h5",
         "nb_int_2.h5",
@@ -81,8 +205,18 @@ datasets = [
         "nb_int_5.h5",
         "nb_int_6.h5",
         "nb_cint.h5",
-    ]),
+    ])),
 ]
+
+if !isempty(parsed_args["files"])
+    datasets = [
+        (parsed_args["setname"],parsed_args["files"])
+    ]
+end
+
+for (setname, fnames) ∈ datasets
+    generate_plots(output_prefix, setname, fnames)
+end
 
 angle_datas = [
     ("fermi_lattice", "nb_lattice.h5"),
@@ -91,99 +225,3 @@ angle_datas = [
     ("cos3", "nb_int_3.h5"),
     ("cint", "nb_cint.h5"),
 ]
-
-for (setname, fnames) ∈ datasets
-    data = [
-        load(path_prefix * n) for n ∈ fnames
-    ]
-    ts = data[1]["ts"]
-    num_rays = data[1]["num_rays"]
-    dt = data[1]["dt"]
-    # Parameters should be equal between all files
-    for d ∈ data
-        @assert d["dt"] == dt
-        @assert d["ts"] == ts
-        @assert d["num_rays"] == num_rays
-    end
-    labels = [make_label(d) for d ∈ data]
-    num_branches = hcat([d["nb_mean"] for d ∈ data]...)
-
-    for (scalename, scaleparams) ∈ [
-        ("", [])
-        ("_log", [:yticks => [1, 10, 100, 1000], :yscale => Makie.pseudolog10])
-    ]
-        xmax = min(ts[end], max_time)
-        if scalename == ""
-            # Only show the first part in linear scale
-            xmax = 2
-        end
-        included_ts = ts .≤ xmax
-        fig = Figure(resolution=(1024, 576))
-        ax = Axis(fig[1, 1]; xlabel=LaTeXString("time (a.u.)"), ylabel=L"Number of branches $N_b$",
-            title=LaTeXString("Number of branches, $num_rays rays, quasi-2D (\$p_x=1\$)"),
-            limits=((0, xmax), (0, nothing)),
-            scaleparams...
-        )
-
-
-        ls = [:solid for i ∈ 1:length(data)]
-        # ls[1] = :dot
-        palette = vcat([RGBAf(0, 0, 0, 1)], Makie.wong_colors())
-        all_lines = []
-        for j ∈ 1:length(data)
-            label = labels[j]
-            nb = num_branches[:, j]
-            l = lines!(ax, ts[included_ts],
-                nb[included_ts], label=LaTeXString(label),
-                color=palette[j],
-                linestyle=ls[j])
-            push!(all_lines, l)
-        end
-
-
-        # axislegend(ax, position=:lt)
-        fig[1, 2] = Legend(fig, ax, "", framevisible=false, padding=1.0)
-        for ext ∈ ["png", "pdf"]
-            fname = "$(setname)_branches$(scalename).$ext"
-            save(path_prefix * fname, fig, px_per_unit=2)
-        end
-
-        # Exponential fit
-        exp_ts = (ts .≥ 2) .&& (ts .≤ 4)
-        for j ∈ 1:length(data)
-            label = labels[j]
-            nb = num_branches[:, j]
-            a1, a2 = exp_fit(ts[exp_ts], nb[exp_ts])
-            lines!(ax, ts[included_ts],
-                a1 * exp.(a2 * ts[included_ts]),
-                linestyle=:dash, color=palette[j])
-        end
-
-        for ext ∈ ["png", "pdf"]
-            fname = "$(setname)_branches_exp$(scalename).$ext"
-            save(path_prefix * fname, fig, px_per_unit=2)
-        end
-
-        # Scale all lines to make the exponential part match
-        fig = Figure(resolution=(800, 600))
-        ax = Axis(fig[1, 1]; xlabel=L"t/a_2", ylabel=L"N_b/a_1",
-            limits=((0, xmax), (0, 1.5 * exp(xmax))),
-            scaleparams...
-        )
-        exp_ts = (ts .≥ 2) .&& (ts .≤ 4)
-        lines!(ax, ts[included_ts], exp.(ts[included_ts]), linestyle=:dash, color=:gray, label=L"e^t")
-        for j ∈ 1:length(data)
-            label = labels[j]
-            nb = num_branches[:, j]
-            a1, a2 = exp_fit(ts[exp_ts], nb[exp_ts])
-            lines!(ax, ts * a2, nb / a1, label=LaTeXString(label),
-                color=palette[j])
-        end
-        fig[1, 2] = Legend(fig, ax, "", framevisible=false, padding=1.0)
-
-        for ext ∈ ["png", "pdf"]
-            fname = "$(setname)_branches_expfit$scalename.$ext"
-            save(path_prefix * fname, fig, px_per_unit=2)
-        end
-    end
-end
