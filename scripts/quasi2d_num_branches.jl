@@ -1,13 +1,6 @@
 using BranchedFlowSim
-using CairoMakie
-using Interpolations
-using ProgressMeter
 using Statistics
-using LaTeXStrings
 using LinearAlgebra
-using StaticArrays
-using Makie
-using ColorTypes
 using ArgParse
 
 s = ArgParseSettings()
@@ -15,7 +8,7 @@ s = ArgParseSettings()
     "--num_rays", "-n"
         help = "number of rays"
         arg_type = Int
-        default = 10000
+        default = 4000
     "--time", "-T"
         help = "end time"
         arg_type = Float64
@@ -24,7 +17,6 @@ end
 
 parsed_args = parse_args(ARGS, s)
 
-GC.gc()
 # Store results in a separate directory depending on the number of rays
 num_rays = parsed_args["num_rays"]
 path_prefix = "outputs/quasi2d/$num_rays/"
@@ -48,12 +40,12 @@ num_sims = 100
 ts = LinRange(0, sim_width, round(Int, 50 * sim_width))
 
 # Periodic potential
-lattice_a::Float64 = 0.2
+lattice_a = 0.2
 dot_radius = 0.25 * lattice_a
 dot_v0 = 0.08 * 0.5
 
 num_angles = 50
-angles = LinRange(0, π / 2, 51)[1:end-1]
+angles = LinRange(0, π / 2, num_angles+1)[1:end-1]
 
 function random_potential()
     return correlated_random_potential(sim_width, 3, correlation_scale, v0)
@@ -73,17 +65,7 @@ function random_dot_potential()
     xmax = sim_width + 1
     ymin = -y_extra
     ymax = sim_height + y_extra
-    box_dims =
-        num_dots = round(Int, (xmax - xmin) * (ymax - ymin) / lattice_a^2)
-    locs = zeros(2, num_dots)
-    for i ∈ 1:num_dots
-        locs[:, i] = [xmin, ymin] + rand(2) .* [xmax - xmin, ymax - ymin]
-    end
-    return RepeatedPotential(
-        locs,
-        FermiDotPotential(dot_radius, v0),
-        lattice_a
-    )
+    return random_fermi_potential(xmin,xmax, ymin,ymax, lattice_a, dot_radius, v0)
 end
 
 ## Generate potentials
@@ -103,23 +85,10 @@ int_pots = [
 ]
 
 complex_int_degree = 8
-complex_int = begin
-    zpot8 = make_integrable_potential(complex_int_degree)
-    w = Matrix(zpot8.w)
-    w[2:end, 2:end] .= 0
-    CosSeriesPotential{SMatrix{9,9,Float64,81}}(w, zpot8.k)
-end
+complex_int = complex_separable_potential(complex_int_degree, lattice_a, dot_radius, v0; softness=softness)
 cint_pots = rotated_potentials(complex_int)
 
 # Compute average over all angles
-
-function potential_label(degree)
-    if degree == 1
-        return L"$c_1(\cos(2\pi x/a)+\cos(2\pi y/a))$, $a=0.2$"
-    end
-    return L"$\sum_{n+m\le%$(degree)}c_{nm}\cos(nkx)\cos(mky)$, $k=2\pi/0.2$"
-end
-
 
 function get_random_nb()::Vector{Float64}
     # Run simulations to count branches
@@ -185,7 +154,7 @@ quasi2d_compute_and_save_num_branches(
 ## save results for later plotting
 
 ## Run plotting code as well
-include("quasi2d_num_branches_plot.jl")
+# include("quasi2d_num_branches_plot.jl")
 
 ## Visualize simulations
 if true
@@ -205,6 +174,10 @@ if true
         RotatedPotential(θ, complex_int),
         triple_y=true
     )
+    quasi2d_visualize_rays(path_prefix * "cint_rot_sim.png", vis_rays, sim_width,
+        complex_int,
+        triple_y=true
+    )
     for (di, degree) ∈ enumerate(degrees)
         quasi2d_visualize_rays(path_prefix * "int_$(degree)_rot_sim.png",
             vis_rays, sim_width,
@@ -219,5 +192,9 @@ if true
     end
     rand_potential = random_potential()
     quasi2d_visualize_rays(path_prefix * "rand_sim.png", num_rays, sim_width, rand_potential,
+        triple_y=true)
+
+    rand_dots = random_dot_potential()
+    quasi2d_visualize_rays(path_prefix * "fermi_rand_sim.png", num_rays, sim_width, rand_dots,
         triple_y=true)
 end

@@ -4,7 +4,6 @@
 using LinearAlgebra
 using StaticArrays
 using FFTW
-using Makie
 using Interpolations
 using KernelDensity
 
@@ -14,8 +13,11 @@ export RepeatedPotential
 export CosSeriesPotential
 export FunctionPotential
 
-export fermi_dot_lattice_cos_series, correlated_random_potential
 export rotation_matrix, force, force_x, force_y
+export correlated_random_potential
+export random_fermi_potential
+export fermi_dot_lattice_cos_series
+export complex_separable_potential
 export grid_eval
 
 """
@@ -230,7 +232,7 @@ struct RotatedPotential{OrigPotential<:AbstractPotential} <: AbstractPotential
     A::SMatrix{2,2,Float64,4}
     A_inv::SMatrix{2,2,Float64,4}
     V::OrigPotential
-    function RotatedPotential(θ::Real, V :: AbstractPotential)
+    function RotatedPotential(θ::Real, V::AbstractPotential)
         rot = rotation_matrix(θ)
         return new{typeof(V)}(rot, inv(rot), V)
     end
@@ -325,6 +327,13 @@ end
 struct CosSeriesPotential{MatrixType} <: AbstractPotential
     w::MatrixType
     k::Float64
+    function CosSeriesPotential(w::AbstractMatrix{Float64}, k)
+        s = size(w)
+        @assert s[1] == s[2]
+        return new{SMatrix{s[1],s[1],Float64,s[1]^2}}(
+            w, k
+        )
+    end
 end
 
 # function compute_sincos_kx(n, k, x)
@@ -335,8 +344,8 @@ function (V::CosSeriesPotential)(x, y)
     xcos = MVector{len,Float64}(undef)
     ycos = MVector{len,Float64}(undef)
     xcos[1] = ycos[1] = 1.0
-    # TODO: Optimize this. Not as important as `force` is called much more
-    # often.
+    # TODO: Optimize this. Not as important as `force`, which is called much
+    # more often.
     for k ∈ 2:len
         kk = (k - 1) * V.k
         xcos[k] = cos(kk * x)
@@ -415,14 +424,14 @@ function fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0; softnes
     end
     k = 2pi / lattice_a
     # Use statically sized arrays.
-    static_w = SMatrix{1 + degree,1 + degree,Float64,(1 + degree)^2}(w)
-    return CosSeriesPotential{typeof(static_w)}(static_w, k)
+    # static_w = SMatrix{1 + degree,1 + degree,Float64,(1 + degree)^2}(w)
+    return CosSeriesPotential(w, k)
 end
 
 function correlated_random_potential(width,
-     height,
-     correlation_scale,
-     v0, seed=rand(UInt))
+    height,
+    correlation_scale,
+    v0, seed=rand(UInt))
     # To generate the potential array, use a certain number dots per one correlation
     # scale.
     rand_N = 16 / v0
@@ -453,10 +462,46 @@ function Base.convert(::Type{AbstractPotential}, fun::Function)
     return FunctionPotential{typeof(fun)}(fun)
 end
 
-# END OF POTENTIALS
-# TODO: Move rest to quasi2d.jl perhaps?
+"""
+    random_fermi_potential(xmin, xmax, ymin, ymax,
+     lattice_a, dot_radius, v0)
 
+Returns a potential spanning the rectangle from (xmin,ymin) to
+(xmax,ymax). Potential contains Fermi dots with given `dot_radius` and `v0` at
+random locations such that the average density of dots matches
+a periodic lattice with lattice constant `lattice_a`.
+"""
+function random_fermi_potential(xmin, xmax, ymin, ymax,
+    lattice_a, dot_radius, v0)
+    box_dims =
+        num_dots = round(Int, (xmax - xmin) * (ymax - ymin) / lattice_a^2)
+    locs = zeros(2, num_dots)
+    for i ∈ 1:num_dots
+        locs[:, i] = [xmin, ymin] + rand(2) .* [xmax - xmin, ymax - ymin]
+    end
+    return RepeatedPotential(
+        locs,
+        FermiDotPotential(dot_radius, v0),
+        lattice_a
+    )
+end
 
+function complex_separable_potential(degree,
+    lattice_a, dot_radius, v0; softness=0.2)
+    zpot = fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0;
+        softness=softness)
+    w = Matrix(zpot.w)
+    w[2:end, 2:end] .= 0
+    return CosSeriesPotential(w, zpot.k)
+end
+
+"""
+    grid_eval(xs, ys, fun)
+
+Evaluates given callable `fun` in a grid defined by `xs` and `ys`
+and returns a matrix of values. The returned matrix is oriented
+such that y-axis is along rows and x-axis is along columns.
+"""
 function grid_eval(xs, ys, fun)
     return [
         fun(x, y) for y ∈ ys, x ∈ xs

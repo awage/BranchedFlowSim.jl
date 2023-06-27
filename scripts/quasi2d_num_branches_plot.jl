@@ -4,8 +4,31 @@ using Makie
 using CurveFit
 using FileIO
 using HDF5
+using ArgParse
+
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--time", "-T"
+        help = "only plot until this time"
+        arg_type = Float64
+        default = 10000.0
+    "data_dir"
+        help = "directory with daa"
+        required = false
+end
+
+parsed_args = parse_args(ARGS, s)
+
+max_time = parsed_args["time"]
 
 path_prefix = "outputs/quasi2d/latest/"
+if parsed_args["data_dir"] !== nothing
+    path_prefix = parsed_args["data_dir"]
+    # Make sure the prefix ends in /
+    if path_prefix[end] != "/"
+        path_prefix = path_prefix*"/"
+    end
+end
 
 # data = load(path_prefix * "nb_data.jld2")
 # ts = data["ts"]
@@ -20,7 +43,7 @@ function make_label(data)::LaTeXString
     type = data["potential/type"]
     if type == "rand"
         lc = data["potential/correlation_scale"]
-        return L"Correlated random (Metzger), $l_c=%$lc$"
+        return L"Correlated random, $l_c=%$lc$"
     elseif type == "fermi_lattice"
         a = data["potential/lattice_a"]
         return L"Periodic Fermi lattice, $a=%$a$ (mean)"
@@ -34,7 +57,12 @@ function make_label(data)::LaTeXString
             return L"$c_1(\cos(2\pi x/a)+\cos(2\pi y/a))$, $a=%$a$"
         end
         return L"$\sum_{n+m\le%$(degree)}c_{nm}\cos(nkx)\cos(mky)$, $k=2\pi/%$a$"
+    elseif type == "cint"
+        a = data["potential/lattice_a"]
+        degree = data["potential/degree"]
+        return L"$\sum_{n=0}^{%$(degree)}c_{n}\left(\cos(nkx)+\cos(nky)\right)$, $k=2\pi/%$a$"
     end
+    error("Unknown/new potential type \"$type\"")
 end
 
 datasets = [
@@ -52,7 +80,16 @@ datasets = [
         "nb_int_4.h5",
         "nb_int_5.h5",
         "nb_int_6.h5",
+        "nb_cint.h5",
     ]),
+]
+
+angle_datas = [
+    ("fermi_lattice", "nb_lattice.h5"),
+    ("cos1", "nb_int_1.h5"),
+    ("cos2", "nb_int_2.h5"),
+    ("cos3", "nb_int_3.h5"),
+    ("cint", "nb_cint.h5"),
 ]
 
 for (setname, fnames) ∈ datasets
@@ -75,9 +112,9 @@ for (setname, fnames) ∈ datasets
         ("", [])
         ("_log", [:yticks => [1, 10, 100, 1000], :yscale => Makie.pseudolog10])
     ]
-        xmax = ts[end]
+        xmax = min(ts[end], max_time)
         if scalename == ""
-            # Only show the 
+            # Only show the first part in linear scale
             xmax = 2
         end
         included_ts = ts .≤ xmax

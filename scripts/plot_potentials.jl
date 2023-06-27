@@ -5,20 +5,6 @@ using CairoMakie
 path_prefix="outputs/potentials/"
 mkpath(path_prefix)
 
-function random_dot_potential(xmin, xmax, ymin, ymax, lattice_a, dot_radius, v0)
-    box_dims =
-        num_dots = round(Int, (xmax - xmin) * (ymax - ymin) / lattice_a^2)
-    locs = zeros(2, num_dots)
-    for i ∈ 1:num_dots
-        locs[:, i] = [xmin, ymin] + rand(2) .* [xmax - xmin, ymax - ymin]
-    end
-    return RepeatedPotential(
-        locs,
-        FermiDotPotential(dot_radius, v0),
-        lattice_a
-    )
-end
-
 function plot_potential(pot)
     res = 512
     xs = LinRange(0, 2, res)
@@ -31,6 +17,7 @@ function plot_potential(pot)
     mintick = round(Int, ming)
     maxtick = round(Int, maxg)
     tickpoints = mintick:maxtick
+    println("ticks: $tickpoints")
     if maxtick - mintick < 2
         tickpoints = mintick:0.5:maxtick
     end
@@ -58,7 +45,7 @@ lpot = LatticePotential(rotation_matrix(0)*lattice_a, dot_radius, 1)
 save(path_prefix*"fermi_lattice.pdf", plot_potential(lpot))
 
 fermi_rand= 
-    random_dot_potential(-1, 5, -1, 5, lattice_a, dot_radius, 1)
+    random_fermi_potential(-1, 5, -1, 5, lattice_a, dot_radius, 1)
 save(path_prefix*"fermi_random.pdf", plot_potential(fermi_rand))
 
 for deg ∈ 1:6
@@ -67,3 +54,10 @@ for deg ∈ 1:6
     )
     save(path_prefix*"cos_series_$deg.pdf", plot_potential(pot))
 end
+
+for deg ∈ 1:8
+    zpot = complex_separable_potential(deg, lattice_a, dot_radius, 1)
+    save(path_prefix*"complex_separable_$deg.pdf",
+        plot_potential(zpot))
+end
+

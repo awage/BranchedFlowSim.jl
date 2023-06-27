@@ -1,5 +1,7 @@
 using HDF5
 using Statistics
+using Makie
+using CairoMakie
 
 export quasi2d_num_branches, quasi2d_visualize_rays
 export quasi2d_compute_and_save_num_branches
