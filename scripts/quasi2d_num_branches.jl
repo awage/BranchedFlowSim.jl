@@ -9,6 +9,10 @@ s = ArgParseSettings()
         help = "number of rays"
         arg_type = Int
         default = 4000
+    "--num_angles"
+        help = "number of angles used for periodic potentials"
+        arg_type = Int
+        default = 50
     "--time", "-T"
         help = "end time"
         arg_type = Float64
@@ -25,6 +29,9 @@ s = ArgParseSettings()
         help = "maximum degree for the cos_series potentials"
         arg_type = Int
         default = 6
+    "--visualizations"
+        help = "Generate visualization pngs"
+        action = :store_true
 end
 
 parsed_args = parse_args(ARGS, s)
@@ -56,7 +63,7 @@ lattice_a = 0.2
 dot_radius = 0.25 * lattice_a
 dot_v0 = v0
 
-num_angles = 50
+num_angles = parsed_args["num_angles"]
 angles = LinRange(0, π / 2, num_angles + 1)[1:end-1]
 
 function random_potential()
@@ -155,7 +162,7 @@ end
 # include("quasi2d_num_branches_plot.jl")
 
 ## Visualize simulations
-if true
+if parsed_args["visualizations"]
     vis_rays = 2048
     θ = pi / 5
     lattice_mat = lattice_a * rotation_matrix(-θ)
