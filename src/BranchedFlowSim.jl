@@ -28,9 +28,10 @@ import ImageIO
 import FileIO
 
 include("colorschemes.jl")
-include("potentials.jl")
+include("quantum_potentials.jl")
 # TODO: Figure out if this file should be in potentials.jl
-include("classical.jl")
+include("potentials.jl")
+include("potential_argparse.jl")
 include("quasi2d.jl")
 
 default_colorscheme = complex_berlin
@@ -349,7 +350,7 @@ function gaussian_correlated_random(xs, ys, scale, seed=rand(UInt))
     # Convert DFT result to fourier series
     fcorr = (2/num_points)*fft(corr)
     phase = rand(rng, length(ys), length(xs))
-    vrand = ifft(num_points * sqrt.(fcorr) .* exp.(im * 2pi * phase))
+    vrand = ifft(num_points .* sqrt.(fcorr) .* exp.(im .* 2pi .* phase))
     return real(vrand)
 end
 
