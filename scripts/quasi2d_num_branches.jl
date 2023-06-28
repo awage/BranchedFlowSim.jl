@@ -2,6 +2,7 @@ using BranchedFlowSim
 using Statistics
 using LinearAlgebra
 using ArgParse
+using Printf
 
 s = ArgParseSettings()
 @add_arg_table s begin
@@ -40,14 +41,17 @@ potential_types = split(parsed_args["potentials"], ',')
 
 # Store results in a separate directory depending on the number of rays
 num_rays = parsed_args["num_rays"]
-path_prefix = "outputs/quasi2d/$num_rays/"
+sim_height = 1
+sim_width = parsed_args["time"]
+
+# Generate path based on key parameters
+dir = @sprintf "%i_%.1f" num_rays sim_width
+path_prefix = "outputs/quasi2d/$(dir)/"
 mkpath(path_prefix)
 latest_path = "outputs/quasi2d/latest"
 rm(latest_path, force=true)
-symlink("$num_rays/", latest_path)
+symlink("$dir/", latest_path)
 
-sim_height = 1
-sim_width = parsed_args["time"]
 dt = 0.01
 correlation_scale = 0.1
 v0::Float64 = parsed_args["v0"]
