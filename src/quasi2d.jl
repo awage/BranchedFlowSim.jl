@@ -45,9 +45,20 @@ function quasi2d_num_branches(ray_y::AbstractVector{<:Real}, dt::Real,
     end
 end
 
+"""
+    quasi2d_intensity(num_rays, dt, xs, ys, potential; b=0.0030)
+
+Perform quasi-2D ray tracing simulation and return a matrix of smoothed
+intensities.
+Returned matrix has size (length(ys), length(xs)).
+Intensities are computed by 
+"""
 function quasi2d_intensity(num_rays, dt, xs, ys, potential; b=0.0030)
     h = length(ys) * (ys[2] - ys[1])
     T = xs[end] - xs[1]
+    
+    # We want to keep the 
+
     # Make rays start from a region 3 times ys, so that we can measure
     # intensity in the middle.
     extra = T * h / 2

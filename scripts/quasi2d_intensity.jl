@@ -36,52 +36,12 @@ lattice_a::Float64 = 0.2
 dot_radius = 0.25 * lattice_a
 dot_v0 = 0.08 * 0.5
 
-# Compute average over all angles
-function get_lattice_mean_nb()::Vector{Float64}
-    angles = LinRange(0, π / 2, 51)[1:end-1]
-    grid_nb = zeros(length(ts), length(angles))
-    Threads.@threads for di ∈ 1:length(angles)
-        θ = angles[di]
-        potential = LatticePotential(lattice_a * rotation_matrix(θ),
-            dot_radius, dot_v0; softness=softness)
-        grid_nb[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential) / sim_height
-    end
-    return vec(sum(grid_nb, dims=2) / length(angles))
-end
-
-function get_nb_int(V)::Vector{Float64}
-    num_angles = 50
-    angles = LinRange(0, π / 2, num_angles + 1)[1:end-1]
-    int_nb_arr = zeros(length(ts), length(angles))
-    Threads.@threads for di ∈ 1:length(angles)
-        θ = angles[di]
-        potential = RotatedPotential(θ, V)
-        # tys = LinRange(0, 1, 2num_rays)
-        int_nb_arr[:, di] = quasi2d_num_branches(num_rays, dt, ts, potential) / sim_height
-    end
-    return vec(sum(int_nb_arr, dims=2) / length(angles))
-end
-
-function potential_label(degree)
-    lbl = L"\sum_{n+m\le%$(degree)}a_{nm}\cos(nkx)\cos(mky)"
-end
-
 function make_integrable_potential(degree)
     return fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0, softness=softness)
 end
 
 function random_potential()
     return correlated_random_potential(sim_width, sim_height, correlation_scale, v0)
-end
-
-function get_random_nb()::Vector{Float64}
-    # Run simulations to count branches
-    num_branches = zeros(length(ts), num_sims)
-    Threads.@threads for i ∈ 1:num_sims
-        potential = random_potential()
-        num_branches[:, i] = quasi2d_num_branches(num_rays, dt, ts, potential)
-    end
-    return vec(sum(num_branches, dims=2)) ./ (num_sims * sim_height)
 end
 
 complex_int_degree = 8

@@ -44,8 +44,10 @@ num_rays = parsed_args["num_rays"]
 sim_height = 1
 sim_width = parsed_args["time"]
 
+v0::Float64 = parsed_args["v0"]
+
 # Generate path based on key parameters
-dir = @sprintf "%i_%.1f" num_rays sim_width
+dir = @sprintf "%i_%.1f_%.2f" num_rays sim_width v0
 path_prefix = "outputs/quasi2d/$(dir)/"
 mkpath(path_prefix)
 latest_path = "outputs/quasi2d/latest"
@@ -54,9 +56,7 @@ symlink("$dir/", latest_path)
 
 dt = 0.01
 correlation_scale = 0.1
-v0::Float64 = parsed_args["v0"]
 softness = 0.2
-
 num_sims = 100
 
 # Time steps to count branches.
