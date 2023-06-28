@@ -51,19 +51,33 @@ end
 Perform quasi-2D ray tracing simulation and return a matrix of smoothed
 intensities.
 Returned matrix has size (length(ys), length(xs)).
-Intensities are computed by 
+
+The situation being modeled is an infinite vertical wavefront starting
+at x=0 with p_y=0 and p_x=1 (constant). To cover the area defined by xs and ys,
+the actual wavefront being simulated must be taller than ys.
 """
 function quasi2d_intensity(num_rays, dt, xs, ys, potential; b=0.0030)
     h = length(ys) * (ys[2] - ys[1])
     T = xs[end] - xs[1]
     
-    # We want to keep the 
-
-    # Make rays start from a region 3 times ys, so that we can measure
-    # intensity in the middle.
-    extra = T * h / 2
-    ray_y = LinRange(ys[1] - extra, ys[end] + extra, num_rays)
-    return quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (1 + 2extra / h)
+    # First shoot some rays to figure out how wide they spread in the given time.
+    # Then use this to decide how tall to make the initial wavefront.
+    num_canary_rays = 1024
+    canary_ray_y = Vector(LinRange(ys[1], ys[end], num_canary_rays))
+    ray_y = copy(canary_ray_y)
+    ray_py = zero(ray_y)
+    for x ∈ 0:dt:xs[end]
+        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+        ray_y .+= dt .* ray_py
+    end
+    max_travel = maximum(abs.(ray_y - canary_ray_y))
+    rmin = ys[1] - max_travel
+    rmax = ys[end] + max_travel
+    println("ray spread: $rmin .. $rmax")
+    # TODO:
+    ray_y = LinRange(rmin, rmax, num_rays)
+    sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
+    return quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
 end
 
 function quasi2d_intensity(
@@ -98,7 +112,10 @@ function quasi2d_intensity(
     return intensity
 end
 
-
+function quasi2d_compute_and_save_intensity(
+    h5_fname, num_rays, dt, xs,ys, b, potentials::AbstractArray{<:AbstractPotential},
+    pot_params::NamedTuple=())
+end
 
 """
     quasi2d_visualize_rays(path, xs, ys, potential;
@@ -178,15 +195,28 @@ end
 """
     quasi2d_compute_and_save_num_branches(
     h5_fname, num_rays, dt, ts, potentials::AbstractArray{<:AbstractPotential},
-    pot_params::NamedTuple=())
-    h5_fname, num_rays, dt, ts, potentials, pot_params=())
+    pot_params::NamedTuple)
 
 Computes the number of branches for given potentials and stores
-the results in a HDF5 file at `h5_fname`. pot_a
+the results in a HDF5 file at `h5_fname`. pot_params is a NamedTuple
+describing parameters used to generate the potentials.
 """
 function quasi2d_compute_and_save_num_branches(
     h5_fname, num_rays, dt, ts, potentials::AbstractArray{<:AbstractPotential},
-    pot_params::NamedTuple=())
+    pot_params::NamedTuple)
+    dict_params = 
+        Dict{String,Any}([
+            String(k) => v for (k,v) ∈ pairs(pot_params)
+        ])
+    quasi2d_compute_and_save_num_branches(
+        h5_fname, num_rays, dt, ts, potentials,
+        dict_params
+    )
+end
+
+function quasi2d_compute_and_save_num_branches(
+    h5_fname, num_rays, dt, ts, potentials::AbstractArray{<:AbstractPotential},
+    pot_params::Dict{String,Any} = Dict{String,Any}())
     # TODO: Skip if file already exists with given parameters
 
     nb_all = quasi2d_num_branches_parallel(num_rays, dt, ts, potentials,
@@ -201,7 +231,7 @@ function quasi2d_compute_and_save_num_branches(
         f["nb_all"] = nb_all
         pot = create_group(f, "potential")
         for (k, v) ∈ pairs(pot_params)
-            pot[String(k)] = v
+            pot[k] = v
         end
     end
 end

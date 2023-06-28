@@ -43,7 +43,6 @@ potential_types = split(parsed_args["potentials"], ',')
 num_rays = parsed_args["num_rays"]
 sim_height = 1
 sim_width = parsed_args["time"]
-
 v0::Float64 = parsed_args["v0"]
 
 # Generate path based on key parameters
@@ -122,6 +121,7 @@ if "rand" ∈ potential_types
         path_prefix * "nb_rand.h5", num_rays, dt, ts, rand_pots,
         (type="rand", v0=v0, correlation_scale=correlation_scale))
 end
+
 if "fermi_lattice" ∈ potential_types
     quasi2d_compute_and_save_num_branches(
         path_prefix * "nb_lattice.h5", num_rays, dt, ts, lattice_pots,

@@ -27,7 +27,7 @@ num_sims = 100
 # y values for sampling the intensity
 ys = LinRange(0, 1, 4000)
 # smoothing parameter
-smoothing_b = 0.003
+smoothing_b = 0.03
 # Time steps to count branches.
 ts = LinRange(0, sim_width, round(Int, 10 * sim_width))
 
@@ -41,16 +41,12 @@ function make_integrable_potential(degree)
 end
 
 function random_potential()
-    return correlated_random_potential(sim_width, sim_height, correlation_scale, v0)
+    return correlated_random_potential(sim_width, sim_height+2, correlation_scale, v0)
 end
 
 complex_int_degree = 8
-complex_int = begin
-    zpot8 = make_integrable_potential(complex_int_degree)
-    w = Matrix(zpot8.w)
-    w[2:end, 2:end] .= 0
-    CosSeriesPotential{SMatrix{9,9,Float64,81}}(w, zpot8.k)
-end
+complex_int =
+    complex_separable_potential(complex_int_degree, lattice_a, dot_radius, v0; softness=softness)
 
 function random_dot_potential()
     y_extra = 4
@@ -58,17 +54,7 @@ function random_dot_potential()
     xmax = sim_width + 1
     ymin = -y_extra
     ymax = sim_height + y_extra
-    box_dims =
-        num_dots = round(Int, (xmax - xmin) * (ymax - ymin) / lattice_a^2)
-    locs = zeros(2, num_dots)
-    for i ∈ 1:num_dots
-        locs[:, i] = [xmin, ymin] + rand(2) .* [xmax - xmin, ymax - ymin]
-    end
-    return RepeatedPotential(
-        locs,
-        FermiDotPotential(dot_radius, v0),
-        lattice_a
-    )
+    return random_fermi_potential(xmin, xmax, ymin, ymax, lattice_a, dot_radius, v0)
 end
 
 function maximum_intensity(int)
@@ -78,7 +64,7 @@ end
 function mean_max_intensity(pots, progress_text="")
     maxint_all = zeros(length(ts), length(pots))
     int_all = zeros(length(ys), length(ts), length(pots))
-    p = Progress(length(pots), progress_text)
+    p = Progress(length(pots); desc=progress_text, enabled=false)
     dy = ys[2] - ys[1]
     Threads.@threads for j ∈ 1:length(pots)
         int = quasi2d_intensity(num_rays, dt, ts, ys, pots[j], b=smoothing_b)
@@ -87,7 +73,7 @@ function mean_max_intensity(pots, progress_text="")
         next!(p)
     end
     end_p = vec(dy * sum(int_all[:,end,:],dims=1))
-    println("total_p=$(mean(end_p)) ($(minimum(end_p)) - $(maximum(end_p)))")
+    println("$progress_text total_p=$(mean(end_p)) ($(minimum(end_p)) - $(maximum(end_p)))")
     return vec(mean(maxint_all, dims=2)), maxint_all,int_all
 end
 
@@ -119,18 +105,7 @@ lines!(ax, ts, lattice_maxint, label="periodic lattice")
 lines!(ax, ts, int_maxint, label="integrable")
 axislegend(ax)
 save(path_prefix * "max_intensity.png", fig, px_per_unit=2)
+save(path_prefix * "max_intensity.pdf", fig)
 # lines(ys, int_rand[:, end÷2], axis=(title="Profile at w/2",))
 # display(maximum_intensity(int_rand)[end])
 display(fig)
-
-## save results for later plotting
-
-#=
-nb_data::Vector{Tuple{String,Vector{Float64}}} = [
-    (String(L"correlated random (Metzger), $l_c=%$correlation_scale$"), nb_rand),
-    (String(L"periodic lattice, $a=%$(lattice_a)$ (mean)"), nb_lattice),
-    (String(L"random dots, $a=%$(lattice_a)$"), nb_rand_dots),
-    (String(L"$\sum_{n=0}^%$(complex_int_degree) a_n(\cos(nkx)+\cos(nky))$"),
-     nb_cint),
-]
-=#
