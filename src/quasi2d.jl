@@ -63,7 +63,7 @@ function quasi2d_intensity(num_rays, dt, xs, ys, potential; b=0.0030)
     # First shoot some rays to figure out how wide they spread in the given time.
     # Then use this to decide how tall to make the initial wavefront.
     num_canary_rays = 1024
-    canary_ray_y = Vector(LinRange(ys[1], ys[end], num_canary_rays))
+    canary_ray_y = Vector(sample_midpoints(ys[1], ys[end], num_canary_rays))
     ray_y = copy(canary_ray_y)
     ray_py = zero(ray_y)
     for x ∈ 0:dt:xs[end]
@@ -73,11 +73,11 @@ function quasi2d_intensity(num_rays, dt, xs, ys, potential; b=0.0030)
     max_travel = maximum(abs.(ray_y - canary_ray_y))
     rmin = ys[1] - max_travel
     rmax = ys[end] + max_travel
-    println("ray spread: $rmin .. $rmax")
-    # TODO:
+    # println("ray spread: $rmin .. $rmax")
     ray_y = LinRange(rmin, rmax, num_rays)
     sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
-    return quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
+    ints = quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
+    return ints, (rmin, rmax)
 end
 
 function quasi2d_intensity(
@@ -88,7 +88,7 @@ function quasi2d_intensity(
     potential,
     b=0.0030
 )
-    y_start = ys[1]
+    dy = ys[2] - ys[1]
     y_end = ys[1] + length(ys) * (ys[2] - ys[1])
     ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
@@ -96,6 +96,10 @@ function quasi2d_intensity(
     xi = 1
     x = 0.0
     intensity = zeros(length(ys), length(xs))
+    boundary = (
+        ys[1] - dy - 4*b,
+        ys[end] + dy + 4*b,
+    )
     while xi <= length(xs)
         # kick
         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
@@ -104,7 +108,7 @@ function quasi2d_intensity(
         x += dt
         if xs[xi] <= x
             # Compute intensity
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=(y_start, y_end))
+            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity[:, xi] = pdf(density, ys)
             xi += 1
         end

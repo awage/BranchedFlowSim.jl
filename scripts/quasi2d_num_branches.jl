@@ -23,7 +23,6 @@ add_potential_args(s)
 
 parsed_args = parse_args(ARGS, s)
 
-# Store results in a separate directory depending on the number of rays
 num_rays = parsed_args["num_rays"]
 sim_height = 1
 sim_width = parsed_args["time"]
@@ -41,15 +40,15 @@ dt = 0.01
 # Time steps to count branches.
 ts = LinRange(0, sim_width, round(Int, 50 * sim_width))
 
-y_extra = 1
-@time "Created potentials" potentials = get_potentials_from_parsed_args(parsed_args, 0,
-    sim_width, -y_extra, sim_height+y_extra)
+y_extra = 2
+@time "Created potentials" potentials = get_potentials_from_parsed_args(
+    parsed_args, sim_width, sim_height+y_extra)
     
 for pot ∈ potentials
     quasi2d_compute_and_save_num_branches(
-        path_prefix * "nb_$(pot.path_part).h5", num_rays, dt, ts, pot.instances,
+        path_prefix * "nb_$(pot.name).h5", num_rays, dt, ts, pot.instances,
         pot.params)
-    println("$(pot.path_part) done")
+    println("$(pot.name) done")
 end
 
 # @time "rand sim" nb_rand = get_random_nb()

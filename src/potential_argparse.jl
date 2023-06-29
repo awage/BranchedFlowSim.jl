@@ -4,7 +4,14 @@ export add_potential_args
 export get_potentials_from_parsed_args
 export ParsedPotential
 
-function add_potential_args(s::ArgParseSettings)
+"""
+    add_potential_args(s::ArgParseSettings,
+        default_potentials = "rand,fermi_lattice,fermi_rand,cos_series,cint")
+
+TBW
+"""
+function add_potential_args(s::ArgParseSettings;
+        default_potentials = "rand,fermi_lattice,fermi_rand,cos_series,cint")
     @add_arg_table s begin
         "--num_angles"
         help = "number of angles used for periodic potentials"
@@ -25,7 +32,7 @@ function add_potential_args(s::ArgParseSettings)
         "--potentials"
         help = "comma-separated list of potentials to run"
         arg_type = String
-        default = "rand,fermi_lattice,fermi_rand,cos_series,cint"
+        default = default_potentials
         "--cos_max_degree"
         help = "maximum degree for the cos_series potentials"
         arg_type = Int
@@ -48,7 +55,7 @@ end
 struct ParsedPotential
     instances::Vector{AbstractPotential}
     params::Dict{String,Any}
-    path_part :: String
+    name :: String
     function ParsedPotential(instances, params)
         p = params["type"]
         if "degree" ∈ keys(params)
@@ -58,14 +65,9 @@ struct ParsedPotential
     end
 end
 
-function get_path_part(params::Dict{String,Any})::String
-end
-
-function get_potentials_from_parsed_args(parsed_args, xmin, xmax, ymin, ymax)::Vector{ParsedPotential}
+function get_potentials_from_parsed_args(parsed_args, width, height)::Vector{ParsedPotential}
     potential_types = split(parsed_args["potentials"], ',')
     potentials = ParsedPotential[]
-    width = xmax - xmin
-    height = ymax - ymin
     v0 = parsed_args["v0"]
     lattice_a = parsed_args["lattice_a"]
     dot_radius = parsed_args["fermi_dot_radius"]
@@ -100,7 +102,7 @@ function get_potentials_from_parsed_args(parsed_args, xmin, xmax, ymin, ymax)::V
             params["dot_radius"] = dot_radius
             push!(potentials, ParsedPotential(instances, params))
         elseif pt == "fermi_rand"
-            instances = [random_fermi_potential(xmin, xmax, ymin, ymax, lattice_a, dot_radius, v0)
+            instances = [random_fermi_potential(width, height, lattice_a, dot_radius, v0)
                          for _ ∈ 1:num_sims]
             params["lattice_a"] = lattice_a
             params["softness"] = softness

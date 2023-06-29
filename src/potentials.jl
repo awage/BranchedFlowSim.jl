@@ -80,6 +80,14 @@ struct LatticePotential{DotPotential<:AbstractPotential} <: AbstractPotential
             SMatrix{2,2}(inv(A)),
             dot, SVector{2,Float64}(offset), fo)
     end
+    function LatticePotential(A, dot::AbstractPotential; offset=[0,0])
+        A = SMatrix{2,2}(A)
+        fo = [SVector(0.0, 0.0), A[:, 1], A[:, 2], A[:, 1] + A[:, 2]]
+        return new{typeof(dot)}(
+            A,
+            SMatrix{2,2}(inv(A)),
+            dot, SVector{2,Float64}(offset), fo)
+    end
 end
 
 """
@@ -463,27 +471,34 @@ function Base.convert(::Type{AbstractPotential}, fun::Function)
 end
 
 """
-    random_fermi_potential(xmin, xmax, ymin, ymax,
-     lattice_a, dot_radius, v0)
+    random_fermi_potential(width, height, lattice_a, dot_radius, v0;
+        softness=0.2)
 
-Returns a potential spanning the rectangle from (xmin,ymin) to
-(xmax,ymax). Potential contains Fermi dots with given `dot_radius` and `v0` at
-random locations such that the average density of dots matches
-a periodic lattice with lattice constant `lattice_a`.
+Returns a potential with randomly placed Fermi bumps. Fermi bumps have
+radius `dot_radius` and height `v0`. Average density of the bumps matches a
+periodic lattice with lattice constant `lattice_a`.
+
+Randomly generated potential has size (width,height) and is repeated with that
+period to make a periodic potential.
 """
-function random_fermi_potential(xmin, xmax, ymin, ymax,
-    lattice_a, dot_radius, v0)
-    box_dims =
-        num_dots = round(Int, (xmax - xmin) * (ymax - ymin) / lattice_a^2)
+function random_fermi_potential(width, height, lattice_a, dot_radius, v0;
+        softness=0.2)
+    num_dots = round(Int, width * height / lattice_a^2)
     locs = zeros(2, num_dots)
     for i ∈ 1:num_dots
-        locs[:, i] = [xmin, ymin] + rand(2) .* [xmax - xmin, ymax - ymin]
+        locs[:, i] = [-width/2, -height/2] + rand(2) .* [width, height]
     end
-    return RepeatedPotential(
+    pot = RepeatedPotential(
         locs,
-        FermiDotPotential(dot_radius, v0),
+        FermiDotPotential(dot_radius, v0, softness),
         lattice_a
     )
+    # Convert into a lattice potential to make it repeat forever
+    A = [
+        width 0
+        0 height
+    ]
+    return LatticePotential(A, pot)
 end
 
 function complex_separable_potential(degree,

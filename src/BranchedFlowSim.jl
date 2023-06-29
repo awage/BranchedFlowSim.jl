@@ -33,10 +33,12 @@ include("quantum_potentials.jl")
 include("potentials.jl")
 include("potential_argparse.jl")
 include("quasi2d.jl")
+include("helpers.jl")
 
 default_colorscheme = complex_berlin
 
 const mass::Float64 = 1.0
+
 
 """
     gaussian_packet(xgrid, pos, momentum, Δ)
@@ -348,9 +350,12 @@ function gaussian_correlated_random(xs, ys, scale, seed=rand(UInt))
     corr =  exp.(-dist2 / (scale^2))
     num_points = length(xs) * length(ys)
     # Convert DFT result to fourier series
+    # TODO: Not sure why the factor 2 is included here
     fcorr = (2/num_points)*fft(corr)
     phase = rand(rng, length(ys), length(xs))
-    vrand = ifft(num_points .* sqrt.(fcorr) .* exp.(im .* 2pi .* phase))
+    ft = num_points .* sqrt.(fcorr) .* exp.(im .* 2pi .* phase)
+    vrand = ifft(ft)
+    # vrand = ifft(num_points * sqrt.(fcorr) .* cis.(2pi .* phase))
     return real(vrand)
 end
 
@@ -358,7 +363,7 @@ function gaussian_correlated_random_like(corr)
     num_points = length(corr)
     fcorr = 2*fft(corr) / num_points
     phase = rand(size(corr)...)
-    vrand = ifft(num_points * sqrt.(fcorr) .* exp.(im * 2pi * phase))
+    vrand = ifft(num_points * sqrt.(fcorr) .* cis.(2pi .* phase))
     return real(vrand)
 end
 

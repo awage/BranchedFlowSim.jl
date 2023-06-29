@@ -1,111 +1,101 @@
 using BranchedFlowSim
-using CairoMakie
-using Interpolations
-using Statistics
-using LaTeXStrings
 using ProgressMeter
 using LinearAlgebra
-using StaticArrays
-using Makie
-using ColorTypes
-using JLD2
+using ArgParse
+using HDF5
+using Statistics
+using Printf
 
-path_prefix = "outputs/quasi2d/"
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--num_rays", "-n"
+    help = "number of rays"
+    arg_type = Int
+    default = 40000
+    "--time", "-T"
+    help = "end time"
+    arg_type = Float64
+    default = 20.0
+    "--b", "-b"
+    help = "Smoothing parameter b"
+    arg_type = Float64
+    default = 0.003
+    "--yres"
+    help = "Resolution in the y axis"
+    arg_type = Int64
+    default = 1024
+    "--xres"
+    help = "Resolution in x axis per one length unit. Total resolution is xres*time"
+    arg_type = Int64
+    default = 20
+end
+add_potential_args(s;
+    default_potentials="fermi_lattice,fermi_rand,rand,cos_series,cint")
+parsed_args = parse_args(ARGS, s)
+
+num_rays::Int = parsed_args["num_rays"]
+sim_height::Float64 = 1
+sim_width::Float64 = parsed_args["time"]
+v0::Float64 = parsed_args["v0"]
+
+dir = @sprintf "intensity_%i_%.1f_%.2f" num_rays sim_width v0
+path_prefix = "outputs/quasi2d/$(dir)/"
 mkpath(path_prefix)
-sim_height = 1
-sim_width = 20
-num_rays = 40000
-dt = 0.01
-correlation_scale = 0.1
-# To match Metzger, express potential as percents from particle energy (E=1/2).
-ϵ_percent = 8
-v0::Float64 = ϵ_percent * 0.01 * 0.5
-softness = 0.2
+println("Saving data to $path_prefix")
 
-num_sims = 100
+dt = 0.01
 
 # y values for sampling the intensity
-ys = LinRange(0, 1, 4000)
+yres = parsed_args["yres"]
+ys = sample_midpoints(0, 1, yres)
 # smoothing parameter
-smoothing_b = 0.03
+smoothing_b = parsed_args["b"]
 # Time steps to count branches.
-ts = LinRange(0, sim_width, round(Int, 10 * sim_width))
-
-# Periodic potential
-lattice_a::Float64 = 0.2
-dot_radius = 0.25 * lattice_a
-dot_v0 = 0.08 * 0.5
-
-function make_integrable_potential(degree)
-    return fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0, softness=softness)
-end
-
-function random_potential()
-    return correlated_random_potential(sim_width, sim_height+2, correlation_scale, v0)
-end
-
-complex_int_degree = 8
-complex_int =
-    complex_separable_potential(complex_int_degree, lattice_a, dot_radius, v0; softness=softness)
-
-function random_dot_potential()
-    y_extra = 4
-    xmin = -1
-    xmax = sim_width + 1
-    ymin = -y_extra
-    ymax = sim_height + y_extra
-    return random_fermi_potential(xmin, xmax, ymin, ymax, lattice_a, dot_radius, v0)
-end
+xres = parsed_args["xres"]
+ts = LinRange(0, sim_width, round(Int, xres * sim_width))
 
 function maximum_intensity(int)
     return vec(maximum(int, dims=1))
 end
 
-function mean_max_intensity(pots, progress_text="")
-    maxint_all = zeros(length(ts), length(pots))
+function parallel_compute_intensity(pots, progress_text="")
+    println("Start $progress_text")
     int_all = zeros(length(ys), length(ts), length(pots))
+    start_bounds = zeros(2, length(pots))
     p = Progress(length(pots); desc=progress_text, enabled=false)
     dy = ys[2] - ys[1]
     Threads.@threads for j ∈ 1:length(pots)
-        int = quasi2d_intensity(num_rays, dt, ts, ys, pots[j], b=smoothing_b)
-        int_all[:,:, j] = int
-        maxint_all[:, j] = maximum_intensity(int)
+        int,(rmin,rmax) = quasi2d_intensity(
+            num_rays, dt, ts, ys, pots[j], b=smoothing_b)
+        int_all[:, :, j] = int
+        start_bounds[:, j] = [rmin, rmax]
         next!(p)
     end
-    end_p = vec(dy * sum(int_all[:,end,:],dims=1))
-    println("$progress_text total_p=$(mean(end_p)) ($(minimum(end_p)) - $(maximum(end_p)))")
-    return vec(mean(maxint_all, dims=2)), maxint_all,int_all
+    end_p = vec(dy * sum(int_all[:, end, :], dims=1))
+    println("$progress_text total_p=$(mean(end_p))" *
+            " ($(minimum(end_p)) - $(maximum(end_p)))")
+    return int_all, start_bounds
 end
 
-@time "generate rpots" rpots = [random_potential() for _ ∈ 1:num_sims]
-num_angles = 50
-angles = LinRange(0, pi / 2, num_angles + 1)[1:end-1]
-lattice_pots = [LatticePotential(lattice_a * rotation_matrix(θ), dot_radius, v0)
-                for θ ∈ angles
-]
-int1_pot =make_integrable_potential(1)
-int_pots = [ RotatedPotential(θ, int1_pot) for θ ∈ angles]
-## Actually evaluate
+@time("load potentials",
+    potentials = get_potentials_from_parsed_args(parsed_args, sim_width, 3))
+    
+## Compute intensities
 
-GC.gc()
-@time "random intensity" rand_maxint, rand_int_all,rand_int = mean_max_intensity(rpots, "correlated random")
-@time "lattice intensity" lattice_maxint, lattice_int_all,lattice_int = mean_max_intensity(lattice_pots, "lattice")
-@time "int intensity" int_maxint, int_int_all,int_int = mean_max_intensity(int_pots, "integrable")
-
-
-## Plot results
-fig = Figure()
-ax = Axis(fig[1, 1],
-    title="Maximum intensity",
-    limits=(nothing, (0, 10)),
-    yticks=0:10)
-# heatmap(ts, ys, int_rand')
-lines!(ax, ts, rand_maxint, label="correlated random")
-lines!(ax, ts, lattice_maxint, label="periodic lattice")
-lines!(ax, ts, int_maxint, label="integrable")
-axislegend(ax)
-save(path_prefix * "max_intensity.png", fig, px_per_unit=2)
-save(path_prefix * "max_intensity.pdf", fig)
-# lines(ys, int_rand[:, end÷2], axis=(title="Profile at w/2",))
-# display(maximum_intensity(int_rand)[end])
-display(fig)
+for pot ∈ potentials
+    int, start_bounds = parallel_compute_intensity(pot.instances, pot.params["type"])
+    fname = path_prefix * "intensity_$(pot.name).h5"
+    h5open(fname, "w") do f
+        f["dt"] = Float64(dt)
+        f["num_rays"] = Int64(num_rays)
+        f["ts"] = Vector{Float64}(ts)
+        f["ys"] = Vector{Float64}(ys)
+        f["b"] = Float64(smoothing_b)
+        f["intensity"] = int
+        f["start_bounds"] = start_bounds
+        pg = create_group(f, "potential")
+        for (k, v) ∈ pairs(pot.params)
+            pg[k] = v
+        end
+    end
+end

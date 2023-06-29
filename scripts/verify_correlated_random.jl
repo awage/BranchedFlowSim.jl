@@ -3,21 +3,24 @@ using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
 
-Lx = 2
-Ly = 2
-# Weird rectangle size
-Nx = 512
-Ny = 512
+Lx = 4
+Ly = 4
+Nx = 1024
+Ny = 1024
 
 # This is the "feature scale" of the random potential
 scale = 0.1
 
-xs = LinRange(-Lx / 2, Lx / 2, Nx)
+# xs = LinRange(-Lx / 2, Lx / 2, Nx)
+# ys = LinRange(0, Ly, Ny)
+# Use kind of strange values for xs and ys
+xs = LinRange(0, Lx, Nx)
 ys = LinRange(-Ly / 2, Ly / 2, Ny)
+
 
 V = gaussian_correlated_random(xs, ys, scale)
 
-# Plot image
+## Plot
 fig = Figure(resolution=(1024,1024))
 ax = Axis(fig[1, 1], aspect=DataAspect())
 # rowsize!(fig.layout, 1, Relative(10))
@@ -64,7 +67,7 @@ function mean(xs)
 end
 
 rs = LinRange(0, min(Lx, Ly) / 2, 256)
-num_pairs = 4000
+num_pairs = 40000
 corr = [
     mean(
         random_corr(r) for i ∈ 1:num_pairs
