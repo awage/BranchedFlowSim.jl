@@ -81,7 +81,7 @@ function make_label(data)::LaTeXString
         label = LaTeXString("Correlated random")
     elseif type == "fermi_lattice"
         a = data["potential/lattice_a"]
-        label = L"Periodic Fermi lattice, $a=%$a$ (mean)"
+        label = "Periodic Fermi lattice"
     elseif type == "fermi_rand"
         a = data["potential/lattice_a"]
         label = LaTeXString("Random Fermi potential")
@@ -89,7 +89,7 @@ function make_label(data)::LaTeXString
         a = data["potential/lattice_a"]
         degree = data["potential/degree"]
         if degree == 1
-            label = L"$c_1(\cos(2\pi x/a)+\cos(2\pi y/a))$, $a=%$a$"
+            label = L"$c_1(\cos(2\pi x/a)+\cos(2\pi y/a))$"
         else
             label = L"$\sum_{n+m\le%$(degree)}c_{nm}\cos(2\pi nx/a)\cos(2\pi my/a)$"
         end
