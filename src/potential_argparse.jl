@@ -86,8 +86,10 @@ function get_potentials_from_parsed_args(parsed_args, width, height)::Vector{Par
             correlation_scale = parsed_args["correlation_scale"]
             instances = Vector{AbstractPotential}(undef, num_sims)
             Threads.@threads for i ∈ 1:num_sims
+                seed = i
                 instances[i] =
-                    correlated_random_potential(width, height, correlation_scale, v0)
+                    correlated_random_potential(width, height, correlation_scale, v0,
+                        seed)
             end
             params["correlation_scale"] = correlation_scale
             push!(potentials, ParsedPotential(instances, params))
