@@ -442,7 +442,7 @@ function correlated_random_potential(width,
     v0, seed=rand(UInt))
     # To generate the potential array, use a certain number dots per one correlation
     # scale.
-    rand_N = 16 / v0
+    rand_N = 16 / correlation_scale
     rNy = round(Int, rand_N * height)
     rNx = round(Int, rand_N * width)
     ys = LinRange(0, height, rNy + 1)[1:end-1]

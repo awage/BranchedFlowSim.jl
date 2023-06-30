@@ -3,7 +3,7 @@ module BranchedFlowSim
 # Helpers
 export gaussian_packet, braket
 export total_prob
-export gaussian_correlated_random, gaussian_correlated_random_like
+export gaussian_correlated_random
 
 # Simulation and analysis
 export SplitOperatorStepper, timestep!, time_evolution
@@ -342,29 +342,25 @@ function middle(xs)
 end
 
 function gaussian_correlated_random(xs, ys, scale, seed=rand(UInt))
+    # See scripts/verify_correlated_random.jl for testing this
     rng = Xoshiro(seed)
     ymid = middle(ys)
     xmid = middle(xs)
     # TODO: Explain this. 
-    dist2 = ((ys .- ymid) .^ 2) .+ transpose((xs .- xmid) .^ 2)
-    corr =  exp.(-dist2 / (scale^2))
-    num_points = length(xs) * length(ys)
+    # dist2 = ((ys .- ymid) .^ 2) .+ transpose()
+    xcorr = exp.(-(xs .- xmid) .^ 2 ./ (scale^2))
+    ycorr = exp.(-(ys .- ymid) .^ 2 ./ (scale^2))
+    corr =  ComplexF64.(ycorr .* transpose(xcorr))
+        # exp.( -dist2 ./ (scale^2)))
     # Convert DFT result to fourier series
-    # TODO: Not sure why the factor 2 is included here
-    fcorr = (2/num_points)*fft(corr)
-    phase = rand(rng, length(ys), length(xs))
-    ft = num_points .* sqrt.(fcorr) .* exp.(im .* 2pi .* phase)
-    vrand = ifft(ft)
+    fcorr = fft!(corr)
+    num_points = length(xs) * length(ys)
+    # phase = rand(rng, length(ys), length(xs))
+    # TODO: Not sure why the factor 2 is included here inside sqrt
+    ft = num_points .* sqrt.((2/num_points).*fcorr) .* cis.(2pi .* rand.(rng))
+    ifft!(ft)
     # vrand = ifft(num_points * sqrt.(fcorr) .* cis.(2pi .* phase))
-    return real(vrand)
-end
-
-function gaussian_correlated_random_like(corr)
-    num_points = length(corr)
-    fcorr = 2*fft(corr) / num_points
-    phase = rand(size(corr)...)
-    vrand = ifft(num_points * sqrt.(fcorr) .* cis.(2pi .* phase))
-    return real(vrand)
+    return real(ft)
 end
 
 """

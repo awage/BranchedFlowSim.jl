@@ -1,6 +1,7 @@
-# Plot gaussian_correlated_random and make sure statistics are as expected
+# Plot gaussian_correlatedrng_random and make sure statistics are as expected
 using BranchedFlowSim
 using CairoMakie
+using Statistics
 using LaTeXStrings
 
 Lx = 4
@@ -54,16 +55,6 @@ function random_corr(r)
     x2i = 1 + (x2i + Nx - 1) % Nx
     y2i = 1 + (y2i + Ny - 1) % Ny
     return V[y1i, x1i] * V[y2i, x2i]
-end
-
-function mean(xs)
-    s = 0.0
-    c = 0
-    for x ∈ xs
-        s += x
-        c += 1
-    end
-    return s / c
 end
 
 rs = LinRange(0, min(Lx, Ly) / 2, 256)
