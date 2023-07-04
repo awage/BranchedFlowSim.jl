@@ -49,6 +49,14 @@ function add_potential_args(s::ArgParseSettings;
         help = "Softness parameter σ used for the Fermi potentials"
         arg_type = Float64
         default = 0.2
+        "--shake_pos_dev"
+        help = "standard deviation of position displacement for the shaken potentials."
+        arg_type = Float64
+        default = 0.0
+        "--shake_v_dev"
+        help = "standard deviation of bump height displacement for the shaken potentials."
+        arg_type = Float64
+        default = 0.0
     end
 end
 
@@ -60,6 +68,12 @@ struct ParsedPotential
         p = params["type"]
         if "degree" ∈ keys(params)
             p *= "_$(params["degree"])"
+        end
+        if "pos_dev" ∈ keys(params)
+            p *= "_$(params["pos_dev"])"
+        end
+        if "v_dev" ∈ keys(params)
+            p *= "_$(params["v_dev"])"
         end
         return new(instances, params, p)
     end
@@ -137,6 +151,25 @@ function get_potentials_from_parsed_args(parsed_args, width, height)::Vector{Par
             instances = [
                 RotatedPotential(θ, csep) for θ ∈ angles
             ]
+            push!(potentials, ParsedPotential(instances, params))
+        elseif pt == "fermi_lattice_shaken"
+            pos_dev = parsed_args["pos_dev"]
+            v_dev = parsed_args["v_dev"]
+            
+            pot = shaken_fermi_lattice_potential(
+                lattice_a * I, dot_radius,
+                v0,
+            )
+            instances = [
+                RotatedPotential(θ, cos_pot) for θ ∈ angles
+            ]
+            instances =
+                [LatticePotential(lattice_a * rotation_matrix(θ),
+                    dot_radius, v0; softness=softness) for θ ∈ angles]
+            params["lattice_a"] = lattice_a
+            params["softness"] = softness
+            params["angles"] = angles
+            params["dot_radius"] = dot_radius
             push!(potentials, ParsedPotential(instances, params))
         else
             error("Unknown potential type $pt specified in --potentials")

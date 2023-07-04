@@ -9,7 +9,7 @@ using KernelDensity
 
 export AbstractPotential
 export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
-export RepeatedPotential
+export CompositePotential,RepeatedPotential
 export CosSeriesPotential
 export FunctionPotential
 
@@ -18,13 +18,14 @@ export correlated_random_potential
 export random_fermi_potential
 export fermi_dot_lattice_cos_series
 export complex_separable_potential
+export shaken_fermi_lattice_potential
 export grid_eval
 
 """
 We consider an object V to be a Potential if it is callable with two floats
 (like V(x,y)) and has a defined function force(V, x, y) = -∇V. Plain functions
 are supported with numerical differentiation, and some of the potentials
-defined here can be composed together (LatticePotential, RepeatedPotential)
+defined here can be composed together (LatticePotential, CompositePotential)
 to create complex yet efficient potential functions.
 """
 function ispotential(v)
@@ -258,25 +259,34 @@ function force(V::RotatedPotential, x::Real, y::Real)::SVector{2,Float64}
 end
 
 
-struct RepeatedPotential{DotPotential} <: AbstractPotential
-    dot_potential::DotPotential
+struct CompositePotential{DotPotential} <: AbstractPotential
+    dot_potentials::Vector{DotPotential}
     potential_size::Float64
     locations::Matrix{Float64}
     grid_x::Float64
     grid_y::Float64
-    grid_locations::Matrix{Vector{SVector{2,Float64}}}
+    # grid_locations::Matrix{Vector{SVector{2,Float64}}}
+    grid_indices::Matrix{Vector{Int32}}
     grid_w::Int64
     grid_h::Int64
 
-    function RepeatedPotential(locations::AbstractMatrix,
-        dot_potential, potential_size::Real)
+    function CompositePotential(locations::AbstractMatrix,
+        dot_potential::AbstractPotential, potential_size::Real)
+        potentials = Vector{typeof(dot_potential)}(
+            [dot_potential for _ ∈ eachcol(locations)]
+        )
+        return CompositePotential(locations, potentials, potential_size)
+    end
+
+    function CompositePotential(locations::AbstractMatrix,
+        dot_potentials::AbstractVector{DotPotential}, potential_size::Real) where {DotPotential <: AbstractPotential}
         min_x, max_x = extrema(locations[1, :])
         min_y, max_y = extrema(locations[2, :])
         # XXX: Explain this math
         grid_w = 3 + ceil(Int, (max_x - min_x) / potential_size)
         grid_h = 3 + ceil(Int, (max_y - min_y) / potential_size)
-        grid_locations = [
-            Vector{SVector{2,Float64}}()
+        grid_indices= [
+            Vector{Int32}()
             for y ∈ 1:grid_h, x ∈ 1:grid_w
         ]
         offsets = [
@@ -290,21 +300,21 @@ struct RepeatedPotential{DotPotential} <: AbstractPotential
             1 1
             1 -1
         ]'
-        for (x, y) ∈ eachcol(locations)
+        for (i, (x, y)) ∈ enumerate(eachcol(locations))
             ix = 2 + floor(Int, (x - min_x) / potential_size)
             iy = 2 + floor(Int, (y - min_y) / potential_size)
             for (dx, dy) ∈ eachcol(offsets)
-                push!(grid_locations[iy+dy, ix+dx], SVector(x, y))
+                push!(grid_indices[iy+dy, ix+dx], i)
             end
         end
-        return new{typeof(dot_potential)}(dot_potential, potential_size,
-            locations, min_x, min_y, grid_locations,
+        return new{DotPotential}(dot_potentials, potential_size,
+            locations, min_x, min_y, grid_indices,
             grid_w, grid_h
         )
     end
 end
 
-function (V::RepeatedPotential)(x::Real, y::Real)::Float64
+function (V::CompositePotential)(x::Real, y::Real)::Float64
     # find index
     ix = 2 + floor(Int, (x - V.grid_x) / V.potential_size)
     iy = 2 + floor(Int, (y - V.grid_y) / V.potential_size)
@@ -312,13 +322,16 @@ function (V::RepeatedPotential)(x::Real, y::Real)::Float64
         return 0.0
     end
     v = 0
-    for (rx, ry) ∈ V.grid_locations[iy, ix]
-        v += @inline V.dot_potential(x - rx, y - ry)
+    @inbounds for idx ∈ V.grid_indices[iy, ix]
+        @inbounds rx = V.locations[1, idx]
+        @inbounds ry = V.locations[2, idx]
+        @inbounds pot = V.dot_potentials[idx]
+        v += @inline pot(x - rx, y - ry)
     end
     return v
 end
 
-function force(V::RepeatedPotential, x::Real, y::Real)::SVector{2,Float64}
+function force(V::CompositePotential, x::Real, y::Real)::SVector{2,Float64}
     # find index
     ix = 2 + floor(Int, (x - V.grid_x) / V.potential_size)
     iy = 2 + floor(Int, (y - V.grid_y) / V.potential_size)
@@ -326,11 +339,16 @@ function force(V::RepeatedPotential, x::Real, y::Real)::SVector{2,Float64}
         return SVector(0.0, 0.0)
     end
     F = SVector(0.0, 0.0)
-    for (rx, ry) ∈ V.grid_locations[iy, ix]
-        F += @inline force(V.dot_potential, x - rx, y - ry)
+    for idx ∈ V.grid_indices[iy, ix]
+        rx = V.locations[1, idx]
+        ry = V.locations[2, idx]
+        pot = V.dot_potentials[idx]
+        F += @inline force(pot, x - rx, y - ry)
     end
     return F
 end
+
+const RepeatedPotential = CompositePotential;
 
 struct CosSeriesPotential{MatrixType} <: AbstractPotential
     w::MatrixType
@@ -436,6 +454,21 @@ function fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0; softnes
     return CosSeriesPotential(w, k)
 end
 
+"""
+    correlated_random_potential(width,
+    height,
+    correlation_scale,
+    v0, seed=rand(UInt))
+
+Returns a Gaussian correlated random potential (PeriodicGridPotential) with
+periodicity (width,height), given `correlation_scale` and height `v0`. If
+specified, `seed` is used for random numbers, so that repeated calls result
+in the same potential (as long as other parameters don't change).
+
+Returned potential satisfies the following
+E[V(r)] = 0
+E[V(r₁)*V(r₂)] = v₀² exp(-(|r₁-r₂|²/c²))
+"""
 function correlated_random_potential(width,
     height,
     correlation_scale,
@@ -488,7 +521,7 @@ function random_fermi_potential(width, height, lattice_a, dot_radius, v0;
     for i ∈ 1:num_dots
         locs[:, i] = [-width/2, -height/2] + rand(2) .* [width, height]
     end
-    pot = RepeatedPotential(
+    pot = CompositePotential(
         locs,
         FermiDotPotential(dot_radius, v0, softness),
         lattice_a
@@ -511,14 +544,55 @@ function complex_separable_potential(degree,
 end
 
 """
+    shaken_fermi_lattice_potential(A, dot_radius, v0; pos_dev, v_dev,
+    softness=0.2, period_n = 21)
+    softness=0.2, period_n = 20)
+
+Returns a perturbed Fermi lattice potential with each bump position randomly
+displaced by a normal distribution with deviation `pos_dev`. Height of
+each bump is perturbed by a normal distribution with deviation `v_dev`
+(either deviation can be set to 0.)
+
+Returned potential is made fully periodic by repeating the random 
+"""
+function shaken_fermi_lattice_potential(A, dot_radius, v0; pos_dev, v_dev,
+    softness=0.2, period_n = 21)
+    @assert period_n % 2 == 1
+
+    potentials = FermiDotPotential[]
+    locations = zeros(2, period_n^2)
+    for i ∈ -period_n÷2 : period_n÷2
+        for j ∈ -period_n÷2 : period_n÷2
+            r = A * [i,j]
+            r += pos_dev * randn(2)
+            v = v0 + randn() * v_dev
+            push!(potentials, FermiDotPotential(dot_radius, v, softness))
+            idx = length(potentials)
+            locations[:, idx] = r
+        end
+    end
+    # With softness=0.2 the potential decays to 2e-9 at distance 5.
+    dot_size = dot_radius + 3 * dot_radius * softness / 0.2 
+    comp = CompositePotential(locations, potentials, dot_size)
+    # Make it periodic
+    return LatticePotential(
+        period_n * A, comp
+    )
+end
+
+
+
+"""
     grid_eval(xs, ys, fun)
 
 Evaluates given callable `fun` in a grid defined by `xs` and `ys`
 and returns a matrix of values. The returned matrix is oriented
-such that y-axis is along rows and x-axis is along columns.
+such that y-axis is along rows and x-axis is along columns, i.e.
+    grid_eval(xs, ys, fun)[i,j] = fun(xs[j], ys[i])
 """
 function grid_eval(xs, ys, fun)
     return [
         fun(x, y) for y ∈ ys, x ∈ xs
     ]
 end
+

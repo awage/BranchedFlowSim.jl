@@ -29,6 +29,7 @@ s = ArgParseSettings()
     arg_type = Int64
     default = 20
 end
+
 add_potential_args(s;
     default_potentials="fermi_lattice,fermi_rand,rand,cos_series,cint")
 parsed_args = parse_args(ARGS, s)

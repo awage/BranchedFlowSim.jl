@@ -3,14 +3,15 @@ using CairoMakie
 using FileIO
 using HDF5
 using LaTeXStrings
+using Statistics
 using Makie
 
 # For quick hacks / interactive testing
 custom_args = [
-    "../csc_outputs/quasi2d/intensity_400000_20.0_0.04/intensity_fermi_lattice.h5"
-    "../csc_outputs/quasi2d/intensity_400000_20.0_0.04/intensity_fermi_rand.h5"
-    "../csc_outputs/quasi2d/intensity_400000_20.0_0.04/intensity_rand.h5"
-    "../csc_outputs/quasi2d/intensity_400000_20.0_0.04/intensity_cos_series_1.h5"
+#    "../csc_outputs/quasi2d/intensity_2000000_40.0_0.04/intensity_fermi_lattice.h5"
+#    "../csc_outputs/quasi2d/intensity_2000000_40.0_0.04/intensity_fermi_rand.h5"
+#    "../csc_outputs/quasi2d/intensity_2000000_40.0_0.04/intensity_rand.h5"
+#    "../csc_outputs/quasi2d/intensity_2000000_40.0_0.04/intensity_cos_series_1.h5"
 ]
 args = vcat(ARGS, custom_args)
 s = ArgParseSettings()
@@ -107,7 +108,7 @@ max_int = [
 
 ## Plot
 fig = Figure()
-ax = Axis(fig[1, 1], title=L"Maximum smoothed intensity, $b=%$smoothing_b$, $%$num_rays$ rays",
+ax = Axis(fig[1, 1], title=L"Maximum smoothed intensity, $b=%$b$, $%$num_rays$ rays",
     xlabel=LaTeXString("time (a.u.)"), ylabel=L"I_b^\text{max}",
     yticks=0:10, limits=(nothing, (0, nothing))
 )
@@ -116,7 +117,7 @@ for d ∈ datas
     lines!(ax, ts, max_int, label=make_label(d))
 end
 axislegend(ax)
-display(fig)
+# display(fig)
 save(path_prefix * "max_intensity.pdf", fig)
 save(path_prefix * "max_intensity.png", fig, px_per_unit=2)
 
@@ -124,7 +125,7 @@ save(path_prefix * "max_intensity.png", fig, px_per_unit=2)
 for d ∈ datas
     if "potential/angles" ∈ keys(d)
         fig = Figure()
-        title = L"Maximum smoothed intensity, $b=%$smoothing_b$, $%$num_rays$ rays, "
+        title = L"Maximum smoothed intensity, $b=%$b$, $%$num_rays$ rays, "
         title = title * make_label(d)
         title = LaTeXString(title)
         angles = d["potential/angles"]
@@ -132,13 +133,17 @@ for d ∈ datas
         yticks_l = [L"%$x\pi" for x ∈ yticks_n]
         yticks = (pi * yticks_n, yticks_l)
 
-        ax = Axis(fig[1, 1], title=title, xlabel=LaTeXString("time (a.u.)"), ylabel=L"\theta",
+        ax = Axis(fig[1, 1], title=title, xlabel=LaTeXString("time (a.u.)"),
+            ylabel=L"Propagation angle $\theta$",
             yticks=yticks, limits=(nothing, (0, pi / 2))
         )
-        heatmap!(ax, ts, angles, 
-            maximum(d["intensity"], dims=1)[1,:,:]
+        climits = (1.0, 10.0)
+        hm = heatmap!(ax, ts, angles, 
+            maximum(d["intensity"], dims=1)[1,:,:],
+            colorrange=climits
         )
-        display(fig)
+        fig[1,2] = Colorbar(fig, hm)
+        # display(fig)
         potname = d["potential/type"]
         save(path_prefix * "intensity_angle_$potname.pdf", fig)
         save(path_prefix * "intensity_angle_$potname.png", fig, px_per_unit=2)
