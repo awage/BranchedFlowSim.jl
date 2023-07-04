@@ -11,24 +11,26 @@ export ParsedPotential
 TBW
 """
 function add_potential_args(s::ArgParseSettings;
-        default_potentials = "rand,fermi_lattice,fermi_rand,cos_series,cint")
+        default_potentials = "rand,fermi_lattice,fermi_rand,cos_series,cint",
+        defaults=Dict{String,Any}()
+        )
     @add_arg_table s begin
         "--num_angles"
         help = "number of angles used for periodic potentials"
         arg_type = Int
-        default = 50
+        default = get(defaults, "num_angles", 50)
         "--num_sims"
         help = "number of realizations used for random potentials"
         arg_type = Int
-        default = 100
+        default = get(defaults, "num_sims", 100)
         "--v0"
         help = "potential height. Default is 8% of energy."
         arg_type = Float64
-        default = 0.04
+        default = get(defaults, "v0", 0.04)
         "--correlation_scale"
         help = "Correlation scale (l_c) used for correlated random potential"
         arg_type = Float64
-        default = 0.1
+        default = get(defaults, "correlation_scale", 0.1)
         "--potentials"
         help = "comma-separated list of potentials to run"
         arg_type = String
@@ -36,27 +38,27 @@ function add_potential_args(s::ArgParseSettings;
         "--cos_max_degree"
         help = "maximum degree for the cos_series potentials"
         arg_type = Int
-        default = 6
+        default = get(defaults, "cos_max_degree", 6)
         "--lattice_a"
         help = "lattice constant, used for periodic potentials"
         arg_type = Float64
-        default = 0.2
+        default = get(defaults, "lattice_a", 0.2)
         "--fermi_dot_radius"
         help = "Radius of Fermi potential dots"
         arg_type = Float64
-        default = 0.25 * 0.2
+        default = get(defaults, "fermi_dot_radius", 0.25 * 0.2)
         "--fermi_softness"
         help = "Softness parameter σ used for the Fermi potentials"
         arg_type = Float64
-        default = 0.2
+        default = get(defaults, "fermi_softness", 0.2)
         "--shake_pos_dev"
         help = "standard deviation of position displacement for the shaken potentials."
         arg_type = Float64
-        default = 0.0
+        default = get(defaults, "shake_pos_dev", 0.0)
         "--shake_v_dev"
         help = "standard deviation of bump height displacement for the shaken potentials."
         arg_type = Float64
-        default = 0.0
+        default = get(defaults, "shake_v_dev", 0.0)
     end
 end
 
