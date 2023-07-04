@@ -5,6 +5,7 @@ using HDF5
 using LaTeXStrings
 using Statistics
 using Makie
+using BranchedFlowSim
 
 # For quick hacks / interactive testing
 custom_args = [
@@ -27,7 +28,7 @@ s = ArgParseSettings()
     "--legend_params"
     help = "Comma-separated list of params included in the legend"
     arg_type = String
-    default = "type,correlation_scale,lattice_a"
+    default = "type,correlation_scale,lattice_a,pos_dev,v_dev"
     "input"
     help = "Input h5 file to generate the plot from"
     arg_type = String
@@ -39,47 +40,9 @@ if path_prefix[end] != '/'
     path_prefix *= "/"
 end
 
-# TODO: Move this to src for reuse
 function make_label(data)::LaTeXString
-    type = data["potential/type"]
     params = split(parsed_args["legend_params"], ",")
-    label = L""
-    if type == "rand"
-        label = LaTeXString("Correlated random")
-    elseif type == "fermi_lattice"
-        a = data["potential/lattice_a"]
-        label = "Periodic Fermi lattice"
-    elseif type == "fermi_rand"
-        a = data["potential/lattice_a"]
-        label = LaTeXString("Random Fermi potential")
-    elseif type == "cos_series"
-        a = data["potential/lattice_a"]
-        degree = data["potential/degree"]
-        if degree == 1
-            label = L"$c_1(\cos(2\pi x/a)+\cos(2\pi y/a))$"
-        else
-            label = L"$\sum_{n+m\le%$(degree)}c_{nm}\cos(2\pi nx/a)\cos(2\pi my/a)$"
-        end
-    elseif type == "cint"
-        degree = data["potential/degree"]
-        label = L"$\sum_{n=0}^{%$(degree)}c_{n}\left(\cos(nkx)+\cos(nky)\right)$"
-    else
-        error("Unknown/new potential type \"$type\"")
-    end
-
-    if "correlation_scale" ∈ params && "potential/correlation_scale" ∈ keys(data)
-        lc = data["potential/correlation_scale"]
-        label *= L", $l_c=%$lc$"
-    end
-    if "lattice_a" ∈ params && "potential/lattice_a" ∈ keys(data)
-        a = data["potential/lattice_a"]
-        label *= L", $a=%$a$"
-    end
-    if "v0" ∈ params && "potential/v0" ∈ keys(data)
-        v0 = data["potential/v0"]
-        label *= L", $v_0=%$v0$"
-    end
-    return LaTeXString(label)
+    return potential_label_from_h5_data(data, params)
 end
 
 ## Load and analyze data

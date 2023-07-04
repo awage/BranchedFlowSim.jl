@@ -45,7 +45,7 @@ lpot = LatticePotential(rotation_matrix(0)*lattice_a, dot_radius, 1)
 save(path_prefix*"fermi_lattice.pdf", plot_potential(lpot))
 
 fermi_rand= 
-    random_fermi_potential(-1, 5, -1, 5, lattice_a, dot_radius, 1)
+    random_fermi_potential(5, 5, lattice_a, dot_radius, 1)
 save(path_prefix*"fermi_random.pdf", plot_potential(fermi_rand))
 
 for deg ∈ 1:6
@@ -61,3 +61,15 @@ for deg ∈ 1:8
         plot_potential(zpot))
 end
 
+for dev ∈ (1:10) * 0.001
+    pot = shaken_fermi_lattice_potential(lattice_a * rotation_matrix(0),
+        dot_radius, 1;pos_dev=dev, v_dev=0)
+    save(path_prefix*"shaken_fermi_lattice_pos_dev_$dev.pdf",
+        plot_potential(pot))
+end
+for dev ∈ (1:10) * 0.02
+    pot = shaken_fermi_lattice_potential(lattice_a * rotation_matrix(0),
+        dot_radius, 1;pos_dev=0, v_dev=dev)
+    save(path_prefix*"shaken_fermi_lattice_v_dev_$dev.pdf",
+        plot_potential(pot))
+end

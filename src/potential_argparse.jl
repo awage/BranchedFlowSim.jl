@@ -3,6 +3,7 @@ using ArgParse
 export add_potential_args
 export get_potentials_from_parsed_args
 export ParsedPotential
+export potential_label_from_h5_data
 
 """
     add_potential_args(s::ArgParseSettings,
@@ -11,9 +12,9 @@ export ParsedPotential
 TBW
 """
 function add_potential_args(s::ArgParseSettings;
-        default_potentials = "rand,fermi_lattice,fermi_rand,cos_series,cint",
-        defaults=Dict{String,Any}()
-        )
+    default_potentials="rand,fermi_lattice,fermi_rand,cos_series,cint",
+    defaults=Dict{String,Any}()
+)
     @add_arg_table s begin
         "--num_angles"
         help = "number of angles used for periodic potentials"
@@ -65,7 +66,7 @@ end
 struct ParsedPotential
     instances::Vector{AbstractPotential}
     params::Dict{String,Any}
-    name :: String
+    name::String
     function ParsedPotential(instances, params)
         p = params["type"]
         if "degree" ∈ keys(params)
@@ -149,7 +150,7 @@ function get_potentials_from_parsed_args(parsed_args, width, height)::Vector{Par
             complex_int_degree = 8
             params["degree"] = complex_int_degree
             csep = complex_separable_potential(complex_int_degree,
-                    lattice_a, dot_radius, v0; softness=softness)
+                lattice_a, dot_radius, v0; softness=softness)
             instances = [
                 RotatedPotential(θ, csep) for θ ∈ angles
             ]
@@ -157,7 +158,7 @@ function get_potentials_from_parsed_args(parsed_args, width, height)::Vector{Par
         elseif pt == "fermi_lattice_shaken"
             pos_dev = parsed_args["shake_pos_dev"]
             v_dev = parsed_args["shake_v_dev"]
-            
+
             pot = shaken_fermi_lattice_potential(
                 lattice_a * I, dot_radius,
                 v0;
@@ -178,4 +179,80 @@ function get_potentials_from_parsed_args(parsed_args, width, height)::Vector{Par
         end
     end
     return potentials
+end
+
+
+# This function is placed here to avoid repetition in scripts. Not sure if this
+# is the right place.
+"""
+    potential_label_from_h5_data(data :: Dict{String, Any})
+
+When storing data in HDF5 files, we store metadata about the potential used to
+generate said data in a group "potential/". This function parses that data
+and returns a LaTeXString that can be used in plot titles and labels.
+
+Here `data` is assumed to be a dictionary loaded from a HDF5 file by doing
+data = load("fname.h5").
+"""
+function potential_label_from_h5_data(data::Dict{String,Any},
+    params::AbstractVector{<:AbstractString}=String[
+        "type",
+        "correlation_scale",
+        "lattice_a",
+        "pos_dev",
+        "v_dev"
+    ]
+)::LaTeXString
+    type = data["potential/type"]
+    label = L""
+    if type == "rand"
+        label = LaTeXString("Correlated random")
+    elseif type == "fermi_lattice"
+        a = data["potential/lattice_a"]
+        label = "Periodic Fermi lattice"
+    elseif type == "fermi_rand"
+        a = data["potential/lattice_a"]
+        label = LaTeXString("Random Fermi potential")
+    elseif type == "cos_series"
+        a = data["potential/lattice_a"]
+        degree = data["potential/degree"]
+        if degree == 1
+            label = L"$c_1(\cos(2\pi x/a)+\cos(2\pi y/a))$"
+        else
+            label = L"$\sum_{n+m\le%$(degree)}c_{nm}\cos(2\pi nx/a)\cos(2\pi my/a)$"
+        end
+    elseif type == "cint"
+        degree = data["potential/degree"]
+        label = L"$\sum_{n=0}^{%$(degree)}c_{n}\left(\cos(nkx)+\cos(nky)\right)$"
+    elseif type == "fermi_lattice_shaken"
+        label = "Shaken periodic Fermi lattice"
+    else
+        error("Unknown/new potential type \"$type\"")
+    end
+
+    if "correlation_scale" ∈ params && "potential/correlation_scale" ∈ keys(data)
+        lc = data["potential/correlation_scale"]
+        label *= L", $l_c=%$lc$"
+    end
+    if "lattice_a" ∈ params && "potential/lattice_a" ∈ keys(data)
+        a = data["potential/lattice_a"]
+        label *= L", $a=%$a$"
+    end
+    if "v0" ∈ params && "potential/v0" ∈ keys(data)
+        v0 = data["potential/v0"]
+        label *= L", $v_0=%$v0$"
+    end
+    if "v_dev" ∈ params && "potential/v_dev" ∈ keys(data)
+        v_dev = data["potential/v_dev"]
+        if v_dev > 0
+            label *= L", $\sigma_v=%$v_dev$"
+        end
+    end
+    if "pos_dev" ∈ params && "potential/pos_dev" ∈ keys(data)
+        pos_dev = data["potential/pos_dev"]
+        if pos_dev > 0
+            label *= L", $\sigma_r=%$pos_dev$"
+        end
+    end
+    return LaTeXString(label)
 end

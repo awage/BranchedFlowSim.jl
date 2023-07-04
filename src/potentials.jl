@@ -6,6 +6,7 @@ using StaticArrays
 using FFTW
 using Interpolations
 using KernelDensity
+using LaTeXStrings
 
 export AbstractPotential
 export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
@@ -58,7 +59,8 @@ function force(V::FermiDotPotential, x::Real, y::Real)::SVector{2,Float64}
     if d <= 1e-9
         return SVector(0.0, 0.0)
     end
-    z = exp(V.inv_α * (-V.radius + d))
+    power = V.inv_α * (-V.radius + d)
+    z = @inline exp(power)
     return SVector(x, y) * (V.v0 * z * V.inv_α / (d * (1 + z)^2))
 end
 
@@ -340,10 +342,10 @@ function force(V::CompositePotential, x::Real, y::Real)::SVector{2,Float64}
     end
     F = SVector(0.0, 0.0)
     for idx ∈ V.grid_indices[iy, ix]
-        rx = V.locations[1, idx]
-        ry = V.locations[2, idx]
-        pot = V.dot_potentials[idx]
-        F += @inline force(pot, x - rx, y - ry)
+        @inbounds rx = V.locations[1, idx]
+        @inbounds ry = V.locations[2, idx]
+        @inbounds pot = V.dot_potentials[idx]
+        F += force(pot, x - rx, y - ry)
     end
     return F
 end
@@ -595,4 +597,3 @@ function grid_eval(xs, ys, fun)
         fun(x, y) for y ∈ ys, x ∈ xs
     ]
 end
-

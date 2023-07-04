@@ -28,6 +28,9 @@ s = ArgParseSettings()
     help = "Resolution in x axis per one length unit. Total resolution is xres*time"
     arg_type = Int64
     default = 20
+    "--benchmark"
+    help = "Run a benchmark instead of saving data"
+    action = :store_true
 end
 
 add_potential_args(s;
@@ -66,7 +69,7 @@ function parallel_compute_intensity(pots, progress_text="")
     p = Progress(length(pots); desc=progress_text, enabled=false)
     dy = ys[2] - ys[1]
     Threads.@threads for j ∈ 1:length(pots)
-        int,(rmin,rmax) = quasi2d_intensity(
+        int, (rmin, rmax) = quasi2d_intensity(
             num_rays, dt, ts, ys, pots[j], b=smoothing_b)
         int_all[:, :, j] = int
         start_bounds[:, j] = [rmin, rmax]
@@ -80,23 +83,35 @@ end
 
 @time("load potentials",
     potentials = get_potentials_from_parsed_args(parsed_args, sim_width, 3))
-    
-## Compute intensities
 
-for pot ∈ potentials
-    int, start_bounds = parallel_compute_intensity(pot.instances, pot.params["type"])
-    fname = path_prefix * "intensity_$(pot.name).h5"
-    h5open(fname, "w") do f
-        f["dt"] = Float64(dt)
-        f["num_rays"] = Int64(num_rays)
-        f["ts"] = Vector{Float64}(ts)
-        f["ys"] = Vector{Float64}(ys)
-        f["b"] = Float64(smoothing_b)
-        f["intensity"] = int
-        f["start_bounds"] = start_bounds
-        pg = create_group(f, "potential")
-        for (k, v) ∈ pairs(pot.params)
-            pg[k] = v
+if parsed_args["benchmark"]
+    for pot ∈ potentials
+        instance = pot.instances[end÷2]
+        # First, force compilation by runnning just a few steps
+        _ = quasi2d_intensity(
+            num_rays, dt, [0,2*dt], ys, instance, b=smoothing_b)
+        t = @elapsed int, (rmin, rmax) = quasi2d_intensity(
+            num_rays, dt, ts, ys, instance, b=smoothing_b)
+        num_steps = ts[end] / dt
+        @printf "%s: %.3f ms/step\n" pot.name (1e3*t / num_steps)
+    end
+else
+    ## Compute intensities
+    for pot ∈ potentials
+        int, start_bounds = parallel_compute_intensity(pot.instances, pot.params["type"])
+        fname = path_prefix * "intensity_$(pot.name).h5"
+        h5open(fname, "w") do f
+            f["dt"] = Float64(dt)
+            f["num_rays"] = Int64(num_rays)
+            f["ts"] = Vector{Float64}(ts)
+            f["ys"] = Vector{Float64}(ys)
+            f["b"] = Float64(smoothing_b)
+            f["intensity"] = int
+            f["start_bounds"] = start_bounds
+            pg = create_group(f, "potential")
+            for (k, v) ∈ pairs(pot.params)
+                pg[k] = v
+            end
         end
     end
 end

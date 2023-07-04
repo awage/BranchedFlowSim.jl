@@ -73,48 +73,6 @@ mkpath(output_prefix)
 
 ## Plots
 
-function make_label(data)::LaTeXString
-    type = data["potential/type"]
-    params = split(parsed_args["legend_params"], ",")
-    label = L""
-    if type == "rand"
-        label = LaTeXString("Correlated random")
-    elseif type == "fermi_lattice"
-        a = data["potential/lattice_a"]
-        label = "Periodic Fermi lattice"
-    elseif type == "fermi_rand"
-        a = data["potential/lattice_a"]
-        label = LaTeXString("Random Fermi potential")
-    elseif type == "cos_series"
-        a = data["potential/lattice_a"]
-        degree = data["potential/degree"]
-        if degree == 1
-            label = L"$c_1(\cos(2\pi x/a)+\cos(2\pi y/a))$"
-        else
-            label = L"$\sum_{n+m\le%$(degree)}c_{nm}\cos(2\pi nx/a)\cos(2\pi my/a)$"
-        end
-    elseif type == "cint"
-        degree = data["potential/degree"]
-        label = L"$\sum_{n=0}^{%$(degree)}c_{n}\left(\cos(nkx)+\cos(nky)\right)$"
-    else
-        error("Unknown/new potential type \"$type\"")
-    end
-
-    if "correlation_scale" ∈ params && "potential/correlation_scale" ∈ keys(data)
-        lc = data["potential/correlation_scale"]
-        label *= L", $l_c=%$lc$"
-    end
-    if "lattice_a" ∈ params && "potential/lattice_a" ∈ keys(data)
-        a = data["potential/lattice_a"]
-        label *= L", $a=%$a$"
-    end
-    if "v0" ∈ params && "potential/v0" ∈ keys(data)
-        v0 = data["potential/v0"]
-        label *= L", $v_0=%$v0$"
-    end
-    return LaTeXString(label)
-end
-
 function generate_plots(output_prefix, setname, fnames)
     data = [
         load(n) for n ∈ fnames
@@ -128,7 +86,10 @@ function generate_plots(output_prefix, setname, fnames)
         @assert (d["ts"] == ts[1] || d["ts"][end] >= max_time)
         @assert d["num_rays"] == num_rays
     end
-    labels = [make_label(d) for d ∈ data]
+    legend_params = split(parsed_args["legend_params"], ",")
+    labels = [
+        potential_label_from_h5_data(d, legend_params) for d ∈ data
+        ]
     num_branches = [d["nb_mean"] for d ∈ data]
 
     for (scalename, scaleparams) ∈ [
