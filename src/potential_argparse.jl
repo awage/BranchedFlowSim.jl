@@ -155,23 +155,23 @@ function get_potentials_from_parsed_args(parsed_args, width, height)::Vector{Par
             ]
             push!(potentials, ParsedPotential(instances, params))
         elseif pt == "fermi_lattice_shaken"
-            pos_dev = parsed_args["pos_dev"]
-            v_dev = parsed_args["v_dev"]
+            pos_dev = parsed_args["shake_pos_dev"]
+            v_dev = parsed_args["shake_v_dev"]
             
             pot = shaken_fermi_lattice_potential(
                 lattice_a * I, dot_radius,
-                v0,
+                v0;
+                pos_dev=pos_dev, v_dev=v_dev
             )
             instances = [
-                RotatedPotential(θ, cos_pot) for θ ∈ angles
+                RotatedPotential(θ, pot) for θ ∈ angles
             ]
-            instances =
-                [LatticePotential(lattice_a * rotation_matrix(θ),
-                    dot_radius, v0; softness=softness) for θ ∈ angles]
             params["lattice_a"] = lattice_a
             params["softness"] = softness
             params["angles"] = angles
             params["dot_radius"] = dot_radius
+            params["pos_dev"] = pos_dev
+            params["v_dev"] = v_dev
             push!(potentials, ParsedPotential(instances, params))
         else
             error("Unknown potential type $pt specified in --potentials")
