@@ -28,6 +28,10 @@ s = ArgParseSettings()
     help = "Resolution in x axis per one length unit. Total resolution is xres*time"
     arg_type = Int64
     default = 20
+    "--dt"
+    help = "Time step"
+    arg_type = Float64
+    default = 0.01
     "--benchmark"
     help = "Run a benchmark instead of saving data"
     action = :store_true
@@ -47,7 +51,7 @@ path_prefix = "outputs/quasi2d/$(dir)/"
 mkpath(path_prefix)
 println("Saving data to $path_prefix")
 
-dt = 0.01
+dt::Float64 = parsed_args["dt"]
 
 # y values for sampling the intensity
 yres = parsed_args["yres"]
