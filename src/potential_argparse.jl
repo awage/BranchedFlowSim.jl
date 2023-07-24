@@ -254,5 +254,9 @@ function potential_label_from_h5_data(data::Dict{String,Any},
             label *= L", $\sigma_r=%$pos_dev$"
         end
     end
+    if "dt" ∈ params
+        dt = data["dt"]
+        label *= L", $dt=%$dt$"
+    end
     return LaTeXString(label)
 end
