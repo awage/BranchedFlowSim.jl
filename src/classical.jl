@@ -1,6 +1,9 @@
 using DifferentialEquations
 using StaticArrays
 
+export ray_trajectories
+export lattice_intersections
+
 Vec2 = SVector{2, Float64}
 
 function ray_f(dr::Vec2, r :: Vec2, pot, t)
@@ -78,3 +81,36 @@ function ray_trajectories(
     collect_sol(sol)
     nothing
 end
+
+function lattice_intersections(f, intersect, step, offset, rs, ps)
+    A = hcat(intersect, step)
+    Ainv = SMatrix{2, 2, Float64, 4}(inv(A))
+    num_points = size(rs)[2]
+
+    for i ∈ 1:(num_points-1)
+        r0 = Vec2(@view rs[:,i])
+        r1 = Vec2(@view rs[:,i+1])
+        p0 = Vec2(@view ps[:,i])
+        p1 = Vec2(@view ps[:,i+1])
+
+        q0 = Ainv * r0
+        q1 = Ainv * r1
+      
+        # Look for t such that q0+t*(q1-q0) == (x, k)
+        # where k is an integer.
+        q0i = floor(Int, q0[2])
+        q1i = floor(Int, q1[2])
+        if q0i != q1i
+            t = if q0i < q1i
+                (q1i - q0[2]) / (q1[2]-q0[2])
+            else
+                (q0i - q0[2]) / (q0[2]-q1[2])
+            end
+            q = q0 + t * (q1-q0)
+            p = p0 + t * (p1-p0)
+            w = Ainv * p
+            f(r0 + t * (r1-r0), p0 + t * (p1-p0), q[1]-floor(q[1]), w[1])
+        end
+    end
+end
+

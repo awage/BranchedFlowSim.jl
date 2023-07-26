@@ -4,48 +4,40 @@
 using BranchedFlowSim
 using ColorSchemes
 using CairoMakie
-using DifferentialEquations
+using ColorTypes
 using LinearAlgebra
 using Makie
 
-function ray_f!(ddu, du, u, pot, t)
-    # r[i] = u[:,i]
-    sz = size(u)
-    @assert sz[1] == 2
-    num_particles = sz[2]
-    for i ∈ 1:num_particles
-        x = u[1,i]
-        y = u[2,i]
-        ddu[:,i] .= force(pot, x, y)
+function normalize_momentum!(p, r, potential, E=0.5)
+    @assert size(p) == size(r)
+    for i ∈ 1:size(p)[2]
+        V = potential(r[1,i], r[2,i])
+        pnorm = sqrt(2 * (E - V))
+        @assert isreal(pnorm)
+        p[:,i] .*= pnorm / norm(p[:,i])
     end
-    nothing
 end
 
 lattice_a::Float64 = 0.2
 dot_radius::Float64 = 0.25 * lattice_a
-v0::Float64 = 0.04
+v0::Float64 = 0.1
 softness = 0.1
-dt::Float64 = 0.01
+dt::Float64 = 0.005
 
 pot = LatticePotential(lattice_a * I, dot_radius, v0;
-    softness =softness)
+    softness=softness, offset=[lattice_a/2, lattice_a/2])
 # pot = correlated_random_potential(4,4,0.1,v0)
 # pot= fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, -v0)
 
-num_particles = 1000
+num_particles = 10000
 # num_particles = 4
-r0 = lattice_a * [0.1, 0.3] * ones(num_particles)'
-angles = LinRange(0, 2pi, num_particles+1)[1:end-1]
-p0 = hcat(([cos(θ),sin(θ)] for θ ∈ angles)...)
+r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
+angles = LinRange(0, 2pi, num_particles + 1)[1:end-1]
+p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
+    
+normalize_momentum!(p0, r0, pot)
 
-tspan = (0.0, 10.0)
-
-prob = SecondOrderODEProblem{true}(ray_f!, p0, r0, tspan, pot)
-
-# saveat = 0.05
-@time "ode solve" sol = solve(prob, Yoshida6(), dt=dt);
-
-
+T = 5.0
 
 ## Plotting
 
@@ -57,119 +49,87 @@ function pixel_heatmap(path, data; kwargs...)
     return scene
 end
 
-function iter_pixels(f, x0, y0, x1, y1)
-    # Always draw in positive x direction
-    if x0 > x1
-        iter_pixels(-x0, y0, -x1, y1) do x,y
-            @inline f(-x, y)
-        end
-        return nothing
-    end
-    ix :: Int = round(Int, x0)
-    iy :: Int = round(Int, y0)
-    # Form line equation y = mx + b
-    m :: Float64 = (y1 - y0) / (x1 - x0)
-    b :: Float64 = y0 - m * x0
-    # End pixel coordinate
-    ixe :: Int = round(Int, x1)
-    iye :: Int = round(Int, y1)
+function heatmap_with_potential(path, data, potential; colorrange=extrema(data))
+    fire = reverse(ColorSchemes.linear_kryw_0_100_c71_n256)
+    pot_colormap = ColorSchemes.grays
+    # data_colormap = ColorSchemes.viridis
+    data_colormap = fire
 
-    if abs(x0 - x1) < 1e-9
-        for y ∈ iy:iye
-            f(y, ix)
-        end
-        return nothing
-    end
-
-    ny ::Float64  = b + m * (ix + 0.5) - iy
-    if y0 < y1 
-        # Moving upwards
-        while true
-            @inline f(ix, iy)
-            if ix == ixe && iy == iye
-                break
-            end
-            # We move either up or to the right
-            if ny > 0.5
-                iy += 1
-                ny -= 1
-            else
-                ix += 1
-                ny += m
-            end
-        end
-    else
-        # Moving downwards
-        while true
-            @inline f(ix, iy)
-            if ix == ixe && iy == iye
-                break
-            end
-            # We move either down or to the right
-            if ny < -0.5
-                iy -= 1
-                ny += 1
-            else
-                ix += 1
-                ny += m
-            end
-        end
-    end
-    return nothing
+    V = real(potential)
+    minV, maxV = extrema(V)
+    minD, maxD = colorrange
+    print("datarange: [$(minD),$(maxD)]\n")
+    pot_img = get(pot_colormap, (V .- minV) ./ (maxV - minV + 1e-9))
+    data_img = get(data_colormap, (data .- minD) / (maxD - minD))
+    
+    img = mapc.((d,v) -> clamp(d - 0.2 * v, 0, 1), data_img, pot_img) 
+    save(path, img)
+    return img
 end
 
-Nh = 1024
-xs = LinRange(-6, 6, Nh)
-img = zeros(Nh, Nh)
+Nh = 512
+xs = LinRange(-2, 2, Nh)
+hist = zeros(Nh, Nh)
 
 function nearest_idx(xs, x)
     dx = xs[2] - xs[1]
-    return 1 + round(Int64, (x-xs[1]) / dx)
+    return 1 + round(Int64, (x - xs[1]) / dx)
 end
 
 dx = xs[2] - xs[1]
-for i ∈ 1:num_particles
+
+@time "histo" ray_trajectories(r0, p0, pot, T, dt) do ts, rs, ps
     lx::Float64 = -1
     ly::Float64 = -1
-    px::Int32 = 0
-    py::Int32 = 0
-    for j ∈ 1:length(sol)
-        x, y = sol[j].x[2][:,i]
-        xi = 1 + (x-xs[1]) / dx
-        yi = 1 + (y-xs[1]) / dx
-        if 1<xi<Nh && 1<yi<Nh && 1<lx<Nh && 1<ly<Nh
-            # img[round(Int, yi), round(Int, xi)] += 2
-            # plot_line(lx, ly, xi, yi) do x,y
-            iter_pixels(lx, ly, xi, yi) do x,y
-                if x != px || y != py
-                    img[y,x] += 1
-                end
-                  px = x
-                  py = y
+    px::Int = 0
+    py::Int = 0
+    N = length(ts)
+    for (x, y) ∈ eachcol(rs)
+        if false
+            xi = round(Int, 1 + (x - xs[1]) / dx)
+            yi = round(Int, 1 + (y - xs[1]) / dx)
+            if 1 < xi < Nh && 1 < yi < Nh && xi != px && yi != py
+                hist[yi, xi] += 1
+                px = xi
+                py = yi
             end
+        else
+            xi = 1 + (x - xs[1]) / dx
+            yi = 1 + (y - xs[1]) / dx
+            if 1 < xi < Nh && 1 < yi < Nh && 1 < lx < Nh && 1 < ly < Nh
+                # img[round(Int, yi), round(Int, xi)] += 2
+                # plot_line(lx, ly, xi, yi) do x,y
+                line_integer_cells(lx, ly, xi, yi) do x, y
+                    if x != px || y != py
+                        hist[y, x] += 1
+                    end
+                    px = x
+                    py = y
+                end
+            end
+            lx = xi
+            ly = yi
         end
-        lx = xi
-        ly = yi
     end
 end
 
+## Visualize histogram
 
 fire = reverse(ColorSchemes.linear_kryw_0_100_c71_n256)
-fig = pixel_heatmap(
-    "outputs/classical/dot.png", img;
-    colorscale=Makie.pseudolog10,
-    colorrange=(0, 200),
-    colormap=fire)
-display(fig)
+# fig = pixel_heatmap(
+#     "outputs/classical/dot.png", Makie.pseudolog10.(img);
+#     colorrange=(0, Makie.pseudolog10(2 * num_particles)),
+#     colormap=fire)
+# display(fig)
+
+img = heatmap_with_potential(
+    "outputs/classical/dot.png",
+    hist, 
+    grid_eval(xs, xs, pot),
+    colorrange=(0.0, 2.0 * num_particles / 100)
+)
+image(xs, xs, img, axis=(aspect=DataAspect(),))
 # save("outputs/classical/dot.png", current_figure())
 #fig = Figure()
 #ax = Axis(fig[1,1])
 #display(fig)
-
-R = 1.0
-cross_angles = Float64[]
-weights = Float64[]
-for i ∈ 1:num_particles
-    pos = hcat([s.x[2][:,1] for s ∈ sol.u]...)
-end
-

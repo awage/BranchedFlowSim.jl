@@ -29,10 +29,10 @@ import FileIO
 
 include("colorschemes.jl")
 include("quantum_potentials.jl")
-# TODO: Figure out if this file should be in potentials.jl
 include("potentials.jl")
 include("potential_argparse.jl")
 include("quasi2d.jl")
+include("classical.jl")
 include("helpers.jl")
 
 default_colorscheme = complex_berlin
