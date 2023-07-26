@@ -24,64 +24,37 @@ end
 lattice_a::Float64 = 0.2
 dot_radius::Float64 = 0.25 * lattice_a
 v0::Float64 = 0.04
+softness = 0.1
 dt::Float64 = 0.01
 
-# pot = LatticePotential(lattice_a * I, dot_radius, v0;
-#     offset=lattice_a * [0.45,0.51])
-pot = correlated_random_potential(4,4,0.1,v0)
+pot = LatticePotential(lattice_a * I, dot_radius, v0;
+    softness =softness)
+# pot = correlated_random_potential(4,4,0.1,v0)
 # pot= fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, -v0)
 
-num_particles = 10000
+num_particles = 1000
 # num_particles = 4
 r0 = lattice_a * [0.1, 0.3] * ones(num_particles)'
 angles = LinRange(0, 2pi, num_particles+1)[1:end-1]
 p0 = hcat(([cos(θ),sin(θ)] for θ ∈ angles)...)
 
-tspan = (0.0, 6.0)
+tspan = (0.0, 10.0)
 
 prob = SecondOrderODEProblem{true}(ray_f!, p0, r0, tspan, pot)
 
-saveat = 0.05
-@time "ode solve" sol = solve(prob, Yoshida6(), saveat=saveat, dt=dt);
+# saveat = 0.05
+@time "ode solve" sol = solve(prob, Yoshida6(), dt=dt);
 
-## Plot
-function plot_line(f, x0, y0, x1, y1)
-    x = round(Int32, x0)
-    y = round(Int32, y0)
-    xe = round(Int32, x1)
-    ye = round(Int32, y1)
-    # dx = round(Int32, abs(x1 - x0))
-    # dx = abs(x1 - x0)
-    dx = abs(xe - x)
-    sx ::Int32 = x < xe ? 1 : -1
-    # sx ::Int32 = x0 < x1 ? 1 : -1
-    # dy = round(Int32, -abs(y1 - y0))
-    # dy = -abs(y1 - y0)
-    dy = -abs(ye - y)
-    sy ::Int32 = y < ye ? 1 : -1
-    # sy ::Int32 = y0 < y1 ? 1 : -1
-    error::Float64 = dx + dy
-    while true
-        @inline f(x, y)
-        if x == xe && y == ye
-            break
-        end
-        e2::Float64 = 2 * error
-        if e2 >= dy
-            if x == xe
-                break
-            end
-            error = error + dy
-            x = x + sx
-        end
-        if e2 <= dx
-            if y == ye
-                break
-            end
-            error = error + dx
-            y = y + sy
-        end
-    end
+
+
+## Plotting
+
+function pixel_heatmap(path, data; kwargs...)
+    data = transpose(data)
+    scene = Scene(camera=campixel!, resolution=size(data))
+    heatmap!(scene, data; kwargs...)
+    save(path, scene)
+    return scene
 end
 
 function iter_pixels(f, x0, y0, x1, y1)
@@ -145,8 +118,8 @@ function iter_pixels(f, x0, y0, x1, y1)
     return nothing
 end
 
-Nh = 512
-xs = LinRange(-4, 4, Nh)
+Nh = 1024
+xs = LinRange(-6, 6, Nh)
 img = zeros(Nh, Nh)
 
 function nearest_idx(xs, x)
@@ -182,11 +155,13 @@ end
 
 
 fire = reverse(ColorSchemes.linear_kryw_0_100_c71_n256)
-f = heatmap(xs, xs, img,
+fig = pixel_heatmap(
+    "outputs/classical/dot.png", img;
     colorscale=Makie.pseudolog10,
     colorrange=(0, 200),
     colormap=fire)
-display(current_figure())
+display(fig)
+# save("outputs/classical/dot.png", current_figure())
 #fig = Figure()
 #ax = Axis(fig[1,1])
 #display(fig)

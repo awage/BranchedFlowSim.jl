@@ -6,22 +6,11 @@ using FileIO
 using Random
 using FixedPointNumbers
 
-function low_line(f, x0, y0, x1, y1)
-    # Assumptions here:
-    #  x0 < x1
-    #  y0 < y1
-    #  y1 - y0 < x1 - x0
-    
-    dx = x1 - x0
-    dy = y1 - y0
-
-end
-
 function iter_pixels(f, x0, y0, x1, y1)
     # Always draw in positive x direction
     if x0 > x1
         iter_pixels(-x0, y0, -x1, y1) do x,y
-            f(-x, y)
+            @inline f(-x, y)
         end
         return nothing
         # x0, x1 = x1, x0
@@ -42,8 +31,9 @@ function iter_pixels(f, x0, y0, x1, y1)
 
     # Form line equation y = mx + b
     m :: Float64 = (y1 - y0) / (x1 - x0)
-    b :: Float64 = y0 - m * x0
-    ny ::Float64  = b + m * (ix + 0.5) - iy
+    # b :: Float64 = y0 - m * x0
+    # ny ::Float64  = b + m * (ix + 0.5) - iy
+    ny ::Float64  = y0 + m * (ix -x0 + 0.5) - iy
     if y0 < y1 
         # Moving upwards
         while true
