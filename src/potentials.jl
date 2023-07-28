@@ -9,8 +9,9 @@ using KernelDensity
 using LaTeXStrings
 
 export AbstractPotential
-export FermiDotPotential, LatticePotential, PeriodicGridPotential, RotatedPotential
-export CompositePotential,RepeatedPotential
+export FermiDotPotential, LatticePotential, PeriodicGridPotential
+export CompositePotential, RepeatedPotential
+export RotatedPotential, TranslatedPotential
 export CosSeriesPotential
 export FunctionPotential
 
@@ -350,6 +351,7 @@ function force(V::CompositePotential, x::Real, y::Real)::SVector{2,Float64}
     return F
 end
 
+# TODO: get rid of this old name
 const RepeatedPotential = CompositePotential;
 
 struct CosSeriesPotential{MatrixType} <: AbstractPotential
@@ -431,6 +433,44 @@ function force(V::CosSeriesPotential, x, y)
     return -F
 end
 
+struct FunctionPotential{F} <: AbstractPotential
+    f::F
+end
+
+function (V::FunctionPotential)(x::Real, y::Real)::Float64
+    return V.f(x, y)
+end
+
+function force(V::FunctionPotential, x::Real, y::Real)::SVector{2,Float64}
+    return force_diff(V.f, x, y)
+end
+
+function Base.convert(::Type{AbstractPotential}, fun::Function)
+    if !applicable(fun, 1.2, 3.14)
+        throw(DomainError(fun, "Is not a function taking 2 floats"))
+    end
+    return FunctionPotential{typeof(fun)}(fun)
+end
+
+struct TranslatedPotential{WrappedPotential <: AbstractPotential} <: AbstractPotential
+    wrapped::WrappedPotential
+    tx :: Float64
+    ty :: Float64
+end
+
+function (V::TranslatedPotential)(x::Real, y::Real)::Float64
+    return V.wrapped(V.tx + x, V.ty + y)
+end
+
+function force(V::TranslatedPotential, x::Real, y::Real)::SVector{2,Float64}
+    return force(V.wrapped, V.tx + x, V.ty + y)
+end
+
+
+## Various helper functions for creating potentials follow.
+# Keep potential type definitions above this.
+
+
 function fermi_dot_lattice_cos_series(degree, lattice_a, dot_radius, v0; softness=0.2)
     pot = LatticePotential(lattice_a * I, dot_radius, v0, softness=softness)
     # Find coefficients numerically by doing FFT
@@ -484,25 +524,6 @@ function correlated_random_potential(width,
     xs = LinRange(0, width, rNx + 1)[1:end-1]
     pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale, seed)
     return PeriodicGridPotential(xs, ys, pot_arr)
-end
-
-struct FunctionPotential{F} <: AbstractPotential
-    f::F
-end
-
-function (V::FunctionPotential)(x::Real, y::Real)::Float64
-    return V.f(x, y)
-end
-
-function force(V::FunctionPotential, x::Real, y::Real)::SVector{2,Float64}
-    return force_diff(V.f, x, y)
-end
-
-function Base.convert(::Type{AbstractPotential}, fun::Function)
-    if !applicable(fun, 1.2, 3.14)
-        throw(DomainError(fun, "Is not a function taking 2 floats"))
-    end
-    return FunctionPotential{typeof(fun)}(fun)
 end
 
 """

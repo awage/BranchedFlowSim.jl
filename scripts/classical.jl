@@ -2,8 +2,8 @@
 # Move to src/ once more mature
 
 using BranchedFlowSim
-using ColorSchemes
 using CairoMakie
+using ColorSchemes
 using ColorTypes
 using LinearAlgebra
 using Makie
@@ -69,7 +69,7 @@ end
 
 Nh = 512
 xs = LinRange(-2, 2, Nh)
-hist = zeros(Nh, Nh)
+hist :: Matrix{Float64} = zeros(Nh, Nh)
 
 function nearest_idx(xs, x)
     dx = xs[2] - xs[1]
@@ -88,7 +88,7 @@ dx = xs[2] - xs[1]
         if false
             xi = round(Int, 1 + (x - xs[1]) / dx)
             yi = round(Int, 1 + (y - xs[1]) / dx)
-            if 1 < xi < Nh && 1 < yi < Nh && xi != px && yi != py
+            if 1 < xi < Nh && 1 < yi < Nh && (xi != px || yi != py)
                 hist[yi, xi] += 1
                 px = xi
                 py = yi

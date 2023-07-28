@@ -1,5 +1,6 @@
 using CairoMakie
 using LaTeXStrings
+using BranchedFlowSim
 using Makie
 using CurveFit
 using FileIO
@@ -188,12 +189,12 @@ apply_prefix(fs) = [input_prefix * f for f ∈ fs]
 datasets = [
     ("num", apply_prefix([
         "nb_rand.h5",
-        "nb_fermi_lattice.h5",
+        "nb_lattice.h5",
         "nb_fermi_rand.h5",
         "nb_cos_series_1.h5",
     ])),
     ("cos", apply_prefix([
-        "nb_fermi_lattice.h5",
+        "nb_lattice.h5",
         "nb_cos_series_1.h5",
         "nb_cos_series_2.h5",
         "nb_cos_series_3.h5",
