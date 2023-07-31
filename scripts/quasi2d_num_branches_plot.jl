@@ -1,12 +1,13 @@
-using CairoMakie
-using LaTeXStrings
+using ArgParse
 using BranchedFlowSim
-using Makie
+using CairoMakie
 using CurveFit
 using FileIO
-using Printf
 using HDF5
-using ArgParse
+using LaTeXStrings
+using Statistics
+using Makie
+using Printf
 
 s = ArgParseSettings()
 @add_arg_table s begin
@@ -90,8 +91,9 @@ function generate_plots(output_prefix, setname, fnames)
     legend_params = split(parsed_args["legend_params"], ",")
     labels = [
         potential_label_from_h5_data(d, legend_params) for d ∈ data
-        ]
+    ]
     num_branches = [d["nb_mean"] for d ∈ data]
+    std_dev = [vec(std(d["nb_all"], dims=2)) for d ∈ data]
 
     for (scalename, scaleparams) ∈ [
         ("", [])
@@ -108,24 +110,28 @@ function generate_plots(output_prefix, setname, fnames)
             limits=((0, xmax), (0, nothing)),
             scaleparams...
         )
-
-
         ls = [:solid for i ∈ 1:length(data)]
         # ls[1] = :dot
         palette = vcat([RGBAf(0, 0, 0, 1)], Makie.wong_colors())
-        all_lines = []
         for j ∈ 1:length(data)
             label = labels[j]
             included_ts = ts[j] .≤ xmax
             nb = num_branches[j]
-            l = lines!(ax, ts[j][included_ts],
+            dev = std_dev[j]
+            lines!(ax, ts[j][included_ts],
                 nb[included_ts], label=LaTeXString(label),
                 color=palette[j],
                 linestyle=ls[j])
-            push!(all_lines, l)
+            fill_color = RGBAf(palette[j].r,
+                palette[j].g,
+                palette[j].b,
+                0.3)
+            fill_between!(ax, ts[j][included_ts],
+                nb[included_ts] - dev[included_ts],
+                nb[included_ts] + dev[included_ts],
+                color=fill_color
+            )
         end
-
-
         # axislegend(ax, position=:lt)
         legend = Legend(fig, ax, "", framevisible=false, padding=1.0)
         fig[1, 2] = legend
@@ -133,6 +139,7 @@ function generate_plots(output_prefix, setname, fnames)
             fname = "$(setname)_branches$(scalename).$ext"
             save(output_prefix * fname, fig, px_per_unit=2)
         end
+        fig = Figure()
 
         # Plot matching exponential curve
         for j ∈ 1:length(data)
@@ -145,7 +152,7 @@ function generate_plots(output_prefix, setname, fnames)
                 a1 * exp.(a2 * ts[j][included_ts]),
                 linestyle=:dash, color=palette[j],
                 label=LaTeXString(@sprintf("\$%.2f \\exp(%.2f t)\$", a1, a2))
-                )
+            )
         end
         delete!(legend)
         legend = Legend(fig, ax, "", framevisible=false, padding=1.0)

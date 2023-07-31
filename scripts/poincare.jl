@@ -102,26 +102,31 @@ function make_explanation_figure(pot, step, intersect, offset, angles)
     return fig
 end
 
-function make_trajectory_plot(pot, step, intersect, offset, angles, T)
-    num_particles = length(angles)
-    r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
-    p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
+function make_trajectory_plot(pot, step, intersect, offset, r0, p0, T)
+    num_particles = size(r0)[2]
     normalize_momentum!(p0, r0, pot)
 
-    fig = Figure(resolution=(1024, 512))
+    fig = Figure(resolution=(1024, 1024), figure_padding=0)
+    ax_section = Axis(fig[2, 1],
+        xlabel=L"$q",
+        ylabel=L"$w",
+        limits=((0, 1), (-1.0, 1.0)),
+        aspect=2
+    )
 
-    M = 2.0
     hist_width = 512
-    section_width = 400
-    xs = LinRange(-M, M, hist_width)
+    section_width = 512
+    xs = LinRange(0, 8, hist_width)
+    ys = LinRange(-2, 2, hist_width)
     qs = LinRange(0, 1, section_width)
     ws = LinRange(-1, 1, section_width)
 
     hist = zeros(hist_width, hist_width)
-    section_img = fill(RGB{N0f8}(1,1,1), section_width, section_width)
-    ray_img = potential_heatmap(xs, xs, pot)
-    
+    section_img = fill(RGB{N0f8}(1, 1, 1), section_width, section_width)
+    ray_img = potential_heatmap(ys, xs, pot)
+
     dx = xs[2] - xs[1]
+    dy = ys[2] - ys[1]
     dq = qs[2] - qs[1]
     dw = ws[2] - ws[1]
 
@@ -132,25 +137,25 @@ function make_trajectory_plot(pot, step, intersect, offset, angles, T)
         color = convert(RGB{N0f8}, HSV(traj_i * 360 / num_particles, 1, 0.7))
         traj_i += 1
         lattice_intersections(intersect, step, offset, rs, ps) do r, p, q, w
-            qi = round(Int, 1 + (q - qs[1])/dq)
-            wi = round(Int, 1 + (w - ws[1])/dw)
+            qi = round(Int, 1 + (q - qs[1]) / dq)
+            wi = round(Int, 1 + (w - ws[1]) / dw)
             if 1 < qi < section_width && 1 < wi < section_width
                 section_img[qi, wi] = color
             end
-            # scatter!(ax_section, q, w, color=color, markersize=3)
+            # scatter!(ax_section, q, w, color=color, markersize=1)
         end
         lx::Float64 = 0.0
         ly::Float64 = 0.0
         for (x, y) ∈ eachcol(rs)
             xi = 1 + (x - xs[1]) / dx
-            yi = 1 + (y - xs[1]) / dx
-            if 1 < xi < hist_width && 1 < yi < hist_width && 
-                1 < lx < hist_width && 1 < ly < hist_width
+            yi = 1 + (y - ys[1]) / dy
+            if 1 < xi < hist_width && 1 < yi < hist_width &&
+               1 < lx < hist_width && 1 < ly < hist_width
                 first = true
                 line_integer_cells(lx, ly, xi, yi) do x, y
                     if !first
-                        hist[x,y] += 1
-                        ray_img[x,y] = color
+                        hist[x, y] += 1
+                        ray_img[x, y] = color
                     end
                     first = false
                 end
@@ -159,22 +164,23 @@ function make_trajectory_plot(pot, step, intersect, offset, angles, T)
             ly = yi
         end
     end
-    ax_traj = Axis(fig[1, 1], limits=((-M, M), (-M, M)),
+    ax_traj = Axis(fig[1, 1], limits=((xs[1], xs[end]), (ys[1], ys[end])),
         aspect=DataAspect(),
         xlabel=L"$x",
         ylabel=L"$y"
     )
-    hist_img = heatmap_with_potential(xs, xs, hist, pot,
+    hist_img = heatmap_with_potential(xs, ys, hist, pot,
         colorrange=(0.0, 2.0 * num_particles / 100)
     )
     # image!(ax_traj, xs, xs, hist_img)
-    image!(ax_traj, xs, xs, ray_img)
-    ax_section = Axis(fig[1, 2],
-        xlabel=L"$q",
-        ylabel=L"$w",
-        limits=((0, 1), (-1.2, 1.2))
-    )
+    image!(ax_traj, xs, ys, ray_img)
     image!(ax_section, qs, ws, section_img)
+    hidedecorations!(ax_traj)
+    hidedecorations!(ax_section)
+    hidespines!(ax_traj)
+    hidespines!(ax_section)
+    colgap!(fig.layout, 0.0)
+    rowgap!(fig.layout, 0.0)
     return fig
 end
 
@@ -182,7 +188,7 @@ lattice_a::Float64 = 0.2
 dot_radius::Float64 = 0.25 * lattice_a
 v0::Float64 = 0.05
 softness = 0.2
-num_particles = 20
+num_particles = 30
 T = 500
 
 offset = [lattice_a / 2, lattice_a / 2]
@@ -190,19 +196,43 @@ offset = [lattice_a / 2, lattice_a / 2]
 
 intersect = [0.0, 0.2]
 step = [0.2, 0.0]
-angles = LinRange(-pi/8, pi/8, num_particles + 1)[1:end-1]
+# angles = LinRange(-pi/8, pi/8, num_particles + 1)[1:end-1]
+# r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
+# p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
+r0 = lattice_a * [0.0, 1] * LinRange(-0.5, 0.5, num_particles)'
+p0 = [1.0, 0] * ones(num_particles)'
 
+# Integrable and almost integrable potentials
 for deg ∈ 1:4
     pot = fermi_dot_lattice_cos_series(deg, lattice_a, dot_radius, v0)
-    pot = TranslatedPotential(pot, lattice_a/2, lattice_a/2)
-# cos_pot = CosSeriesPotential(-[-v0/2 v0/4; v0/4 0], 2pi/lattice_a)
-    fig = make_trajectory_plot(pot, step, intersect, offset, angles, T)
+    pot = TranslatedPotential(pot, lattice_a / 2, lattice_a / 2)
+    # cos_pot = CosSeriesPotential(-[-v0/2 v0/4; v0/4 0], 2pi/lattice_a)
+    fig = make_trajectory_plot(pot, step, intersect, offset, r0, p0, T)
     display(fig)
-    save("outputs/classical/poincare_cos_$deg.png", fig, px_per_unit=2)
+    save("outputs/classical/poincare_cos_$deg.pdf", fig)
+    save("outputs/classical/poincare_cos_$deg.png", fig, px_per_unit=1)
 end
 
+# Complex separable (and thus integrable?) potential
+cint = complex_separable_potential(5, lattice_a, dot_radius, v0)
+cint = TranslatedPotential(cint, lattice_a / 2, lattice_a / 2)
+fig = make_trajectory_plot(cint, step, intersect, offset, r0, p0, T)
+display(fig)
+save("outputs/classical/poincare_cint.pdf", fig)
+save("outputs/classical/poincare_cint.png", fig, px_per_unit=1)
+
+
+begin
 lattice_pot = LatticePotential(lattice_a * I, dot_radius, v0;
     softness=softness, offset=offset)
-fig = make_trajectory_plot(lattice_pot, step, intersect, offset, angles, T)
+fig = make_trajectory_plot(lattice_pot, step, intersect, offset, r0, p0, T)
 display(fig)
-save("outputs/classical/poincare_lattice.png", fig, px_per_unit=2)
+save("outputs/classical/poincare_lattice.pdf", fig)
+save("outputs/classical/poincare_lattice.png", fig, px_per_unit=1)
+end
+
+# Make a single explanation plot
+fig = make_explanation_figure(lattice_pot, step, intersect, offset,
+    LinRange(0, 2pi, 6)[1:end-1])
+display(fig)
+save("outputs/classical/poincare_explanation.pdf", fig)
