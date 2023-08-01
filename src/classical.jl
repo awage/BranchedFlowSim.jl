@@ -131,6 +131,9 @@ function ray_trajectories2(
     nothing
 end
 
+struct IntersectDetector
+end
+
 function lattice_intersections(f, intersect, step, offset, rs, ps)
     A = hcat(intersect, step)
     Ainv = SMatrix{2,2,Float64,4}(inv(A))
