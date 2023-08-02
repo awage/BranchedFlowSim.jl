@@ -1,6 +1,7 @@
 using DifferentialEquations
 using BranchedFlowSim
 using ColorTypes
+using LaTeXStrings
 using ArgParse
 using CurveFit
 using CairoMakie
@@ -9,14 +10,14 @@ using StaticArrays
 using LinearAlgebra
 using ColorSchemes
 
-function count_nonzero(img, scale) :: Int
+function count_nonzero(img, scale)::Int
     w = size(img)[1] ÷ scale
     h = size(img)[2] ÷ scale
     c::Int = 0
     for x ∈ 0:w-1
         for y ∈ 0:h-1
-            if !iszero(@view img[(1 + scale*x):(scale*(x+1)),
-                (1 + scale*y):(scale*(y+1))])
+            if !iszero(@view img[(1+scale*x):(scale*(x+1)),
+                (1+scale*y):(scale*(y+1))])
                 c += 1
             end
         end
@@ -24,7 +25,7 @@ function count_nonzero(img, scale) :: Int
     return c
 end
 
-function fractal_dimension(section) :: Float64
+function fractal_dimension(section)::Float64
     max_scale = 4
     w = size(section)[1]
     grid_width = [w / s for s ∈ 1:max_scale]
@@ -64,7 +65,7 @@ function get_section_hits(mapper, ris, pis)
         if 1 <= rint <= Nr && 1 <= pint <= Np
             if hit[rint, pint]
                 nohit_count += 1
-                if nohit_count > sqrt(Np*Nr)
+                if nohit_count > 4 * sqrt(Np * Nr)
                     println("stop at $z")
                     break
                 end
@@ -79,7 +80,7 @@ function get_section_hits(mapper, ris, pis)
             #     println("Stop at z=$z")
             #     break
             # end
-           #  hit[rint, pint] = true
+            #  hit[rint, pint] = true
         end
     end
     return hit
@@ -132,21 +133,21 @@ offset = [0.0, 0.0]
 ris = LinRange(0, 0.5, Q)
 pis = LinRange(0, 1, Q)
 
-dim_tot = zeros(Q,Q)
+dim_tot = zeros(Q, Q)
 dim_min = fill(10.0, Q, Q)
 dim_max = fill(0.0, Q, Q)
-dim_count = zeros(Q,Q)
+dim_count = zeros(Q, Q)
 
-progress_plot = false
+progress_plot = true
 
 ## 
 for (i, r) ∈ enumerate(ris)
     maxp = max_momentum(pot, r * intersect)
-    for (j,p) ∈ enumerate(pis)
+    for (j, p) ∈ enumerate(pis)
         if p >= maxp
             continue
         end
-        if dim_count[i,j] == 0
+        if dim_count[i, j] == 0
             # Not yet covered, shoot a ray
             println("Shoot ($r,$p)")
             mapper = PoincareMapper(
@@ -157,7 +158,7 @@ for (i, r) ∈ enumerate(ris)
                 offset,
                 dt
             )
-            @time "Poincaré sim" hit = get_section_hits(mapper, ris,pis)
+            @time "Poincaré sim" hit = get_section_hits(mapper, ris, pis)
             dim = fractal_dimension(hit)
             for idx ∈ eachindex(hit)
                 if hit[idx]
@@ -170,12 +171,17 @@ for (i, r) ∈ enumerate(ris)
             mean_dim = dim_tot ./ dim_count
             if progress_plot
                 fig = Figure()
-                ax = Axis(fig[1,1], title="$r, $p")
+                ax = Axis(fig[1, 1], title="$r, $p, dim=$dim")
                 hm = heatmap!(ax, ris, pis, mean_dim,
-                    colorrange=(0.0, 2.0))
-                contour!(ax, ris, pis, hit, color=:red)
-                scatter!(ax, r, p, marker='+', color=:blue)
-                Colorbar(fig[1,2], hm)
+                    colorrange=(1.0, 2.0))
+                # contour!(ax, ris, pis, hit, color=:red)
+                image!(ax, ris, pis, hit,
+                    colormap=[
+                        RGBA(0.0, 0.0, 0.0, 0.0),
+                        RGBA(1.0, 0.0, 0.0, 1.0)
+                    ])
+                scatter!(ax, r, p, marker=:xcross, markersize=15, color=:orange)
+                Colorbar(fig[1, 2], hm)
                 display(fig)
             end
             # display(hit)
@@ -186,14 +192,22 @@ end
 ##
 
 dim_mean = dim_tot ./ dim_count
-fig = Figure()
-ax = Axis(fig[1,1], xticks=0.5:0.1:1.0)
-hm = heatmap!(ax, ris, pis, dim_min, colorrange=(1.0, 2.0),
-    colormap=ColorSchemes.viridis)
-cm = Colorbar(fig[1,2], hm)
-# display(fig)
 
-save("outputs/classical/kam.png", fig, px_per_unit=2)
+for (name, d) ∈ [
+    ("mean", dim_mean),
+    ("min", dim_min),
+    ("max", dim_max)
+]
+    fig = Figure()
+    ax = Axis(fig[1, 1], xticks=0.5:0.1:1.0,
+        title=LaTeXString("Fractal dimension ($name)"))
+    hm = heatmap!(ax, ris, pis, d, colorrange=(1.0, 2.0),
+        colormap=ColorSchemes.viridis)
+    cm = Colorbar(fig[1, 2], hm)
+    display(fig)
+
+    save("outputs/classical/kam_$name.png", fig, px_per_unit=2)
+end
 
 
 # @time "Poincaré sim" ris,pis,hit = get_section_hits(mapper, Q)
