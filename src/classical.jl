@@ -5,6 +5,12 @@ export ray_trajectories
 export ray_trajectories2
 export lattice_intersections
 
+export PoincareMapper
+export PoincareIntersection
+export next_intersection!
+
+export max_momentum
+
 Vec2 = SVector{2,Float64}
 
 function ray_f(dr::Vec2, r::Vec2, pot, t)
@@ -122,16 +128,13 @@ function ray_trajectories2(
     end
 
     for i ∈ 1:num_particles
-        r = Vec2(@view r0[:,i])
-        p = Vec2(@view p0[:,i])
+        r = Vec2(@view r0[:, i])
+        p = Vec2(@view p0[:, i])
         prob = SecondOrderODEProblem{false}(ray_f, p, r, tspan, potential)
         sol = solve(prob, Yoshida6(), dt=dt)
         collect_sol(sol)
     end
     nothing
-end
-
-struct IntersectDetector
 end
 
 function lattice_intersections(f, intersect, step, offset, rs, ps)
@@ -145,8 +148,8 @@ function lattice_intersections(f, intersect, step, offset, rs, ps)
         p0 = Vec2(@view ps[:, i])
         p1 = Vec2(@view ps[:, i+1])
 
-        q0 = Ainv * (r0+offset)
-        q1 = Ainv * (r1+offset)
+        q0 = Ainv * (r0 + offset)
+        q1 = Ainv * (r1 + offset)
 
         # Look for t such that q0+t*(q1-q0) == (x, k)
         # where k is an integer.
@@ -156,7 +159,7 @@ function lattice_intersections(f, intersect, step, offset, rs, ps)
             t = if q0i < q1i
                 (q1i - q0[2]) / (q1[2] - q0[2])
             else
-                (q0[2]-q0i) / (q0[2] - q1[2])
+                (q0[2] - q0i) / (q0[2] - q1[2])
             end
             q = q0 + t * (q1 - q0)
             p = p0 + t * (p1 - p0)
@@ -166,6 +169,123 @@ function lattice_intersections(f, intersect, step, offset, rs, ps)
                 q[1] - floor(q[1]), w[1])
         end
     end
+end
+
+function max_momentum(pot, r, E=0.5)
+    V = pot(r[1], r[2])
+    return sqrt(2*(E-V))
+end
+
+struct PoincareMapper{Integrator<:OrdinaryDiffEq.ODEIntegrator}
+    integrator::Integrator
+    offset::Vec2
+    A::SMatrix{2,2,Float64,4}
+    Ainv::SMatrix{2,2,Float64,4}
+
+    function PoincareMapper(pot::AbstractPotential,
+        r_int :: Real,
+        p_int :: Real,
+        intersect,
+        step,
+        offset,
+        dt)
+        r = Vec2(offset + r_int * intersect)
+
+        # Normalize p:
+        V = pot(r[1], r[2])
+        E = 0.5
+        py = p_int
+        px = sqrt(2*(E-V)-py^2)
+        if false
+            throw()
+        end
+        rot90 = rotation_matrix(-pi/2)
+        ey = intersect/norm(intersect)
+        ex = rot90 * ey
+        p = Vec2(px * ex + py * ey)
+        return PoincareMapper(pot, r, p, intersect, step, offset, dt)
+    end
+
+    function PoincareMapper(pot::AbstractPotential,
+        r0::AbstractVector{<:Real},
+        p0::AbstractVector{<:Real},
+        intersect,
+        step,
+        offset,
+        dt)
+        prob = SecondOrderODEProblem{false}(ray_f, p0, r0, (0, Inf), pot)
+        A = SMatrix{2,2,Float64,4}(hcat(intersect, step))
+        Ainv = inv(A)
+        integrator = init(prob, Yoshida6(), dt=dt,
+            save_everystep=false)
+        return new{typeof(integrator)}(
+            integrator,
+            offset,
+            A,
+            Ainv
+        )
+    end
+end
+
+struct PoincareIntersection
+    # Relative position coordinate along the intersect vector.
+    # r_int ∈ [0,1]
+    r_int::Float64
+    # Component of momentum coordinate parallel to the intersect vector
+    # p_int ∈ [-1,1]
+    p_int::Float64
+end
+
+function next_intersection!(mapper::PoincareMapper)::PoincareIntersection
+    while true
+        r0 = mapper.integrator.u.x[2]
+        p0 = mapper.integrator.u.x[1]
+        step!(mapper.integrator)
+        r1 = mapper.integrator.u.x[2]
+        p1 = mapper.integrator.u.x[1]
+
+        q0 = mapper.Ainv * (r0 + mapper.offset)
+        q1 = mapper.Ainv * (r1 + mapper.offset)
+
+        # Look for t such that q0+t*(q1-q0) == (x, k)
+        # where k is an integer.
+        q0i = floor(Int, q0[2])
+        q1i = floor(Int, q1[2])
+        if q0i != q1i
+            t = if q0i < q1i
+                (q1i - q0[2]) / (q1[2] - q0[2])
+            else
+                (q0[2] - q0i) / (q0[2] - q1[2])
+            end
+            q = q0 + t * (q1 - q0)
+            p = p0 + t * (p1 - p0)
+            intersect = mapper.A[:,1]
+            w = dot(intersect, p) / norm(intersect)
+
+            # Map back to unit cell to retain accuracy
+            qfrac = q[1] - floor(q[1])
+            r1_new = mapper.A * (q1 - floor.(q1)) - mapper.offset
+            # Normalize energy back to 0.5
+            pot = mapper.integrator.sol.prob.p
+            V = pot(r1_new[1], r1_new[2])
+            pnorm = sqrt(2*(0.5-V))
+            p1_new = (pnorm / norm(p1)) * p1
+            
+            set_u!(mapper.integrator,
+                ArrayPartition((
+                    p1_new, r1_new
+                ))
+            )
+            return PoincareIntersection(qfrac, w[1])
+        end
+    end
+end
+
+function total_energy(mapper::PoincareMapper)
+    pot = mapper.integrator.sol.prob.p
+    r = mapper.integrator.u.x[2]
+    p = mapper.integrator.u.x[1]
+    return pot(r[1],r[2]) + sum(p.^2) / 2
 end
 
 # struct Hist2D

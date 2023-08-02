@@ -190,8 +190,8 @@ v0::Float64 = 0.05
 softness = 0.2
 num_particles = 30
 T = 500
-
-offset = [lattice_a / 2, lattice_a / 2]
+p
+offsek = [lattice_a / 2, lattice_a / 2]
 # pot = fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, -v0)
 
 intersect = [0.0, 0.2]
