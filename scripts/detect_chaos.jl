@@ -2,13 +2,41 @@ using DifferentialEquations
 using BranchedFlowSim
 using ColorTypes
 using LaTeXStrings
+using Serialization
 using ArgParse
+using Printf
 using CurveFit
 using CairoMakie
 using Makie
 using StaticArrays
 using LinearAlgebra
 using ColorSchemes
+
+s = ArgParseSettings()
+@add_arg_table s begin
+    "--grid_size"
+    help = "width and height of the grid used for the Poincaré section plot"
+    arg_type = Int
+    default = 600
+    "--dt"
+    help = "time step of integration"
+    arg_type = Float64
+    default = 0.005
+    "--output_dir"
+    help = "Directory for outputs"
+    arg_type = String
+    default = "outputs/classical/"
+end
+
+add_potential_args(s,
+    default_potentials="fermi_lattice",
+    defaults=Dict(
+        "num_angles" => 1,
+        "num_sims" => 1,
+        "lattice_a" => 1.0,
+        "fermi_dot_radius" => 0.25,
+    )
+)
 
 function count_nonzero(img, scale)::Int
     w = size(img)[1] ÷ scale
@@ -25,31 +53,67 @@ function count_nonzero(img, scale)::Int
     return c
 end
 
-function fractal_dimension(section)::Float64
-    max_scale = 4
+function one_indices(bm::AbstractMatrix{Bool})
+    num_ones = sum(bm)
+    indices = zeros(Int32, 2, num_ones)
+    for (k, I) ∈ enumerate(findall(bm))
+        indices[:, k] .= Tuple(I)
+    end
+    return indices
+end
+
+function matrix_from_one_indices(size, one_indices)
+    mat = falses(size...)
+    for I ∈ eachcol(one_indices)
+        mat[I...] = true
+    end
+    return mat
+end
+
+function fractal_dimension(section, debug=false)::Float64
+    max_scale = 2
     w = size(section)[1]
-    grid_width = [w / s for s ∈ 1:max_scale]
-    num_cells = [count_nonzero(section, s) for s ∈ 1:max_scale]
+
+    scales = 1:max_scale
+    grid_width = [w / s for s ∈ scales]
+    num_cells = [count_nonzero(section, s) for s ∈ scales]
     a, d = power_fit(grid_width, num_cells)
-    #=
-    @show grid_width,num_cells
-    fig = Figure()
-    ax = Axis(fig[1,1])
-    scatter!(ax, grid_width, num_cells)
-    xs = LinRange(0, w, 100)
-    lines!(ax, xs, a * xs.^d)
-    display(fig)
-    @show a,d
-    =#
+
+    a2, d2 = power_fit(grid_width[2:end], num_cells[2:end])
+    if d2 < d
+        d = d2
+        a = a2
+    end
+
+    if debug
+        @show grid_width, num_cells
+        fig = Figure()
+        ax = Axis(fig[1, 1])
+        scatter!(ax, grid_width, num_cells)
+        xs = LinRange(0, w, 100)
+        lines!(ax, xs, a * xs .^ d)
+        display(fig)
+        @show a, d
+    end
     return d
 end
 
-function get_section_hits(mapper, ris, pis)
-    dr = ris[2] - ris[1]
-    dp = pis[2] - pis[1]
+function nearest_index(range, x)
+    dx = range[2] - range[1]
+    return round(Int, 1 + (x - range[1]) / dx)
+end
+
+function section_and_dim(mapper, ris, pis)
     Nr = length(ris)
     Np = length(pis)
     hit = fill(false, Nr, Np)
+    # 
+    Nr2 = 3 * Nr ÷ 4
+    Np2 = 3 * Np ÷ 4
+    ris2 = LinRange(ris[begin], ris[end], Nr2)
+    pis2 = LinRange(pis[begin], pis[end], Np2)
+    hit2 = fill(false, Nr2, Np2)
+
     nohit_count = 0
     hit_count = 0
     for z ∈ 1:(4*Nr*Np)
@@ -60,12 +124,12 @@ function get_section_hits(mapper, ris, pis)
             r = 1.0 - r
         end
         p = abs(int.p_int)
-        rint = round(Int, 1 + (r - ris[1]) / dr)
-        pint = round(Int, 1 + (p - pis[1]) / dp)
+        rint = nearest_index(ris, r)
+        pint = nearest_index(pis, p)
         if 1 <= rint <= Nr && 1 <= pint <= Np
             if hit[rint, pint]
                 nohit_count += 1
-                if nohit_count > 4 * sqrt(Np * Nr)
+                if nohit_count > 3 * sqrt(Np * Nr)
                     println("stop at $z")
                     break
                 end
@@ -74,51 +138,52 @@ function get_section_hits(mapper, ris, pis)
                 hit_count += 1
                 hit[rint, pint] = true
             end
-            # if last_hit[rint, pint] == 0
-            #     hit_count += 1
-            # elseif last_hit[rint,pint] == hit_count && z > (Q*Q)
-            #     println("Stop at z=$z")
-            #     break
-            # end
-            #  hit[rint, pint] = true
+        end
+        rint2 = nearest_index(ris2, r)
+        pint2 = nearest_index(pis2, p)
+        if 1 <= rint2 <= Nr2 && 1 <= pint2 <= Np2
+            hit2[rint2, pint2] = true
         end
     end
-    return hit
+    # 
+    # f(N)/f(N₂) = (N/N₂)^d
+    n_ratio = sqrt(Nr*Np/(Nr2*Np2))
+    d = log(n_ratio, sum(hit)/sum(hit2))
+
+    return hit,d
 end
 
-s = ArgParseSettings()
-@add_arg_table s begin
-    "--grid_size"
-    help = "width and height of the grid used for the Poincaré section plot"
-    arg_type = Int
-    default = 600
-    "--min_time"
-    help = "end time"
-    arg_type = Float64
-    default = 500.0
-    "--dt"
-    help = "time step of integration"
-    arg_type = Float64
-    default = 0.005
+#=
+function section_and_dim(mapper, ris, pis)
+    hit = get_section_hits(mapper, ris, pis)
+    dim = fractal_dimension(hit
+    if dim > 1.1 && sum(hit) < 2 * (length(ris) + length(pis))
+        # This is likely a stable orbit.
+        # To get more accurate dimension, compute
+        # using increased resolution.
+        ris2 = LinRange(ris[begin], ris[end], 2 * length(ris))
+        pis2 = LinRange(pis[begin], pis[end], 2 * length(pis))
+        println("Likely stable, computing with double res")
+        hit_for_dim = get_section_hits(mapper, ris2, pis2)
+        dim2 = fractal_dimension(hit_for_dim)
+        println("dim: $dim => $dim2")
+        dim = dim2
+    end
+    return hit, dim
 end
-
-add_potential_args(s,
-    default_potentials="fermi_lattice",
-    defaults=Dict(
-        "num_angles" => 1,
-        "num_sims" => 1,
-        "lattice_a" => 1.0,
-        "fermi_dot_radius" => 0.25,
-    )
-)
+=#
 
 parsed_args = parse_args(ARGS, s)
 
 potentials = get_potentials_from_parsed_args(parsed_args, 1, 1)
+if length(potentials) != 1
+    println("potentials=$potentials")
+    error("Exactly one potential is required, got $(length(potentials))")
+end
 pot = potentials[1].instances[1]
+pot_name = potentials[1].name
 
 Q = parsed_args["grid_size"]
-T = parsed_args["min_time"]
 dt = parsed_args["dt"]
 
 section = fill(RGB(1, 1, 1), Q, Q)
@@ -140,6 +205,7 @@ dim_count = zeros(Q, Q)
 
 progress_plot = true
 
+hit_maps = BitMatrix[]
 ## 
 for (i, r) ∈ enumerate(ris)
     maxp = max_momentum(pot, r * intersect)
@@ -158,8 +224,9 @@ for (i, r) ∈ enumerate(ris)
                 offset,
                 dt
             )
-            @time "Poincaré sim" hit = get_section_hits(mapper, ris, pis)
-            dim = fractal_dimension(hit)
+            @time "Poincaré sim" hit, dim = section_and_dim(mapper, ris, pis)
+            push!(hit_maps, BitMatrix(hit))
+            @printf "dim=%.2f\n" dim
             for idx ∈ eachindex(hit)
                 if hit[idx]
                     dim_tot[idx] += dim
@@ -178,9 +245,9 @@ for (i, r) ∈ enumerate(ris)
                 image!(ax, ris, pis, hit,
                     colormap=[
                         RGBA(0.0, 0.0, 0.0, 0.0),
-                        RGBA(1.0, 0.0, 0.0, 1.0)
+                        RGBA(1.0, 0.0, 0.0, 0.5)
                     ])
-                scatter!(ax, r, p, marker=:xcross, markersize=15, color=:orange)
+                scatter!(ax, r, p, marker=:xcross, markersize=15, color=:red)
                 Colorbar(fig[1, 2], hm)
                 display(fig)
             end
@@ -188,11 +255,46 @@ for (i, r) ∈ enumerate(ris)
         end
     end
 end
+## Recreate dim_min etc.
 
-##
+if false
+    dim_tot = zeros(Q, Q)
+    dim_min = fill(10.0, Q, Q)
+    dim_max = fill(0.0, Q, Q)
+    dim_count = zeros(Q, Q)
+    for hit ∈ hit_maps
+        dim = fractal_dimension(hit)
+        for idx ∈ eachindex(hit)
+            if hit[idx]
+                dim_tot[idx] += dim
+                dim_min[idx] = min(dim_min[idx], dim)
+                dim_max[idx] = max(dim_max[idx], dim)
+                dim_count[idx] += 1
+            end
+        end
+    end
+end
+
+
+## Write outputs
+
+dir = parsed_args["output_dir"]
+if dir[end] != '/'
+    push!(dir, '/')
+end
+
+pot_dir = "$(potentials[1].name)_$(potentials[1].params["v0"])"
+if potentials[1].name == "fermi_lattice"
+    pot_dir = @sprintf("%s_%.2f_%.2f",
+        pot_dir,
+        potentials[1].params["dot_radius"],
+        potentials[1].params["softness"])
+end
+dir = dir * pot_dir
 
 dim_mean = dim_tot ./ dim_count
 
+mkpath(dir)
 for (name, d) ∈ [
     ("mean", dim_mean),
     ("min", dim_min),
@@ -205,10 +307,26 @@ for (name, d) ∈ [
         colormap=ColorSchemes.viridis)
     cm = Colorbar(fig[1, 2], hm)
     display(fig)
-
-    save("outputs/classical/kam_$name.png", fig, px_per_unit=2)
+    save("$dir/kam_$name.png", fig, px_per_unit=2)
 end
 
+h5open("$dir/data.h5", "w") do f
+    f["dt"] = Float64(dt)
+    f["grid_size"] = Q
+    f["rs"] = ris
+    f["ps"] = pis
+    f["dim_mean"] = dim_mean
+    f["dim_max"] = dim_mean
+    f["dim_min"] = dim_mean
+    pot = create_group(f, "potential")
+    for (k, v) ∈ pairs(potentials[1].params)
+        pot[k] = v
+    end
+    sections = create_group(f, "sections")
+    for (k,map) ∈ enumerate(hit_maps)
+        sections["$k"] = one_indices(map)
+    end
+end
 
 # @time "Poincaré sim" ris,pis,hit = get_section_hits(mapper, Q)
 # for i ∈ eachindex(section)
