@@ -238,6 +238,10 @@ function potential_label_from_h5_data(data::Dict{String,Any},
         a = data["potential/lattice_a"]
         label *= L", $a=%$a$"
     end
+    if "softness" ∈ params && "potential/softness" ∈ keys(data)
+        a = data["potential/softness"]
+        label *= L", $\sigma=%$a$"
+    end
     if "v0" ∈ params && "potential/v0" ∈ keys(data)
         v0 = data["potential/v0"]
         label *= L", $v_0=%$v0$"

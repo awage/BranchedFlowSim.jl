@@ -2,6 +2,7 @@ using DifferentialEquations
 using BranchedFlowSim
 using ColorTypes
 using LaTeXStrings
+using FileIO
 using Serialization
 using ArgParse
 using Printf
@@ -10,6 +11,7 @@ using CairoMakie
 using Makie
 using StaticArrays
 using LinearAlgebra
+using HDF5
 using ColorSchemes
 
 s = ArgParseSettings()
@@ -35,6 +37,7 @@ add_potential_args(s,
         "num_sims" => 1,
         "lattice_a" => 1.0,
         "fermi_dot_radius" => 0.25,
+        "fermi_softness" => 0.10,
     )
 )
 
@@ -295,26 +298,12 @@ dir = dir * pot_dir
 dim_mean = dim_tot ./ dim_count
 
 mkpath(dir)
-for (name, d) ∈ [
-    ("mean", dim_mean),
-    ("min", dim_min),
-    ("max", dim_max)
-]
-    fig = Figure()
-    ax = Axis(fig[1, 1], xticks=0.5:0.1:1.0,
-        title=LaTeXString("Fractal dimension ($name)"))
-    hm = heatmap!(ax, ris, pis, d, colorrange=(1.0, 2.0),
-        colormap=ColorSchemes.viridis)
-    cm = Colorbar(fig[1, 2], hm)
-    display(fig)
-    save("$dir/kam_$name.png", fig, px_per_unit=2)
-end
 
 h5open("$dir/data.h5", "w") do f
     f["dt"] = Float64(dt)
     f["grid_size"] = Q
-    f["rs"] = ris
-    f["ps"] = pis
+    f["rs"] = Vector{Float64}(ris)
+    f["ps"] = Vector{Float64}(pis)
     f["dim_mean"] = dim_mean
     f["dim_max"] = dim_mean
     f["dim_min"] = dim_mean
@@ -326,6 +315,35 @@ h5open("$dir/data.h5", "w") do f
     for (k,map) ∈ enumerate(hit_maps)
         sections["$k"] = one_indices(map)
     end
+end
+
+h5_data = load("$dir/data.h5")
+label = potential_label_from_h5_data(h5_data,
+    ["type", "softness"])
+
+for (name, d) ∈ [
+    ("mean", dim_mean),
+    ("min", dim_min),
+    ("max", dim_max)
+]
+    fig = Figure()
+    ax = Axis(fig[1, 1], xticks=0.0:0.1:0.5,
+        title=LaTeXString("$label, fractal dimension ($name)"),
+        xlabel=L"y",
+        ylabel=L"p_y"
+        )
+    # Write NaN at each value that was not at all computed.
+    d2 = copy(d)
+    for idx ∈ eachindex(d2)
+        if dim_count[idx] == 0
+            d2[idx] = NaN
+        end
+    end
+    hm = heatmap!(ax, ris, pis, d2, colorrange=(1.0, 2.0),
+        colormap=ColorSchemes.viridis)
+    cm = Colorbar(fig[1, 2], hm)
+    display(fig)
+    save("$dir/kam_$name.png", fig, px_per_unit=2)
 end
 
 # @time "Poincaré sim" ris,pis,hit = get_section_hits(mapper, Q)
