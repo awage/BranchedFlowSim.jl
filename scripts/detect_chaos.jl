@@ -23,7 +23,7 @@ s = ArgParseSettings()
     "--dt"
     help = "time step of integration"
     arg_type = Float64
-    default = 0.005
+    default = 0.002
     "--output_dir"
     help = "Directory for outputs"
     arg_type = String
@@ -37,7 +37,7 @@ add_potential_args(s,
         "num_sims" => 1,
         "lattice_a" => 1.0,
         "fermi_dot_radius" => 0.25,
-        "fermi_softness" => 0.20,
+        "fermi_softness" => 0.10,
     )
 )
 
@@ -132,7 +132,7 @@ function section_and_dim(mapper, ris, pis)
         if 1 <= rint <= Nr && 1 <= pint <= Np
             if hit[rint, pint]
                 nohit_count += 1
-                if nohit_count > 3 * sqrt(Np * Nr)
+                if nohit_count > sqrt(Np * Nr)
                     println("stop at $z")
                     break
                 end
@@ -210,6 +210,7 @@ progress_plot = isinteractive()
 
 hit_maps = BitMatrix[]
 hit_dims = Float64[]
+traj_start = Vector{Float64}[]
 ## 
 for (i, r) ∈ enumerate(ris)
     maxp = max_momentum(pot, r * intersect)
@@ -231,6 +232,7 @@ for (i, r) ∈ enumerate(ris)
             @time "Poincaré sim" hit, dim = section_and_dim(mapper, ris, pis)
             push!(hit_maps, BitMatrix(hit))
             push!(hit_dims, dim)
+            push!(traj_start, [r, p])
             @printf "dim=%.2f\n" dim
             for idx ∈ eachindex(hit)
                 if hit[idx]
@@ -282,8 +284,8 @@ dim_mean = dim_tot ./ dim_count
 mkpath(dir)
 
 h5open("$dir/data.h5", "w") do f
-    f["dt"] = Float64(dt)
     f["grid_size"] = Q
+    f["dt"] = Float64(dt)
     f["rs"] = Vector{Float64}(ris)
     f["ps"] = Vector{Float64}(pis)
     f["dim_mean"] = dim_mean
@@ -291,6 +293,7 @@ h5open("$dir/data.h5", "w") do f
     f["dim_min"] = dim_min
     f["dim_count"] = dim_count
     f["trajectory_dim"] = hit_dims
+    f["trajectory_start"] = hcat(traj_start...)
     pot = create_group(f, "potential")
     for (k, v) ∈ pairs(potentials[1].params)
         pot[k] = v
