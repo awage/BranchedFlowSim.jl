@@ -37,7 +37,7 @@ add_potential_args(s,
         "num_sims" => 1,
         "lattice_a" => 1.0,
         "fermi_dot_radius" => 0.25,
-        "fermi_softness" => 0.10,
+        "fermi_softness" => 0.20,
     )
 )
 
@@ -206,9 +206,10 @@ dim_min = fill(10.0, Q, Q)
 dim_max = fill(0.0, Q, Q)
 dim_count = zeros(Q, Q)
 
-progress_plot = true
+progress_plot = isinteractive()
 
 hit_maps = BitMatrix[]
+hit_dims = Float64[]
 ## 
 for (i, r) ∈ enumerate(ris)
     maxp = max_momentum(pot, r * intersect)
@@ -229,6 +230,7 @@ for (i, r) ∈ enumerate(ris)
             )
             @time "Poincaré sim" hit, dim = section_and_dim(mapper, ris, pis)
             push!(hit_maps, BitMatrix(hit))
+            push!(hit_dims, dim)
             @printf "dim=%.2f\n" dim
             for idx ∈ eachindex(hit)
                 if hit[idx]
@@ -258,26 +260,6 @@ for (i, r) ∈ enumerate(ris)
         end
     end
 end
-## Recreate dim_min etc.
-
-if false
-    dim_tot = zeros(Q, Q)
-    dim_min = fill(10.0, Q, Q)
-    dim_max = fill(0.0, Q, Q)
-    dim_count = zeros(Q, Q)
-    for hit ∈ hit_maps
-        dim = fractal_dimension(hit)
-        for idx ∈ eachindex(hit)
-            if hit[idx]
-                dim_tot[idx] += dim
-                dim_min[idx] = min(dim_min[idx], dim)
-                dim_max[idx] = max(dim_max[idx], dim)
-                dim_count[idx] += 1
-            end
-        end
-    end
-end
-
 
 ## Write outputs
 
@@ -305,13 +287,15 @@ h5open("$dir/data.h5", "w") do f
     f["rs"] = Vector{Float64}(ris)
     f["ps"] = Vector{Float64}(pis)
     f["dim_mean"] = dim_mean
-    f["dim_max"] = dim_mean
-    f["dim_min"] = dim_mean
+    f["dim_max"] = dim_max
+    f["dim_min"] = dim_min
+    f["dim_count"] = dim_count
+    f["trajectory_dim"] = hit_dims
     pot = create_group(f, "potential")
     for (k, v) ∈ pairs(potentials[1].params)
         pot[k] = v
     end
-    sections = create_group(f, "sections")
+    sections = create_group(f, "trajectory_plot")
     for (k,map) ∈ enumerate(hit_maps)
         sections["$k"] = one_indices(map)
     end
@@ -342,7 +326,9 @@ for (name, d) ∈ [
     hm = heatmap!(ax, ris, pis, d2, colorrange=(1.0, 2.0),
         colormap=ColorSchemes.viridis)
     cm = Colorbar(fig[1, 2], hm)
-    display(fig)
+    if isinteractive()
+        display(fig)
+    end
     save("$dir/kam_$name.png", fig, px_per_unit=2)
 end
 
