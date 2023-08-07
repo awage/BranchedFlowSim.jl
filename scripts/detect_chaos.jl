@@ -23,7 +23,7 @@ s = ArgParseSettings()
     "--dt"
     help = "time step of integration"
     arg_type = Float64
-    default = 0.002
+    default = 0.005
     "--output_dir"
     help = "Directory for outputs"
     arg_type = String
@@ -156,6 +156,34 @@ function section_and_dim(mapper, ris, pis)
     return hit,d
 end
 
+function section_and_correlation_dim(mapper, ris, pis)
+    Nr = length(ris)
+    Np = length(pis)
+    hit = fill(false, Nr, Np)
+
+    N = 20000
+    points = zeros(2, N)
+    for i ∈ 1:N
+        int = next_intersection!(mapper)
+        # Map to distance from midline
+        r = int.r_int
+        if r > 0.5
+            r = 1.0 - r
+        end
+        p = abs(int.p_int)
+        rint = nearest_index(ris, r)
+        pint = nearest_index(pis, p)
+        if 1 <= rint <= Nr && 1 <= pint <= Np
+            hit[rint, pint] = true
+        end
+        points[1, i] = r
+        points[2, i] = p
+    end
+    
+    d = correlation_dimension(points, 0.01)
+    return hit,d
+end
+
 #=
 function section_and_dim(mapper, ris, pis)
     hit = get_section_hits(mapper, ris, pis)
@@ -229,6 +257,7 @@ for (i, r) ∈ enumerate(ris)
                 offset,
                 dt
             )
+            # @time "Poincaré sim" hit, dim = section_and_correlation_dim(mapper, ris, pis)
             @time "Poincaré sim" hit, dim = section_and_dim(mapper, ris, pis)
             push!(hit_maps, BitMatrix(hit))
             push!(hit_dims, dim)
