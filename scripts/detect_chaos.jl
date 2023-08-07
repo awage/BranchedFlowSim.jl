@@ -31,13 +31,14 @@ s = ArgParseSettings()
 end
 
 add_potential_args(s,
-    default_potentials="fermi_lattice",
+    default_potentials="cos_series",
     defaults=Dict(
+        "cos_degrees" => "3",
         "num_angles" => 1,
         "num_sims" => 1,
         "lattice_a" => 1.0,
         "fermi_dot_radius" => 0.25,
-        "fermi_softness" => 0.10,
+        "fermi_softness" => 0.20,
     )
 )
 
@@ -82,11 +83,11 @@ function fractal_dimension(section, debug=false)::Float64
     num_cells = [count_nonzero(section, s) for s ∈ scales]
     a, d = power_fit(grid_width, num_cells)
 
-    a2, d2 = power_fit(grid_width[2:end], num_cells[2:end])
-    if d2 < d
-        d = d2
-        a = a2
-    end
+#     a2, d2 = power_fit(grid_width[2:end], num_cells[2:end])
+#     if d2 < d
+#         d = d2
+#         a = a2
+#     end
 
     if debug
         @show grid_width, num_cells
@@ -132,7 +133,7 @@ function section_and_dim(mapper, ris, pis)
         if 1 <= rint <= Nr && 1 <= pint <= Np
             if hit[rint, pint]
                 nohit_count += 1
-                if nohit_count > sqrt(Np * Nr)
+                if nohit_count > 4*sqrt(Np * Nr)
                     println("stop at $z")
                     break
                 end
@@ -331,37 +332,6 @@ h5open("$dir/data.h5", "w") do f
     for (k,map) ∈ enumerate(hit_maps)
         sections["$k"] = one_indices(map)
     end
-end
-
-h5_data = load("$dir/data.h5")
-label = potential_label_from_h5_data(h5_data,
-    ["type", "softness"])
-
-for (name, d) ∈ [
-    ("mean", dim_mean),
-    ("min", dim_min),
-    ("max", dim_max)
-]
-    fig = Figure()
-    ax = Axis(fig[1, 1], xticks=0.0:0.1:0.5,
-        title=LaTeXString("$label, fractal dimension ($name)"),
-        xlabel=L"y",
-        ylabel=L"p_y"
-        )
-    # Write NaN at each value that was not at all computed.
-    d2 = copy(d)
-    for idx ∈ eachindex(d2)
-        if dim_count[idx] == 0
-            d2[idx] = NaN
-        end
-    end
-    hm = heatmap!(ax, ris, pis, d2, colorrange=(1.0, 2.0),
-        colormap=ColorSchemes.viridis)
-    cm = Colorbar(fig[1, 2], hm)
-    if isinteractive()
-        display(fig)
-    end
-    save("$dir/kam_$name.png", fig, px_per_unit=2)
 end
 
 # @time "Poincaré sim" ris,pis,hit = get_section_hits(mapper, Q)

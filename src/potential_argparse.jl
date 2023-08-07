@@ -40,6 +40,10 @@ function add_potential_args(s::ArgParseSettings;
         help = "maximum degree for the cos_series potentials"
         arg_type = Int
         default = get(defaults, "cos_max_degree", 6)
+        "--cos_degrees"
+        help = "Degrees evaluated for the cos_series potentials. Overrides --cos_max_degree"
+        arg_type = String
+        default = get(defaults, "cos_degrees", "")
         "--lattice_a"
         help = "lattice constant, used for periodic potentials"
         arg_type = Float64
@@ -129,11 +133,16 @@ function get_potentials_from_parsed_args(parsed_args, width, height)::Vector{Par
             push!(potentials, ParsedPotential(instances, params))
         elseif pt == "cos_series"
             max_degree = parsed_args["cos_max_degree"]
+            degrees = collect(1:max_degree)
+            if parsed_args["cos_degrees"] != ""
+                degrees_str = split(parsed_args["cos_degrees"], ',')
+                degrees = map(x->parse(Int, x), degrees_str)
+            end
             params["lattice_a"] = lattice_a
             params["angles"] = angles
             params["dot_radius"] = dot_radius
             params["softness"] = softness
-            for degree ∈ 1:max_degree
+            for degree ∈ degrees
                 params["degree"] = degree
                 cos_pot = fermi_dot_lattice_cos_series(
                     degree, lattice_a, dot_radius, v0, softness=softness)

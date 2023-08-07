@@ -124,3 +124,12 @@ end
     @test nb == 0.0
     println("nb=$nb")
 end
+
+
+@testset "poincare_mapper"
+    # Just test that the code doesn't crash. This is not deeply checking for correctness.
+    a = 0.2
+    radius = 0.2 * 0.25
+    potential = LatticePotential(rotation_matrix(0) * a, radius, 0.04)
+    
+end
