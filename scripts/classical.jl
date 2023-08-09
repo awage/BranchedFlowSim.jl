@@ -20,7 +20,7 @@ end
 
 lattice_a::Float64 = 0.2
 dot_radius::Float64 = 0.25 * lattice_a
-v0::Float64 = 0.1
+v0::Float64 = 0.04
 softness = 0.1
 dt::Float64 = 0.005
 

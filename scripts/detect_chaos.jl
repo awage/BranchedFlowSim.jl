@@ -24,6 +24,10 @@ s = ArgParseSettings()
     help = "time step of integration"
     arg_type = Float64
     default = 0.005
+    "--correlation_dim"
+    help = "Instead of box-counting, compute the dimension by correlation"
+    arg_type = Bool
+    default = true
     "--output_dir"
     help = "Directory for outputs"
     arg_type = String
@@ -31,9 +35,9 @@ s = ArgParseSettings()
 end
 
 add_potential_args(s,
-    default_potentials="cos_series",
+    default_potentials="fermi_lattice",
     defaults=Dict(
-        "cos_degrees" => "3",
+        "cos_degrees" => "2",
         "num_angles" => 1,
         "num_sims" => 1,
         "lattice_a" => 1.0,
@@ -83,11 +87,11 @@ function fractal_dimension(section, debug=false)::Float64
     num_cells = [count_nonzero(section, s) for s ∈ scales]
     a, d = power_fit(grid_width, num_cells)
 
-#     a2, d2 = power_fit(grid_width[2:end], num_cells[2:end])
-#     if d2 < d
-#         d = d2
-#         a = a2
-#     end
+    #     a2, d2 = power_fit(grid_width[2:end], num_cells[2:end])
+    #     if d2 < d
+    #         d = d2
+    #         a = a2
+    #     end
 
     if debug
         @show grid_width, num_cells
@@ -133,7 +137,7 @@ function section_and_dim(mapper, ris, pis)
         if 1 <= rint <= Nr && 1 <= pint <= Np
             if hit[rint, pint]
                 nohit_count += 1
-                if nohit_count > 4*sqrt(Np * Nr)
+                if nohit_count > 4 * sqrt(Np * Nr)
                     println("stop at $z")
                     break
                 end
@@ -151,10 +155,10 @@ function section_and_dim(mapper, ris, pis)
     end
     # 
     # f(N)/f(N₂) = (N/N₂)^d
-    n_ratio = sqrt(Nr*Np/(Nr2*Np2))
-    d = log(n_ratio, sum(hit)/sum(hit2))
+    n_ratio = sqrt(Nr * Np / (Nr2 * Np2))
+    d = log(n_ratio, sum(hit) / sum(hit2))
 
-    return hit,d
+    return hit, d
 end
 
 function section_and_correlation_dim(mapper, ris, pis)
@@ -164,6 +168,7 @@ function section_and_correlation_dim(mapper, ris, pis)
 
     N = 20000
     points = zeros(2, N)
+    nohit_count::Int64 = 0
     for i ∈ 1:N
         int = next_intersection!(mapper)
         # Map to distance from midline
@@ -175,14 +180,23 @@ function section_and_correlation_dim(mapper, ris, pis)
         rint = nearest_index(ris, r)
         pint = nearest_index(pis, p)
         if 1 <= rint <= Nr && 1 <= pint <= Np
-            hit[rint, pint] = true
+            if hit[rint,pint]
+                nohit_count += 1
+            else
+                nohit_count = 0
+                hit[rint, pint] = true
+            end
         end
         points[1, i] = r
         points[2, i] = p
+        if nohit_count > sqrt(Nr*Np)
+            points = points[:, 1:i]
+            println("Stop at $i")
+            break
+        end
     end
-    
-    d = correlation_dimension(points, 0.01)
-    return hit,d
+    d = correlation_dimension(points)
+    return hit, d
 end
 
 #=
@@ -217,6 +231,8 @@ pot_name = potentials[1].name
 
 Q = parsed_args["grid_size"]
 dt = parsed_args["dt"]
+
+use_correlation_dim = parsed_args["correlation_dim"]
 
 section = fill(RGB(1, 1, 1), Q, Q)
 # r0 = SA[0.0, 0.18]
@@ -258,8 +274,12 @@ for (i, r) ∈ enumerate(ris)
                 offset,
                 dt
             )
-            # @time "Poincaré sim" hit, dim = section_and_correlation_dim(mapper, ris, pis)
-            @time "Poincaré sim" hit, dim = section_and_dim(mapper, ris, pis)
+            @time "Poincaré sim" hit, dim =
+                if use_correlation_dim 
+                     section_and_correlation_dim(mapper, ris, pis)
+                else 
+                    section_and_dim(mapper, ris, pis)
+                end
             push!(hit_maps, BitMatrix(hit))
             push!(hit_dims, dim)
             push!(traj_start, [r, p])
@@ -307,13 +327,17 @@ if potentials[1].name == "fermi_lattice"
         potentials[1].params["dot_radius"],
         potentials[1].params["softness"])
 end
+if use_correlation_dim
+    pot_dir = pot_dir * "_correlation"
+end
 dir = dir * pot_dir
 
 dim_mean = dim_tot ./ dim_count
 
 mkpath(dir)
 
-h5open("$dir/data.h5", "w") do f
+output_path= "$dir/data.h5"
+h5open(output_path, "w") do f
     f["grid_size"] = Q
     f["dt"] = Float64(dt)
     f["rs"] = Vector{Float64}(ris)
@@ -329,10 +353,11 @@ h5open("$dir/data.h5", "w") do f
         pot[k] = v
     end
     sections = create_group(f, "trajectory_plot")
-    for (k,map) ∈ enumerate(hit_maps)
+    for (k, map) ∈ enumerate(hit_maps)
         sections["$k"] = one_indices(map)
     end
 end
+println("Wrote $output_path")
 
 # @time "Poincaré sim" ris,pis,hit = get_section_hits(mapper, Q)
 # for i ∈ eachindex(section)

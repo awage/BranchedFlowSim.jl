@@ -4,6 +4,7 @@ export add_potential_args
 export get_potentials_from_parsed_args
 export ParsedPotential
 export potential_label_from_h5_data
+export potential_from_h5_data
 
 """
     add_potential_args(s::ArgParseSettings,
@@ -272,4 +273,21 @@ function potential_label_from_h5_data(data::Dict{String,Any},
         label *= L", $dt=%$dt$"
     end
     return LaTeXString(label)
+end
+
+"""
+    potential_from_h5_data(data::Dict{String,Any})
+
+Returns a potential matching the 
+"""
+function potential_from_h5_data(data::Dict{String,Any})
+    type = data["potential/type"]
+    v0 = data["potential/v0"]
+    if type == "fermi_lattice"
+        lattice_a = data["potential/lattice_a"]
+        dot_radius = data["potential/dot_radius"]
+        softness = data["potential/softness"]
+        return LatticePotential(rotation_matrix(0)*lattice_a, dot_radius, v0, softness=softness)
+    end
+    error("potential_from_h5_data doesn't yet support type=$type")
 end

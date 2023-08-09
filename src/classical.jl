@@ -1,6 +1,7 @@
 using DifferentialEquations
 using StaticArrays
 
+export ray_trajectory
 export ray_trajectories
 export ray_trajectories2
 export lattice_intersections
@@ -31,10 +32,13 @@ function ray_f!(ddu, du, u, pot, t)
 end
 
 
-function ray_trajectory(r::Vec2, p::Vec2, potential::AbstractPotential, T, dt)
+function ray_trajectory(r::AbstractVector{<:Real}, p::AbstractVector{<:Real},
+     potential::AbstractPotential, T, dt, saveat=dt)
+    r = Vec2(r)
+    p = Vec2(p)
     tspan = (0.0, Float64(T))
     prob = SecondOrderODEProblem{false}(ray_f, p, r, tspan, potential)
-    sol = solve(prob, Yoshida6(), dt=dt)
+    sol = solve(prob, Yoshida6(), dt=dt, saveat=saveat)
     # sol = solve(prob, VelocityVerlet(), dt=dt)
     # sol = solve(prob, dt=dt)
 
@@ -213,6 +217,8 @@ struct PoincareMapper{Integrator<:OrdinaryDiffEq.ODEIntegrator}
         step,
         offset,
         dt)
+        r0 = Vec2(r0)
+        p0 = Vec2(p0)
         prob = SecondOrderODEProblem{false}(ray_f, p0, r0, (0, Inf), pot)
         A = SMatrix{2,2,Float64,4}(hcat(intersect, step))
         Ainv = inv(A)

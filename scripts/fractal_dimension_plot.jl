@@ -56,6 +56,8 @@ for fname ∈ parsed_args["input"]
         hm = heatmap!(ax, ris, pis, d2, colorrange=(1.0, 2.0),
             colormap=ColorSchemes.viridis)
         cm = Colorbar(fig[1, 2], hm)
-        save("$dir/fractal_dim_$name.png", fig, px_per_unit=2)
+        path = "$dir/fractal_dim_$name.png"
+        save(path, fig, px_per_unit=2)
+        println("Wrote $path")
     end
 end
