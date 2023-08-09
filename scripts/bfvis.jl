@@ -36,14 +36,16 @@ intersect = [0.0, 1.0]
 fig = Figure()
 display(fig)
 
+last_dim = Observable(0.0)
+
 W = 20
 
 real_ax = Axis(fig[1, 1], limits=((-W / 2, W / 2), (-W / 2, W / 2)),
     aspect=DataAspect())
 psos_ax = Axis(fig[1, 2],
     xzoomlock=true, yzoomlock=true,
-    xrectzoom=false, yrectzoom=false
-    )
+    xrectzoom=false, yrectzoom=false,
+    title=lift(d->"last dim: $d", last_dim))
 fig[2, 1:2] = bottomgrid = GridLayout(height=200)
 
 dim_max = data["dim_max"]
@@ -87,7 +89,8 @@ function add_traj(ry, py)
         return false
     end
     # Find first matching trajectory
-    for t ∈ trajectory_bitmaps
+    for (ti, t) ∈ enumerate(trajectory_bitmaps)
+        last_dim[] = trajectory_dim[ti]
         if t[ridx, pidx]
             global highlight_hms
             global traj_lines
@@ -103,7 +106,7 @@ function add_traj(ry, py)
             V = pot(r[1], r[2])
             px = sqrt(1 - 2V - py^2)
 
-            _, traj_rs, _ = ray_trajectory(r, [px, py], pot, 100, 0.005, 1.00)
+            _, traj_rs, _ = ray_trajectory(r, [px, py], pot, 20, 0.005, 1.00)
             traj_line = lines!(real_ax, traj_rs, color=:red)
             push!(traj_lines, traj_line)
             break

@@ -26,7 +26,7 @@ for fname ∈ parsed_args["input"]
 
     h5_data = load(fname)
     label = potential_label_from_h5_data(h5_data,
-        ["type", "softness"])
+        ["type", "softness", "dot_radius", "v0"])
 
     dim_mean = h5_data["dim_mean"]
     dim_min = h5_data["dim_min"]

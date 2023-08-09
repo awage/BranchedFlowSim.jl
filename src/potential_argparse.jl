@@ -252,6 +252,10 @@ function potential_label_from_h5_data(data::Dict{String,Any},
         a = data["potential/softness"]
         label *= L", $\sigma=%$a$"
     end
+    if "dot_radius" ∈ params && "potential/dot_radius" ∈ keys(data)
+        r = data["potential/dot_radius"]
+        label *= L", $r=%$r$"
+    end
     if "v0" ∈ params && "potential/v0" ∈ keys(data)
         v0 = data["potential/v0"]
         label *= L", $v_0=%$v0$"
