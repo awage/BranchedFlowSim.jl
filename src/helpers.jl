@@ -199,7 +199,7 @@ function pick_r0(points::AbstractMatrix{Float64})
     minx, maxx = extrema(@view points[1, :])
     miny, maxy = extrema(@view points[2, :])
     N = size(points)[2]
-    A = (maxx - minx) * (maxy - miny)
+    A = (0.001 + maxx - minx) * (0.001 + maxy - miny)
     return sqrt(2 * A / (pi * N))
 end
 
