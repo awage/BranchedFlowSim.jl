@@ -11,8 +11,16 @@ export PoincareIntersection
 export next_intersection!
 
 export max_momentum
+export ParticleIntegrator
+export particle_step!
+export particle_position
+export particle_momentum
+export particle_energy
+export normalized_momentum
+export normalize_particle_energy!
 
 Vec2 = SVector{2,Float64}
+AbstractFloatVec = AbstractVector{<:Real}
 
 function ray_f(dr::Vec2, r::Vec2, pot, t)
     return @inline force(pot, r[1], r[2])
@@ -180,6 +188,89 @@ function max_momentum(pot, r, E=0.5)
     return sqrt(2*(E-V))
 end
 
+"""
+Iterator for advancing along a ray, one timestep at a time.
+
+"""
+struct ParticleIntegrator{Integrator<:OrdinaryDiffEq.ODEIntegrator}
+    integrator::Integrator
+    function ParticleIntegrator(pot::AbstractPotential,
+        r :: AbstractFloatVec,
+        p :: AbstractFloatVec,
+        dt :: Real)
+        r0 = Vec2(r)
+        p0 = Vec2(p)
+        prob = SecondOrderODEProblem{false}(ray_f, p0, r0, (0, Inf), pot)
+        integrator = init(prob, Yoshida6(), dt=dt, save_everystep=false)
+        return new{typeof(integrator)}(
+            integrator
+        )
+    end
+end
+
+function particle_position(pint :: ParticleIntegrator) :: Vec2
+    return pint.integrator.u.x[2]
+end
+
+"""
+    particle_momentum(pint :: ParticleIntegrator) :: Vec2
+
+Returns momentum (equal to velocity) of the particle.
+"""
+function particle_momentum(pint :: ParticleIntegrator) :: Vec2
+    return pint.integrator.u.x[1]
+end
+
+function particle_t(pint::ParticleIntegrator) :: Float64 
+    return pint.integrator.t
+end
+
+"""
+    particle_step!(pint::ParticleIntegrator)
+
+Advance ray by one timestep.
+"""
+function particle_step!(pint::ParticleIntegrator)
+    step!(pint.integrator)
+    return nothing
+end
+
+function normalized_momentum(
+    pot::AbstractPotential,
+    r,
+    p, E=0.5
+    )
+    V = pot(r[1], r[2])
+    pnorm = sqrt(2*(0.5-V))
+    return (pnorm / norm(p)) * p
+end
+
+"""
+    normalize_particle_energy!(pint::ParticleIntegrator, E=0.5)
+
+
+"""
+function normalize_particle_energy!(pint::ParticleIntegrator, E=0.5)
+    r = particle_position(pint)
+    p = particle_momentum(pint)
+    pot = pint.integrator.sol.prob.p
+    p_new = normalized_momentum(pot, r, p, E)
+    set_u!(pint.integrator,
+        ArrayPartition((
+            p_new, particle_position(pint)
+        ))
+    )
+    return nothing
+end
+
+function particle_energy(pint::ParticleIntegrator)
+    r = particle_position(pint)
+    p = particle_momentum(pint)
+    pot = pint.integrator.sol.prob.p
+    V = pot(r[1], r[2])
+    return V + (p[1]^2+p[2]^2)/2
+end
+
 struct PoincareMapper{Integrator<:OrdinaryDiffEq.ODEIntegrator}
     integrator::Integrator
     offset::Vec2
@@ -234,6 +325,8 @@ struct PoincareMapper{Integrator<:OrdinaryDiffEq.ODEIntegrator}
 end
 
 struct PoincareIntersection
+    t :: Float64
+    
     # Relative position coordinate along the intersect vector.
     # r_int ∈ [0,1]
     r_int::Float64
@@ -282,7 +375,7 @@ function next_intersection!(mapper::PoincareMapper)::PoincareIntersection
                     p1_new, r1_new
                 ))
             )
-            return PoincareIntersection(qfrac, w[1])
+            return PoincareIntersection(mapper.integrator.t, qfrac, w[1])
         end
     end
 end

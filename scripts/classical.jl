@@ -1,5 +1,6 @@
-# Temporary script to play around with classical simulations
-# Move to src/ once more mature
+#=
+Script to visualize classical trajectories
+=#
 
 using BranchedFlowSim
 using CairoMakie

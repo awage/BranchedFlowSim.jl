@@ -1,3 +1,7 @@
+#=
+Ugly script to try to make 
+
+=#
 using BranchedFlowSim
 using Makie
 using LinearAlgebra
@@ -55,14 +59,18 @@ function potential_heatmap(xs, ys, potential)
     return get(pot_colormap, 0.4 * (V .- minV) ./ (maxV - minV + 1e-9))
 end
 
-
-data = load("outputs/classical/fermi_lattice_0.04_0.25_0.20_correlation/data.h5")
+data = load("../csc_outputs/classical/fermi_lattice_0.04_0.25_0.05_correlation/data.h5")
 
 psos_rs = data["rs"]
 psos_ps = data["ps"]
 Nr = length(psos_rs)
 Np = length(psos_ps)
+# Trajectories with fractal dimension less than this are considered stable.
 threshold = 1.4
+
+# Change this to > in order to map chaotic islands instead
+accept_dim(d) = d <= threshold
+
 dt = data["dt"]
 
 dim_max = data["dim_max"]
@@ -80,7 +88,7 @@ trajectory_bitmaps = [
 ]
 first_traj_idx = zeros(Int, Nr, Np)
 for (i, plot) ∈ enumerate(trajectory_plots)
-    if trajectory_dim[i] <= threshold
+    if accept_dim(trajectory_dim[i])
         for (rj, pj) ∈ eachcol(plot)
             if first_traj_idx[rj, pj] == 0
                 first_traj_idx[rj, pj] = i
@@ -96,14 +104,14 @@ intersect = [0.0, 1.0]
 
 island_color = zeros(Int, Nr, Np)
 
-is_stable = dim_max .< threshold
+is_stable = BitMatrix(accept_dim.(dim_max))
 
 next_color::Int64 = 1
 color_sizes = Int64[]
 println("starting loop")
 for rj ∈ 1:Nr
     for pj ∈ 1:Np
-        if island_color[rj, pj] != 0 || dim_max[rj, pj] > threshold || first_traj_idx[rj, pj] == 0
+        if island_color[rj, pj] != 0 || !is_stable[rj, pj] || first_traj_idx[rj, pj] == 0
             continue
         end
         crj = rj
@@ -129,7 +137,7 @@ for rj ∈ 1:Nr
 
             found = false
             for idx ∈ findall(next_candidate)
-                if dim_max[idx] <= threshold && first_traj_idx[idx] != 0
+                if is_stable[idx] && first_traj_idx[idx] != 0
                     found = true
                     crj, cpj = Tuple(CartesianIndices(island_bitmap)[idx])
                     break
@@ -151,7 +159,7 @@ end
 
 ## Plotting
 
-num_big = 22
+num_big = min(22, next_color-1)
 colors = distinguishable_colors(num_big, [RGB(0, 0, 0), RGB(1, 1, 1)], dropseed=true)
 # Only pick the largest islands
 sp = reverse(sortperm(color_sizes))
