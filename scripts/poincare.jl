@@ -44,8 +44,9 @@ function heatmap_with_potential(xs, ys, data, potential; colorrange=extrema(data
 end
 
 function make_explanation_figure(pot, step, intersect, offset, angles)
-    num_particles = size(angles)
-    r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
+    num_particles = length(angles)
+    # r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
+    r0 = zeros(2, num_particles)
     p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
     normalize_momentum!(p0, r0, pot)
 
@@ -190,8 +191,7 @@ v0::Float64 = 0.05
 softness = 0.2
 num_particles = 30
 T = 500
-p
-offsek = [lattice_a / 2, lattice_a / 2]
+offset = [lattice_a / 2, lattice_a / 2]
 # pot = fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, -v0)
 
 intersect = [0.0, 0.2]
@@ -231,8 +231,16 @@ save("outputs/classical/poincare_lattice.pdf", fig)
 save("outputs/classical/poincare_lattice.png", fig, px_per_unit=1)
 end
 
-# Make a single explanation plot
-fig = make_explanation_figure(lattice_pot, step, intersect, offset,
-    LinRange(0, 2pi, 6)[1:end-1])
+## Make a single explanation plot
+# Here's some testing for how to rotate the potential
+test_angle = pi/10
+test_pot = LatticePotential(lattice_a * rotation_matrix(-test_angle),
+    dot_radius, v0)
+test_step = rotation_matrix(test_angle) * step
+test_intersect  = rotation_matrix(test_angle) * intersect
+test_offset = rotation_matrix(test_angle) * offset
+
+fig = make_explanation_figure(test_pot, test_step, test_intersect, test_offset,
+    test_angle .+ LinRange(0, 2pi, 6)[1:end-1])
 display(fig)
 save("outputs/classical/poincare_explanation.pdf", fig)

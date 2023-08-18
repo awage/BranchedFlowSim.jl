@@ -14,6 +14,7 @@ export CompositePotential, RepeatedPotential
 export RotatedPotential, TranslatedPotential
 export CosSeriesPotential
 export FunctionPotential
+export ZeroPotential
 
 export rotation_matrix, force, force_x, force_y
 export correlated_random_potential
@@ -464,6 +465,18 @@ end
 
 function force(V::TranslatedPotential, x::Real, y::Real)::SVector{2,Float64}
     return force(V.wrapped, V.tx + x, V.ty + y)
+end
+
+# Optimized potential for free particles
+struct ZeroPotential <: AbstractPotential
+end
+
+function (V::ZeroPotential)(x::Real, y::Real)::Float64
+    return 0.0
+end
+
+function force(V::ZeroPotential, x::Real, y::Real)::SVector{2,Float64}
+    return SVector(0.0, 0.0)
 end
 
 

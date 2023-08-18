@@ -5,6 +5,7 @@ Set of small helpers, not directly belonging to any other file.
 export sample_midpoints
 export line_integer_cells
 export correlation_dimension
+export gaussian_correlated_random
 
 """
     sample_midpoints(a,b, n)
@@ -108,6 +109,13 @@ function line_integer_cells(f, x0, y0, x1, y1)
     return nothing
 end
 
+"""
+    loop_close_distances_squared(f,
+    points::AbstractMatrix{Float64},
+    r0::Float64)
+
+Calls f with the square of each distance that is less than r0.
+"""
 function loop_close_distances_squared(f,
     points::AbstractMatrix{Float64},
     r0::Float64)
@@ -199,6 +207,9 @@ function pick_r0(points::AbstractMatrix{Float64})
     minx, maxx = extrema(@view points[1, :])
     miny, maxy = extrema(@view points[2, :])
     N = size(points)[2]
+    # Small values are added to dimensions such that we don't return 0 if all
+    # points are along a vertical or horizontal line.
+    # NOTE: This is probably not ideal.
     A = (0.001 + maxx - minx) * (0.001 + maxy - miny)
     return sqrt(2 * A / (pi * N))
 end
@@ -207,12 +218,16 @@ end
     correlation_dimension(points :: AbstractMatrix{Float64},
      r0::Float64)
 
-TBW
+Given a set of 2D points (one per column), returns an estimation for
+the dimensionality of the set ("correlation dimension"). r0 is a radius
+used in the algorithm - ideally there should be O(N) pairs of
+points closer than r0 in the set.
 """
 function correlation_dimension(points::AbstractMatrix{Float64},
     r0::Float64 = pick_r0(points))
     @assert size(points)[1] == 2 "Only 2D points are supported"
 
+    # This Ref business seems to be required for performance. 
     tot = Ref(0.0)
     num = Ref(0.0)
     log_r0 :: Float64 = log(r0)
@@ -221,4 +236,38 @@ function correlation_dimension(points::AbstractMatrix{Float64},
         num[] += 1.0
     end
     return -1.0 / (tot[] / num[])
+end
+
+function middle(xs)
+    if length(xs) % 2 == 1
+        return xs[1+end÷2]
+    end
+    return (xs[end÷2] + xs[1+end÷2]) / 2
+end
+
+"""
+    gaussian_correlated_random(xs, ys, scale, seed=rand(UInt))
+
+Returns random potential matrix of Gaussian correlated random values.
+"""
+function gaussian_correlated_random(xs, ys, scale, seed=rand(UInt))
+    # See scripts/verify_correlated_random.jl for testing this
+    rng = Xoshiro(seed)
+    ymid = middle(ys)
+    xmid = middle(xs)
+    # TODO: Explain this. 
+    # dist2 = ((ys .- ymid) .^ 2) .+ transpose()
+    xcorr = exp.(-(xs .- xmid) .^ 2 ./ (scale^2))
+    ycorr = exp.(-(ys .- ymid) .^ 2 ./ (scale^2))
+    corr =  ComplexF64.(ycorr .* transpose(xcorr))
+        # exp.( -dist2 ./ (scale^2)))
+    # Convert DFT result to fourier series
+    fcorr = fft!(corr)
+    num_points = length(xs) * length(ys)
+    # phase = rand(rng, length(ys), length(xs))
+    # TODO: Not sure why the factor 2 is included here inside sqrt
+    ft = num_points .* sqrt.((2/num_points).*fcorr) .* cis.(2pi .* rand.(rng))
+    ifft!(ft)
+    # vrand = ifft(num_points * sqrt.(fcorr) .* cis.(2pi .* phase))
+    return real(ft)
 end

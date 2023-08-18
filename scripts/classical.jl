@@ -25,16 +25,25 @@ v0::Float64 = 0.04
 softness = 0.1
 dt::Float64 = 0.005
 
-pot = LatticePotential(lattice_a * I, dot_radius, v0;
-    softness=softness, offset=[lattice_a/2, lattice_a/2])
+# Width of the simulation box
+W = 6
+
+# pot = LatticePotential(lattice_a * I, dot_radius, v0;
+#     softness=softness, offset=[lattice_a/2, lattice_a/2])
 # pot = correlated_random_potential(4,4,0.1,v0)
+pot = correlated_random_potential(0.5,0.5,0.1,v0)
 # pot= fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, -v0)
 
 num_particles = 10000
 # num_particles = 4
-r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
-angles = LinRange(0, 2pi, num_particles + 1)[1:end-1]
-p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
+if true
+    angles = LinRange(0, 2pi, num_particles + 1)[1:end-1]
+    r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
+    p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
+else
+    r0 = [-W/2, 0] .+ [0, W] * LinRange(-0.5, 0.5, num_particles)'
+    p0 = [1, 0] * ones(num_particles)'
+end
     
 normalize_momentum!(p0, r0, pot)
 
@@ -68,8 +77,8 @@ function heatmap_with_potential(path, data, potential; colorrange=extrema(data))
     return img
 end
 
-Nh = 512
-xs = LinRange(-2, 2, Nh)
+Nh = 1024
+xs = LinRange(-W/2, W/2, Nh)
 hist :: Matrix{Float64} = zeros(Nh, Nh)
 
 function nearest_idx(xs, x)

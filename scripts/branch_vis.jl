@@ -1,6 +1,7 @@
 #=
-An interactive program to inspect how branches look in phase space
+An interactive program to inspect how branches look in phase space.
 =#
+using GeometryBasics
 using LinearAlgebra, Statistics
 using StaticArrays
 using BranchedFlowSim
@@ -69,10 +70,13 @@ GLMakie.activate!(inline=false)
 
 # Modify these to run with different potentials
 dot_radius = 0.25
-v0 = 0.08
-softness = 0.1
-pot = LatticePotential(I, dot_radius, v0, softness=softness)
-# pot = correlated_random_potential(1, 1, 0.2, v0, 0)
+v0 = 0.04
+softness = 0.20
+lattice_a = 1.0
+# pot = LatticePotential(I, dot_radius, v0, softness=softness)
+pot = correlated_random_potential(1, 1, 0.2, v0, 2)
+# pot = fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, v0; softness=softness)
+# LatticePotential(I, dot_radius, v0, softness=softness)
 
 step = [1.0, 0.0]
 intersect = [0.0, 1.0]
@@ -97,6 +101,7 @@ display(fig)
 real_ax = Axis(fig[1, 1], limits=((-W / 2, W / 2), (-W / 2, W / 2)),
     aspect=DataAspect())
 psos_ax = Axis(fig[1, 2], limits=((0, 1), (-1,1)))
+fig[2, 1:2] = bottomgrid = GridLayout(height=200)
 
 angles = LinRange(0, 2pi, num_particles + 1)[1:end-1]
 r0::Vector{Float64} = [0.51, 0.47]
@@ -118,13 +123,20 @@ img = heatmap_with_potential(
 image!(real_ax, xs, ys, img')
 highlight_image = nothing
 
+# Sliders
+sg = SliderGrid(bottomgrid[1,1],
+    (label="select radius", range=0.01:0.01:2, startvalue=0.2))
+select_radius = sg.sliders[1].value
+
+markersize_default = 8
+markersize_highlight = 10
+
 function select_trajectory(x,y)
     global highlight_image
     # look for trajectories passing through closer than some radius from given
     # point.
-    R = 0.2
+    R = select_radius[]
     R2 = R^2
-    D2 = norm(r0-[x,y])^2
     selected = Int[]
     end_velocities = SVector{2, Float64}[]
     for j ∈ 1:num_particles
@@ -153,9 +165,10 @@ function select_trajectory(x,y)
     selected = new_selected
 
     trajs = trajectories[:,:,selected]
+    # Only highlight the beginning part.
     end_time = fill(convert(Float64, T), length(selected))
+    D2 = norm(r0-[x,y])^2
     for j ∈ 1:size(trajs)[3]
-        # Only highlight the beginning part
         for i ∈ 2:trajectory_length
             if (trajs[1, i,j ] - r0[1])^2 + (trajs[2, i,j ] - r0[2])^2 > D2 + 1
                 end_time[j] = i * saveat
@@ -166,6 +179,7 @@ function select_trajectory(x,y)
             end
         end
     end
+    println("trajectories trimmed")
 
     hl_hist = make_trajectory_histogram(trajs, xs, ys)
     img = get(red_highlight, hl_hist / 5)
@@ -174,30 +188,85 @@ function select_trajectory(x,y)
     end
     highlight_image = image!(real_ax, xs, ys, img')
     
+    # Plot Poincare surface of section of selected trajectories up 
     empty!(psos_ax)
     for (et, j) ∈ zip(end_time, selected)
         mapper = PoincareMapper(pot, r0, p0[:, j], intersect, step, [0,0], dt)
         points = Vector{Float64}[]
         while true
             int = next_intersection!(mapper)
+            if isnothing(int)
+                println("Particle with p=$(p0[:,j]) didn't intersect")
+                break
+            end
             if int.t > et
                 break
             end
             push!(points, [int.r_int, int.p_int])
         end
         if length(points) != 0
-            scatter!(psos_ax, reduce(hcat, points), markersize=4)
+            scatter!(psos_ax, reduce(hcat, points), 
+                # Color is based on the angle
+                # color = RGB(HSV(rad2deg(angles[j]), 1, 1)),
+                markersize=markersize_default,
+                # We can just add a custom attribute here to remember the trajectory
+                trajectory_idx = j
+            )
         end
     end
 end
 
+last_picked = nothing
+selected_trajectory_line = nothing
 on(events(real_ax).mousebutton) do mb
     # mb = events(psos_ax).mousebutton[]
     if mb.button == Mouse.left && mb.action == Mouse.press
-        mp = mouseposition(real_ax)
-        # Select this trajectory 
-        println("mouse pressed at $mp")
-        select_trajectory(mp[1], mp[2])
-        return Consume(true)
+        pixel_pos = mouseposition(fig)
+        if pixel_pos ∈ pixelarea(real_ax)[]
+            mp = mouseposition(real_ax)
+            # Select this trajectory 
+            println("real_ax pressed at $mp")
+            select_trajectory(mp[1], mp[2])
+            return Consume(true)
+        elseif pixel_pos ∈ pixelarea(psos_ax)[]
+            mp = mouseposition(psos_ax)
+            println("psos_ax pressed at $mp")
+            picked,pidx = pick(psos_ax, pixel_pos)
+            println("picked $picked")
+            if picked isa Scatter
+                global last_picked, selected_trajectory_line
+                if !isnothing(last_picked)
+                    if :markersize ∈ keys(last_picked.attributes)
+                        last_picked.markersize[] = markersize_default
+                        last_picked.strokewidth[] = 0
+                    end
+                end
+                last_picked = picked
+                picked.markersize[] = markersize_highlight
+                picked.strokewidth[] = 2
+                if !isnothing(selected_trajectory_line)
+                    delete!(real_ax, selected_trajectory_line)
+                end
+                traj_idx = picked.trajectory_idx[]
+                selected_trajectory_line = lines!(real_ax, trajectories[:,:,traj_idx], color=:blue)
+            end
+        end
     end
+    return Consume(false)
 end
+
+# Draw branch selection marker
+mousemarker = lift(events(fig).mouseposition) do mp
+    area = pixelarea(real_ax)[]
+    mp = Point2f0(mp) .- minimum(area)
+    r = [Point2f0(to_world(real_ax.scene, mp))]
+    return r
+end
+mouse_scatter = scatter!(real_ax,
+    mousemarker,
+    markersize=lift(x->2*x, select_radius),
+    marker = Circle,
+    markerspace=:data,
+    color=RGBA(1,0,0, 0.3)
+    )
+
