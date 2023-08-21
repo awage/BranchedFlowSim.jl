@@ -48,7 +48,6 @@ function make_trajectory_histogram(trajectories, xs,ys)
     return hist
 end
 
-fire = reverse(ColorSchemes.linear_kryw_0_100_c71_n256)
 red_highlight = ColorScheme([RGBA(0,0,0,0), RGBA(1,0,0,0.5)])
 
 function heatmap_with_potential(data, potential; colors=ColorSchemes.grayC, colorrange=extrema(data))

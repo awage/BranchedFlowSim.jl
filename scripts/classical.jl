@@ -19,35 +19,44 @@ function normalize_momentum!(p, r, potential, E=0.5)
     end
 end
 
-lattice_a::Float64 = 0.2
+lattice_a::Float64 = 0.5
 dot_radius::Float64 = 0.25 * lattice_a
-v0::Float64 = 0.04
-softness = 0.1
+v0::Float64 = 0.08
+softness = 0.10
 dt::Float64 = 0.005
 
 # Width of the simulation box
-W = 6
+
+# Use this if you want a triangle lattice
+triangle_mat = [
+    1 0
+    cos(pi/3) sin(pi/3)
+]
 
 # pot = LatticePotential(lattice_a * I, dot_radius, v0;
 #     softness=softness, offset=[lattice_a/2, lattice_a/2])
-# pot = correlated_random_potential(4,4,0.1,v0)
-pot = correlated_random_potential(0.5,0.5,0.1,v0)
+# pot = correlated_random_potential(6,6,0.2,v0)
+# pot = correlated_random_potential(0.4, 0.4, 0.05, v0, 0)
 # pot= fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, -v0)
+pot = complex_separable_potential(4, lattice_a, dot_radius, v0)
 
+W = 10
+T = W/2
 num_particles = 10000
 # num_particles = 4
 if true
     angles = LinRange(0, 2pi, num_particles + 1)[1:end-1]
-    r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
+    r0 = lattice_a * [0.51, 0.45] * ones(num_particles)'
     p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
 else
+    W = 3
+    T = W + 1
     r0 = [-W/2, 0] .+ [0, W] * LinRange(-0.5, 0.5, num_particles)'
     p0 = [1, 0] * ones(num_particles)'
 end
     
 normalize_momentum!(p0, r0, pot)
 
-T = 5.0
 
 ## Plotting
 

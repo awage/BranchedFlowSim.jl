@@ -56,7 +56,7 @@ The situation being modeled is an infinite vertical wavefront starting
 at x=0 with p_y=0 and p_x=1 (constant). To cover the area defined by xs and ys,
 the actual wavefront being simulated must be taller than ys.
 """
-function quasi2d_intensity(num_rays, dt, xs, ys, potential; b=0.0030)
+function quasi2d_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030)
     h = length(ys) * (ys[2] - ys[1])
     T = xs[end] - xs[1]
     
@@ -106,7 +106,7 @@ function quasi2d_intensity(
         # drift
         ray_y .+= dt .* ray_py
         x += dt
-        if xs[xi] <= x
+        while xi <= length(xs) && xs[xi] <= x
             # Compute intensity
             density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity[:, xi] = pdf(density, ys)

@@ -429,6 +429,24 @@ function set_position_on_surface!(mapper::PoincareMapper, r_int, p_int)
     nothing
 end
 
+"""
+    particle_position(mapper::PoincareMapper)::Vec2
+
+Returns position of the particle.
+"""
+function particle_position(mapper::PoincareMapper)::Vec2
+    return mapper.integrator.u.x[2]
+end
+
+"""
+    particle_momentum(mapper::PoincareMapper)::Vec2
+
+Returns momentum of the particle.
+"""
+function particle_momentum(mapper::PoincareMapper)::Vec2
+    return mapper.integrator.u.x[1]
+end
+
 function total_energy(mapper::PoincareMapper)
     pot = mapper.integrator.sol.prob.p
     r = mapper.integrator.u.x[2]
