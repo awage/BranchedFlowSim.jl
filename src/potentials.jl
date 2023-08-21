@@ -1,6 +1,9 @@
-# TODO: Figure out if this file should be in potentials.jl
-# Currently this contains mostly potential functions and quasi2d simulation
-# for branch counting.
+#=
+File containing various 2D potential functions.
+Functions are implemented as distinct types (structs) which
+implement both the calling operator and force(x,y) function
+returning the force for a mass=1 particle at a given coordinate.
+=#
 using LinearAlgebra
 using StaticArrays
 using FFTW

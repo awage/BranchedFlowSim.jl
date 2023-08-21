@@ -103,10 +103,12 @@ struct SplitOperatorStepper
     SplitOperatorStepper(
         xgrid::AbstractVector{Float64},
         ygrid::AbstractVector{Float64},
-         Δt::Float64, potential,
+        Δt::Float64, potential,
         hbar::Float64=1.0)
 
-TBW
+`xgrid` and `ygrid` are vectors defining the x and y coordinates of the grid.
+`potential` is a matrix.
+
 """
     function SplitOperatorStepper(
         xgrid::AbstractVector{Float64},
