@@ -180,11 +180,11 @@ mkpath(dir)
 
 path ="$dir/lyapunov.h5"
 h5open(path, "w") do f
-    create_dataset(f, "le_mean", le_mean)
-    create_dataset(f, "le_max", le_max)
-    create_dataset(f, "le_count", le_count)
-    create_dataset(f, "ris", ris)
-    create_dataset(f, "pis", pis)
+    f["le_mean"] = le_mean
+    f["le_max"] = le_max
+    f["le_count"] = le_count
+    f["ris"] = Vector{Float64}(ris)
+    f["pis"] = Vector{Float64}(pis)
 end
 println("Wrote $path")
 
