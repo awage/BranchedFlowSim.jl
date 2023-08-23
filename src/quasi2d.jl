@@ -7,6 +7,7 @@ export quasi2d_num_branches, quasi2d_visualize_rays
 export quasi2d_compute_and_save_num_branches
 export quasi2d_num_branches_parallel
 export quasi2d_intensity
+export quasi2d_histogram_intensity
 
 function quasi2d_num_branches(num_rays, dt, ts, potential::AbstractPotential;
     return_rays=false)
@@ -116,13 +117,19 @@ function quasi2d_intensity(
     return intensity
 end
 
-function quasi2d_histogram_intensity(ray_y, xs, ys, potential)
+"""
+    quasi2d_histogram_intensity(ray_y, xs, ys, potential)
+
+Runs a simulation across a grid defined by `xs` and `ys`, returning a
+matrix of flow intensity computed as a histogram (unsmoothed).
+"""
+function quasi2d_histogram_intensity(num_rays, xs, ys, potential, ray_range=(0,1))
     dt = xs[2] - xs[1]
     dy = ys[2] - ys[1]
     width = length(xs)
     height = length(ys)
     image = zeros(height, width)
-    num_rays = length(ray_y)
+    ray_y = collect(LinRange(ray_range[1], ray_range[2], num_rays))
     ray_py = zeros(num_rays)
     for (xi, x) ∈ enumerate(xs)
         # kick
@@ -156,9 +163,8 @@ function quasi2d_visualize_rays(path, num_rays, sim_width, potential;
     if triple_y
         ys = LinRange(-1, 2, 3*pixel_scale)
     end
-    ray_y = LinRange(0, 1, num_rays)
     xs = LinRange(0, sim_width, pixel_scale * sim_width)
-    image = quasi2d_histogram_intensity(ray_y, xs, ys, potential)
+    image = quasi2d_histogram_intensity(num_rays, xs, ys, potential)
     scene = Scene(camera=campixel!, resolution=size(image'))
     pot_values = [
         potential(x, y) for x ∈ xs, y ∈ ys

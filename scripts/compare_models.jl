@@ -1,6 +1,7 @@
 #=
 Code to simulate the same potential using 3 models and compare the results.
 =#
+using LaTeXStrings
 using ColorSchemes
 using BranchedFlowSim
 using Makie
@@ -38,7 +39,7 @@ function quantum_visualize(xs, ys, pot, ħ)
     px = 1
     x0 = width
     E = 0.5
-    packet_Δx = 0.1
+    packet_Δx = 0.05
     T = 2 * width
     dt = ħ / E
     num_steps = round(Int, T / dt)
@@ -103,23 +104,24 @@ qm_img = quantum_visualize(xs, ys, pot, ħ)
 
 ## Quasi-2D
 
-# This is slower than necessary, really don't need the smoothness stuff.
-int,(rmin,rmax) = quasi2d_intensity(num_rays, 0.005, xs, ys, pot)
-quasi_img = heatmap_with_potential(int, grid_eval(xs, ys, pot))
+int = quasi2d_histogram_intensity(num_rays, xs, ys, pot)
+quasi_img = heatmap_with_potential(int, 
+    grid_eval(xs, ys, pot),
+     colorrange=(0,15))
 
 ## Plot
 
 fig = Figure()
-ax_qm = Axis(fig[1, 1], aspect=DataAspect())
-ax_c = Axis(fig[2, 1], aspect=DataAspect())
-ax_quasi = Axis(fig[3, 1], aspect=DataAspect())
+ax_qm = Axis(fig[1, 1], aspect=DataAspect(), title=LaTeXString("QM"))
+ax_c = Axis(fig[1, 2], aspect=DataAspect(), title=LaTeXString("Classical"))
+ax_quasi = Axis(fig[1, 3], aspect=DataAspect(), title=LaTeXString("Quasi-2D (\$p_x=1\\implies x=t\$)"))
 hidedecorations!(ax_qm)
 hidedecorations!(ax_c)
 hidedecorations!(ax_quasi)
 
-image!(ax_qm, xs, ys, qm_img')
-image!(ax_c, xs, ys, img_cl')
-image!(ax_quasi, xs, ys, quasi_img')
+image!(ax_qm, ys, xs, qm_img)
+image!(ax_c, ys, xs, img_cl)
+image!(ax_quasi, ys, xs, quasi_img)
 
 display(fig)
 save("outputs/compare_models.pdf", fig)

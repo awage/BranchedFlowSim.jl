@@ -1,3 +1,6 @@
+#=
+Script to generate various poincaré plots.
+=#
 using BranchedFlowSim
 using CairoMakie
 using LinearAlgebra
@@ -109,17 +112,17 @@ function make_trajectory_plot(pot, step, intersect, offset, r0, p0, T)
     num_particles = size(r0)[2]
     normalize_momentum!(p0, r0, pot)
 
-    fig = Figure(resolution=(1024, 1024), figure_padding=0)
+    fig = Figure(resolution=(512, 1024), figure_padding=0)
     ax_section = Axis(fig[2, 1],
         xlabel=L"$q",
         ylabel=L"$w",
         limits=((0, 1), (-1.0, 1.0)),
-        aspect=2
+        aspect=1
     )
 
-    hist_width = 512
+    hist_width = 1024
     section_width = 512
-    xs = LinRange(0, 8, hist_width)
+    xs = LinRange(0, 4, hist_width)
     ys = LinRange(-2, 2, hist_width)
     qs = LinRange(0, 1, section_width)
     ws = LinRange(-1, 1, section_width)
@@ -189,20 +192,20 @@ end
 
 lattice_a::Float64 = 0.2
 dot_radius::Float64 = 0.25 * lattice_a
-v0::Float64 = 0.05
-softness = 0.2
-num_particles = 30
+v0::Float64 = 0.08
+softness = 0.20
+num_particles = 50
 T = 500
 offset = [lattice_a / 2, lattice_a / 2]
 # pot = fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, -v0)
 
 intersect = [0.0, 0.2]
 step = [0.2, 0.0]
-# angles = LinRange(-pi/8, pi/8, num_particles + 1)[1:end-1]
-# r0 = lattice_a * [0.1, 0.05] * ones(num_particles)'
-# p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
-r0 = lattice_a * [0.0, 1] * LinRange(-0.5, 0.5, num_particles)'
-p0 = [1.0, 0] * ones(num_particles)'
+angles = LinRange(-pi/3, pi/3, num_particles + 1)[1:end-1]
+r0 = lattice_a * [0.13, 0.05] * ones(num_particles)'
+p0 = hcat(([cos(θ), sin(θ)] for θ ∈ angles)...)
+# r0 = lattice_a * [0.0, 1] * LinRange(-0.5, 0.5, num_particles)'
+# p0 = [1.0, 0] * ones(num_particles)'
 
 # Integrable and almost integrable potentials
 for deg ∈ 1:4
@@ -235,14 +238,15 @@ end
 
 ## Make a single explanation plot
 # Here's some testing for how to rotate the potential
-test_angle = pi/10
+#test_angle = pi/10
+test_angle = 0.0
 test_pot = LatticePotential(lattice_a * rotation_matrix(-test_angle),
-    dot_radius, v0)
+    dot_radius, v0, offset=lattice_a * [0.5, 0.5])
 test_step = rotation_matrix(test_angle) * step
 test_intersect  = rotation_matrix(test_angle) * intersect
 test_offset = rotation_matrix(test_angle) * offset
 
 fig = make_explanation_figure(test_pot, test_step, test_intersect, test_offset,
-    test_angle .+ LinRange(0, 2pi, 6)[1:end-1])
+    test_angle .+ 0.1 .+ LinRange(0, 2pi, 6)[1:end-1])
 display(fig)
 save("outputs/classical/poincare_explanation.pdf", fig)
