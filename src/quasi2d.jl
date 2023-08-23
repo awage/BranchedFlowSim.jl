@@ -116,9 +116,28 @@ function quasi2d_intensity(
     return intensity
 end
 
-function quasi2d_compute_and_save_intensity(
-    h5_fname, num_rays, dt, xs,ys, b, potentials::AbstractArray{<:AbstractPotential},
-    pot_params::NamedTuple=())
+function quasi2d_histogram_intensity(ray_y, xs, ys, potential)
+    dt = xs[2] - xs[1]
+    dy = ys[2] - ys[1]
+    width = length(xs)
+    height = length(ys)
+    image = zeros(height, width)
+    num_rays = length(ray_y)
+    ray_py = zeros(num_rays)
+    for (xi, x) ∈ enumerate(xs)
+        # kick
+        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+        # drift
+        ray_y .+= dt .* ray_py
+        # Collect
+        for y ∈ ray_y
+            yi = 1 + round(Int, (y - ys[1]) / dy)
+            if yi >= 1 && yi <= height
+                image[yi, xi] += 1
+            end
+        end
+    end
+    return image * height / num_rays
 end
 
 """
@@ -133,51 +152,22 @@ function quasi2d_visualize_rays(path, num_rays, sim_width, potential;
     triple_y=false
 )
     pixel_scale = 600
-    sim_height = 1
-    height = round(Int,
-        if triple_y
-            3 * pixel_scale
-        else
-            pixel_scale
-        end
-    )
-    width = round(Int, sim_width * pixel_scale)
-    xs = LinRange(0, sim_width, width)
-    dt = xs[2] - xs[1]
-    image = zeros(height, width)
-    # Height of one pixel in simulation length units
-    pixel_h = 1 / pixel_scale
-    ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:end-1])
-    ypixels = LinRange(0, ray_y[end], height)
-    ray_py = zeros(num_rays)
-    for (xi, x) ∈ enumerate(xs)
-        # kick
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # drift
-        ray_y .+= dt .* ray_py
-        # Collect
-        for y ∈ ray_y
-            yi = 1 + round(Int, y / pixel_h)
-            if triple_y
-                yi += height ÷ 3
-            end
-            if yi >= 1 && yi <= height
-                image[yi, xi] += 1
-            end
-        end
-    end
-    scene = Scene(camera=campixel!, resolution=size(image'))
+    ys = LinRange(0, 1, pixel_scale)
     if triple_y
-        ypixels = LinRange(ypixels[1] - sim_height, ypixels[end] + sim_height, height)
+        ys = LinRange(-1, 2, 3*pixel_scale)
     end
+    ray_y = LinRange(0, 1, num_rays)
+    xs = LinRange(0, sim_width, pixel_scale * sim_width)
+    image = quasi2d_histogram_intensity(ray_y, xs, ys, potential)
+    scene = Scene(camera=campixel!, resolution=size(image'))
     pot_values = [
-        potential(x, y) for x ∈ xs, y ∈ ypixels
+        potential(x, y) for x ∈ xs, y ∈ ys
     ]
     heatmap!(scene, pot_values; colormap=:Greens_3)
     heatmap!(scene, image'; colormap=[
             RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
         ],
-        colorrange=(0, 15 * num_rays / pixel_scale)
+        colorrange=(0, 15)
     )
     save(path, scene)
 end

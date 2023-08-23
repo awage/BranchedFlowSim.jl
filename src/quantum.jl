@@ -171,6 +171,7 @@ struct TimeEvolution
     ygrid::Vector{Float64}
     potential::Matrix{ComplexF64}
     Ψ_initial::Matrix{ComplexF64}
+    ħ ::Float64
 end
 
 function time_evolution(
@@ -178,7 +179,7 @@ function time_evolution(
     ygrid::AbstractVector{Float64},
     potential, Ψ, dt, num_steps, hbar=1.0)
     stepper = SplitOperatorStepper(xgrid, ygrid, dt, potential, hbar)
-    return TimeEvolution(stepper, dt, num_steps, xgrid, ygrid, potential, Ψ)
+    return TimeEvolution(stepper, dt, num_steps, xgrid, ygrid, potential, Ψ, hbar)
 end
 
 function Base.iterate(it::TimeEvolution)
@@ -223,7 +224,11 @@ end
 
 
 """
-    wavefunction_to_image(xgrid, Ψ, potential, max_modulus=0.0)
+    wavefunction_to_image(Ψ;
+    potential=nothing,
+    max_modulus=0.0,
+    colorscheme=default_colorscheme
+)
 
 Produces a RGB image showing given wavefunction Ψ and potential. If `max_modulus` is
 nonzero, Ψ values greater or equal to `max_modulus` are mapped to highest colors.
@@ -363,6 +368,7 @@ Returns eigenfunctions for given `energies` by running a given time evolution.
 """
 function collect_eigenfunctions(evolution::TimeEvolution, energies;
     window=false)
+    ħ = evolution.ħ
     ΨE = zeros(ComplexF64, length(evolution.ygrid), length(evolution.xgrid),
         length(energies))
     T = evolution.num_steps * evolution.dt
@@ -373,7 +379,7 @@ function collect_eigenfunctions(evolution::TimeEvolution, energies;
         end
         Threads.@threads for ei ∈ 1:length(energies)
             E = energies[ei]
-            @views ΨE[:, :, ei] .+= Ψ .* (w * exp(1im * t * E))
+            @views ΨE[:, :, ei] .+= Ψ .* (w * exp(1im * t * E / ħ))
         end
     end
     print("$(length(evolution.xgrid)) ---- $(length(evolution.ygrid))\n")

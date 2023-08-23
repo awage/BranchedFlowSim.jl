@@ -69,9 +69,7 @@ function lyapunov_exponent_and_hits(pot, ris, pis, r_idx, p_idx, intersect, step
     while true
         int = next_intersection!(mapper)
         if isnothing(int)
-            # No intersection was found in reasonable time.
-            println("Bad trajectory: r=$orig_r p=$orig_p")
-            return 0.0, []
+            break
         end
     # 
         if int.t > T / 2
@@ -185,23 +183,19 @@ h5open(path, "w") do f
     f["le_count"] = le_count
     f["ris"] = Vector{Float64}(ris)
     f["pis"] = Vector{Float64}(pis)
+    pot = create_group(f, "potential")
+    for (k, v) ∈ pairs(potentials[1].params)
+        pot[k] = v
+    end
 end
 println("Wrote $path")
 
-## 
-# for i ∈ 1:W
-#     Threads.@threads for j ∈ 1:W
-#         r0p0 = get_r0_p0(pot, ys[i], pys[j])
-#         if isnothing(r0p0)k
-#             continue
-#         end
-#         r0,p0 = r0p0
-#         le = local_lyapunov_exponent(pot, r0, p0, dt, T)
-#         lle[i, j] = le
-#         @printf "r0= (%.3f, %.3f) p0= (%.3f, %.3f) LE=%.3f \n" r0[1] r0[2] p0[1] p0[2] le
-#     end
-#     fig = heatmap(ys[1:i], pys, lle[1:i,:])
-#     display(fig)
-# end
-# 
-# heatmap(ys, pys, lle)
+## Plot results
+
+fig = Figure()
+ax = Axis(fig[1,1], xticks=0.0:0.1:0.5)
+hm = heatmap!(ax, ris, pis, le_mean, colorrange=(0.0, maximum(le_max)))
+cm = Colorbar(fig[1,2], hm)
+
+save("$dir/lyapunov.png", fig, px_per_unit=2)
+save("$dir/lyapunov.pdf", fig)

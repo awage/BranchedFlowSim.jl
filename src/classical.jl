@@ -474,7 +474,7 @@ function classical_visualize_rays(xs, ys, pot, r0, p0, T, dt=0.005)
     Ny = length(ys)
     dx = xs[2] - xs[1]
     dy = ys[2] - ys[1]
-    hist::Matrix{Float64} = zeros(Nx, Ny)
+    hist::Matrix{Float64} = zeros(Ny, Nx)
     ray_trajectories(r0, p0, pot, T, dt) do ts, rs, ps
         lx::Float64 = -1
         ly::Float64 = -1
@@ -485,6 +485,9 @@ function classical_visualize_rays(xs, ys, pot, r0, p0, T, dt=0.005)
             yi = 1 + (y - ys[1]) / dy
             if 1 < xi < Nx && 1 < yi < Ny && 1 < lx < Nx && 1 < ly < Ny
                 line_integer_cells(lx, ly, xi, yi) do x, y
+                    if y > Ny
+                        println("ERROR: $lx $ly -- $xi $yi")
+                    end
                     if x != px || y != py
                         hist[y, x] += 1
                     end
@@ -549,7 +552,6 @@ function lyapunov_inner(pint0, pint1, T, d_start, perform_rescaling)
             end
         end
     end
-    @show rescalings
     @assert particle_t(pint0) == particle_t(pint1)
     # println("end t=$(particle_t(pint0))")
 
