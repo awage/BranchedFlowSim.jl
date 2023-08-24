@@ -192,10 +192,10 @@ end
 
 lattice_a::Float64 = 0.2
 dot_radius::Float64 = 0.25 * lattice_a
-v0::Float64 = 0.08
+v0::Float64 = 0.04
 softness = 0.20
 num_particles = 50
-T = 500
+T = 1000
 offset = [lattice_a / 2, lattice_a / 2]
 # pot = fermi_dot_lattice_cos_series(1, lattice_a, dot_radius, -v0)
 
