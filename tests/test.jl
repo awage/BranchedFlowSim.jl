@@ -126,7 +126,7 @@ end
 end
 
 
-@testset "poincare_mapper"
+@testset "poincare_mapper" begin
     # Just test that the code doesn't crash. This is not deeply checking for correctness.
     a = 0.2
     radius = 0.2 * 0.25

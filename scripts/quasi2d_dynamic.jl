@@ -92,6 +92,7 @@ ax = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
 )
 
 colors = Makie.wong_colors()
+let 
 ci = 1
 for r ∈ 1:size(params)[1]
     for c ∈ 1:size(params)[2]
@@ -101,6 +102,7 @@ for r ∈ 1:size(params)[1]
         lines!(ax, ts, data[r, c], color=color, label=L"n=%$n,\, dt=%$d")
         lines!(ax, ts, rand_rays_nb[r, c], color=color, label=L"n=%$n,\, dt=%$d (rand)", linestyle=:dash)
     end
+end
 end
 # lines!(ax, ts, dyn_branches, label=L"dynamic, $n=%$(length(ray_y))$")
 

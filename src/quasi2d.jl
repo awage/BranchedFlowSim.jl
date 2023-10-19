@@ -10,8 +10,8 @@ export quasi2d_intensity
 export quasi2d_histogram_intensity
 
 function quasi2d_num_branches(num_rays, dt, ts, potential::AbstractPotential;
-    return_rays=false)
-    ray_y = Vector(LinRange(0, 1, num_rays + 1)[1:num_rays])
+    return_rays=false, rays_span = (0,1))
+    ray_y = Vector(LinRange(rays_span[1], rays_span[2], num_rays + 1)[1:num_rays])
     return quasi2d_num_branches(ray_y, dt, ts, potential; return_rays=return_rays)
 end
 
@@ -59,22 +59,7 @@ the actual wavefront being simulated must be taller than ys.
 """
 function quasi2d_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030)
     h = length(ys) * (ys[2] - ys[1])
-    T = xs[end] - xs[1]
-    
-    # First shoot some rays to figure out how wide they spread in the given time.
-    # Then use this to decide how tall to make the initial wavefront.
-    num_canary_rays = 1024
-    canary_ray_y = Vector(sample_midpoints(ys[1], ys[end], num_canary_rays))
-    ray_y = copy(canary_ray_y)
-    ray_py = zero(ray_y)
-    for x ∈ 0:dt:xs[end]
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        ray_y .+= dt .* ray_py
-    end
-    max_travel = maximum(abs.(ray_y - canary_ray_y))
-    rmin = ys[1] - max_travel
-    rmax = ys[end] + max_travel
-    # println("ray spread: $rmin .. $rmax")
+    rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
     sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
     ints = quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
@@ -117,19 +102,45 @@ function quasi2d_intensity(
     return intensity
 end
 
+# First shoot some rays to figure out how wide they spread in the given time.
+# Then use this to decide how tall to make the initial wavefront.
+function quasi2d_compute_front_length(num_canary_rays, dt, xs, ys, potential)
+    T = xs[end] - xs[1]
+    canary_ray_y = Vector(sample_midpoints(ys[1], ys[end], num_canary_rays))
+    ray_y = copy(canary_ray_y)
+    ray_py = zero(ray_y)
+    for x ∈ 0:dt:xs[end]
+        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+        ray_y .+= dt .* ray_py
+    end
+    max_travel = maximum(abs.(ray_y - canary_ray_y))
+    # Front coordinates:
+    rmin = ys[1] - max_travel
+    rmax = ys[end] + max_travel
+    return rmin, rmax
+end
+            
+     
+
 """
     quasi2d_histogram_intensity(ray_y, xs, ys, potential)
 
 Runs a simulation across a grid defined by `xs` and `ys`, returning a
 matrix of flow intensity computed as a histogram (unsmoothed).
 """
-function quasi2d_histogram_intensity(num_rays, xs, ys, potential, ray_range=(0,1))
+function quasi2d_histogram_intensity(num_rays, xs, ys, potential, ray_range=(0,1); normalized = true)
     dt = xs[2] - xs[1]
     dy = ys[2] - ys[1]
+
+   rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
+
+    # ray_range  = LinRange(rmin, rmax, num_rays)
+    # sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
+
     width = length(xs)
     height = length(ys)
     image = zeros(height, width)
-    ray_y = collect(LinRange(ray_range[1], ray_range[2], num_rays))
+    ray_y = collect(LinRange(rmin, rmax, num_rays))
     ray_py = zeros(num_rays)
     for (xi, x) ∈ enumerate(xs)
         # kick
@@ -144,7 +155,13 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential, ray_range=(0,1
             end
         end
     end
-    return image * height / num_rays
+    if normalized 
+        for k in 1:length(xs)
+            image[:,k] .= image[:,k]/sum(image[:,k])/dy
+        end
+    end
+    # return image * height / num_rays
+    return image 
 end
 
 """
