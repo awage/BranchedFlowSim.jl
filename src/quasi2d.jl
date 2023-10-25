@@ -6,8 +6,11 @@ using CairoMakie
 export quasi2d_num_branches, quasi2d_visualize_rays
 export quasi2d_compute_and_save_num_branches
 export quasi2d_num_branches_parallel
-export quasi2d_intensity
+export quasi2d_smoothed_intensity
 export quasi2d_histogram_intensity
+export quasi2d_get_stats
+
+
 
 function quasi2d_num_branches(num_rays, dt, ts, potential::AbstractPotential;
     return_rays=false, rays_span = (0,1))
@@ -57,16 +60,16 @@ The situation being modeled is an infinite vertical wavefront starting
 at x=0 with p_y=0 and p_x=1 (constant). To cover the area defined by xs and ys,
 the actual wavefront being simulated must be taller than ys.
 """
-function quasi2d_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030)
+function quasi2d_smoothed_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030)
     h = length(ys) * (ys[2] - ys[1])
     rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
     sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
-    ints = quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
+    ints = quasi2d_smoothed_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
     return ints, (rmin, rmax)
 end
 
-function quasi2d_intensity(
+function quasi2d_smoothed_intensity(
     ray_y::AbstractVector{<:Real},
     dt::Real,
     xs::AbstractVector{<:Real},
@@ -104,12 +107,16 @@ end
 
 # First shoot some rays to figure out how wide they spread in the given time.
 # Then use this to decide how tall to make the initial wavefront.
-function quasi2d_compute_front_length(num_canary_rays, dt, xs, ys, potential)
+function quasi2d_compute_front_length(num_canary_rays, dt, xs::AbstractVector{<:Real}, ys, potential)
     T = xs[end] - xs[1]
+    return quasi2d_compute_front_length(num_canary_rays, dt, T, ys, potential)
+end
+
+function quasi2d_compute_front_length(num_canary_rays, dt, T::Real, ys, potential)
     canary_ray_y = Vector(sample_midpoints(ys[1], ys[end], num_canary_rays))
     ray_y = copy(canary_ray_y)
     ray_py = zero(ray_y)
-    for x ∈ 0:dt:xs[end]
+    for x ∈ 0:dt:T
         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
         ray_y .+= dt .* ray_py
     end
@@ -128,11 +135,12 @@ end
 Runs a simulation across a grid defined by `xs` and `ys`, returning a
 matrix of flow intensity computed as a histogram (unsmoothed).
 """
-function quasi2d_histogram_intensity(num_rays, xs, ys, potential, ray_range=(0,1); normalized = true)
+function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = true)
     dt = xs[2] - xs[1]
     dy = ys[2] - ys[1]
-
-   rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
+    
+    # Compute the spread beforehand
+    rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
 
     # ray_range  = LinRange(rmin, rmax, num_rays)
     # sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
@@ -197,7 +205,6 @@ end
 
 function quasi2d_num_branches_parallel(
     num_rays, dt, ts, potentials, progress_text="")
-
     p = Progress(length(potentials), progress_text)
     nb_arr = zeros(length(ts), length(potentials))
     Threads.@threads for i ∈ 1:length(potentials)
@@ -252,3 +259,54 @@ function quasi2d_compute_and_save_num_branches(
         end
     end
 end
+
+function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.0030, threshold = 1.5)
+    rmin,rmax = quasi2d_compute_front_length(1024, dt, T, ys, potential)
+    ray_y = LinRange(rmin, rmax, num_rays)
+    xrange, area = quasi2d_smoothed_intensity_stats(ray_y, dt, T, ys, potential, b, threshold) 
+    return xrange, area, (rmin, rmax)
+end
+
+function quasi2d_smoothed_intensity_stats(
+    ray_y::AbstractVector{<:Real},
+    dt::Real,
+    T::Real,
+    ys::AbstractVector{<:Real},
+    potential,
+    b, 
+    threshold
+)
+    dy = ys[2] - ys[1]
+    y_end = ys[1] + length(ys) * (ys[2] - ys[1])
+    h = length(ys) * (ys[2] - ys[1])
+    sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
+    ray_y = Vector{Float64}(ray_y)
+    num_rays = length(ray_y)
+    ray_py = zeros(num_rays)
+    xrange = range(0, T, step = dt) 
+    area = zeros(length(xrange))
+    intensity = zeros(length(ys))
+    background = (num_rays/length(ys))
+    bckgnd_density = background/(dy*num_rays)
+
+    boundary = (
+        ys[1] - dy - 4*b,
+        ys[end] + dy + 4*b,
+    )
+    for (k,x) in enumerate(xrange)
+        # kick
+        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+        # drift
+        ray_y .+= dt .* ray_py
+        x += dt
+        # while xi <= length(xs) && xs[xi] <= x
+        #     # Compute intensity
+        density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
+        intensity = pdf(density, ys)* (sim_h / h)
+        ind = findall(intensity .> threshold*bckgnd_density) 
+        area[k] = length(ind)/length(intensity)  
+    end
+
+    return xrange, area
+end
+

@@ -5,27 +5,8 @@ using LinearAlgebra
 using StaticArrays
 using Peaks
 using DrWatson 
+using LsqFit
 
-
-
-# Compute average over all angles
-function get_branch_nb(r; num_rays = 10000, dt = 1/512, ts = LinRange(0,6,200), sim_height = 1)
-        potential = CosMixedPotential(r, 2π)
-        nb = quasi2d_num_branches(num_rays, dt, ts, potential; rays_span = (-pi, pi)) / sim_height
-    return nb
-end
-
-function plt_branch_number(r)
-    sim_width = 200
-    ts = LinRange(0,sim_width,200)
-    @time " sim" nb_branch = get_branch_nb(r; num_rays = 20000,  ts = ts )
-    fig = Figure(resolution=(800, 600))
-    ax = Axis(fig[1, 1], xlabel=L"t", ylabel=L"N_b",
-        title=LaTeXString("Number of branches"), limits=((0, sim_width), (0, nothing)))
-    lines!(ax, ts, nb_branch, label=L"Cos mixed r")
-    axislegend(ax, position=:lt)
-    display(fig)
-end
 
 # Display and compute histograms :
 function compute_histogram(r, a, v0; res = 1000, num_rays = 20000, θ = 0.)
@@ -103,57 +84,38 @@ end
 
 
 res = 1000; num_rays = 500000; r = 0.1; a = 1; v0 = 1.
-d = @dict(res,num_rays, r, a, v0) # parametros
+rrange = range(0,1,length=20)
 
-data, file = produce_or_load(
-    datadir("./storage"), # path
-    d, # container for parameter
-    _get_histograms, # function
-    prefix = "periodic_bf", # prefix for savename
-    force = false, # true for forcing sims
-    wsave_kwargs = (;compress = true)
-)
+p = zeros(length(rrange))
 
-@unpack I,Is,xg,yg = data
-dy = yg[2] - yg[1]
-background = (num_rays/res)
-bckgnd_density = background/(dy*num_rays)
-for threshold in 1:0.1:2
-    a,p,h = get_stats(Is, threshold*bckgnd_density)
-    fig = Figure(resolution=(800, 600))
-    ax1= Axis(fig[1, 1]) 
-    ax2= Axis(fig[1, 1]) 
-    ax3= Axis(fig[1, 1]) 
-    lines!(ax1, xg, a, color = :blue, label = "area")
-    lines!(ax2, xg, p, color = :black, label = "# peaks")
-    lines!(ax3, xg, h, color = :red, label = "Σ heights")
-    axislegend(ax1)
-    # display(fig)
-    save(string("../outputs/plot_smoothed_hist_periodic", threshold, ".png"),fig)
-
-    a,p,h = get_stats(I, threshold*bckgnd_density)
-    fig = Figure(resolution=(800, 600))
-    ax1= Axis(fig[1, 1]) 
-    ax2= Axis(fig[1, 1]) 
-    ax3= Axis(fig[1, 1]) 
-    lines!(ax1, xg, a, color = :blue, label = "area")
-    lines!(ax2, xg, p, color = :black, label = "# peaks")
-    lines!(ax3, xg, h, color = :red, label = "Σ heights")
-    axislegend(ax1); 
-    save(string("../outputs/plot_hist_periodic", threshold, ".png"),fig)
-
+for (k,r) in enumerate(rrange)
+    d = @dict(res,num_rays, r, a, v0) # parametros
+    data, file = produce_or_load(
+        datadir("./storage"), # path
+        d, # container for parameter
+        _get_histograms, # function
+        prefix = "periodic_bf", # prefix for savename
+        force = false, # true for forcing sims
+        wsave_kwargs = (;compress = true)
+    )
+    @unpack I,Is,xg,yg = data
+    dy = yg[2] - yg[1]
+    background = (num_rays/res)
+    bckgnd_density = background/(dy*num_rays)
+    model(x, p) = p[1] * exp.(-p[2] * x)
+    threshold = 1.5
+    ydata = count_area(Is, threshold*bckgnd_density)
+    p0 = [0.5, 0.5]
+    ind = findall(xg .> 2) # skip transient 
+    fit = curve_fit(model, xg[ind], ydata[ind], p0)
+    param = fit.param
+    p[k] = param[2]
 end
 
+plot(rrange,p)
 
 
 # Ajustes las curvas. 
-using LsqFit 
-model(x, p) = p[1] * exp.(-p[2] * x)
-threshold = 1.5
-ydata = count_heights(Is, threshold*bckgnd_density)
-xdata = xg 
-p0 = [0.5, 0.5]
-fit = curve_fit(model, xdata, ydata, p0)
-param = fit.param
+
 
 

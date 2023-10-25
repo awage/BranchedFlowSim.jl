@@ -640,15 +640,16 @@ end
 struct CosMixedPotential <: AbstractPotential
     r::Float64
     a::Float64
+    v0::Float64
 end
 
 function (V::CosMixedPotential)(x, y)
-    return  -(1-V.r)/2*(cos(x*2π/V.a)+cos(y*2π/V.a))-V.r*cos(x*2π/V.a)*cos(y*2π/V.a);
+    return  V.v0*(-(1-V.r)/2*(cos(x*2π/V.a)+cos(y*2π/V.a))-V.r*cos(x*2π/V.a)*cos(y*2π/V.a))
 end
 
 
 function force(V::CosMixedPotential, x, y)
     x = x*2π/V.a; y = y*2π/V.a; 
-    return SVector(-2π/V.a*sin(x)*(2*V.r*cos(y)-V.r+1)/2, 
-                   -2π/V.a*sin(y)*(2*V.r*cos(x)-V.r+1)/2 )
+    return SVector(-V.v0*2π/V.a*sin(x)*(2*V.r*cos(y)-V.r+1)/2, 
+                   -V.v0*2π/V.a*sin(y)*(2*V.r*cos(x)-V.r+1)/2 )
 end

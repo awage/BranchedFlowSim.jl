@@ -74,8 +74,8 @@ function _get_histograms(d)
     yg = range(0, 1, length = res)  
     dt = xg[2] - xg[1]
     pot2 = correlated_random_potential(60*a,10*a, a, v0, rand(UInt))
-    I = quasi2d_histogram_intensity(num_rays, xg, yg, pot2, (0,1); normalized = true)
-    Is, rmax = quasi2d_intensity(num_rays, dt,  xg, yg, pot2)
+    I = quasi2d_histogram_intensity(num_rays, xg, yg, pot2; normalized = true)
+    Is, rmax = quasi2d_smoothed_intensity(num_rays, dt,  xg, yg, pot2)
     return @strdict(xg, yg, I, Is, rmax)
 end
 
@@ -87,7 +87,7 @@ function get_stats(I, threshold)
 end
 
 
-res = 1000; num_rays = 500000; a = 0.1; v0 = 0.1
+res = 1000; num_rays = 100000; a = 0.1; v0 = 0.1
 d = @dict(res,num_rays, v0, a) # parametros
 
 data, file = produce_or_load(
@@ -99,10 +99,12 @@ data, file = produce_or_load(
     wsave_kwargs = (;compress = true)
 )
 
-@unpack xg,yg,I,Is
+@unpack xg,yg,I,Is = data
 
-# threshold = 8.
-for threshold in 1:0.1:2
+dy = yg[2] - yg[1]
+background = (num_rays/res)
+bckgnd_density = background/(dy*num_rays)
+for threshold in 1:0.5:4
     b = count_area(I, threshold)
     c = count_peaks(I, threshold)
     d = count_heights(I, threshold)
@@ -115,12 +117,7 @@ for threshold in 1:0.1:2
     lines!(ax2, xg, c, color = :black)
     lines!(ax3, xg, d, color = :red)
     save(string("../outputs/plot_hist_correlated_",threshold, ".png"),fig)
-end
 
-# display(fig)
-
-for threshold in 1:0.1:2
-# threshold = 2.
     b = count_area(Is, threshold)
     c = count_peaks(Is, threshold)
     d = count_heights(Is, threshold)
@@ -135,7 +132,5 @@ for threshold in 1:0.1:2
 # display(fig)
     save(string("../outputs/plot_smoothed_hist_correlated", threshold, ".png"),fig)
 end
-# heatmap(yg, xg, log.(I))
-# plot_heatmap(0.3, 0.1)
 
 
