@@ -60,12 +60,12 @@ The situation being modeled is an infinite vertical wavefront starting
 at x=0 with p_y=0 and p_x=1 (constant). To cover the area defined by xs and ys,
 the actual wavefront being simulated must be taller than ys.
 """
-function quasi2d_smoothed_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030)
+function quasi2d_smoothed_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030, d = 0.01)
     h = length(ys) * (ys[2] - ys[1])
     rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
     sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
-    ints = quasi2d_smoothed_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
+    ints = quasi2d_smoothed_intensity(ray_y, dt, xs, ys, potential, b, d) * (sim_h / h)
     return ints, (rmin, rmax)
 end
 
@@ -75,7 +75,7 @@ function quasi2d_smoothed_intensity(
     xs::AbstractVector{<:Real},
     ys::AbstractVector{<:Real},
     potential,
-    b=0.0030
+    b, d
 )
     dy = ys[2] - ys[1]
     y_end = ys[1] + length(ys) * (ys[2] - ys[1])
@@ -85,23 +85,33 @@ function quasi2d_smoothed_intensity(
     xi = 1
     x = 0.0
     intensity = zeros(length(ys), length(xs))
+    # boundary = (
+    #     ys[1] - dy - 4*b,
+    #     ys[end] + dy + 4*b,
+    # )
     boundary = (
-        ys[1] - dy - 4*b,
-        ys[end] + dy + 4*b,
+        (xs[1] -dt - 4*dt, xs[end] +dt +4*dt), (ys[1] - dy - 4*b , ys[end] + dy + 4*b)
     )
+    points = zeros(num_rays*length(xs), 2)
     while xi <= length(xs)
         # kick
         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
         # drift
         ray_y .+= dt .* ray_py
         x += dt
+        points[1 + (xi-1)*num_rays : xi*num_rays, 1] .= x
+        points[1 + (xi-1)*num_rays : xi*num_rays, 2] .= ray_y
         while xi <= length(xs) && xs[xi] <= x
-            # Compute intensity
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
-            intensity[:, xi] = pdf(density, ys)
+        #     # Compute intensity
+        #     density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
+        #     intensity[:, xi] = pdf(density, ys)
             xi += 1
         end
     end
+    # @show size(points)
+    density = kde(points, bandwidth=(d, b), npoints=(16*1024, 16*1024), boundary = boundary)
+    # density = kde(points, bandwidth=(b,b))
+    intensity = pdf(density, xs, ys)
     return intensity
 end
 
@@ -260,11 +270,11 @@ function quasi2d_compute_and_save_num_branches(
     end
 end
 
-function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.0030, threshold = 1.5)
+function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.003, threshold = 1.5)
     rmin,rmax = quasi2d_compute_front_length(1024, dt, T, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
-    xrange, area = quasi2d_smoothed_intensity_stats(ray_y, dt, T, ys, potential, b, threshold) 
-    return xrange, area, (rmin, rmax)
+    xrange, area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, T, ys, potential, b, threshold) 
+    return xrange, area, max_I, (rmin, rmax)
 end
 
 function quasi2d_smoothed_intensity_stats(
@@ -285,6 +295,7 @@ function quasi2d_smoothed_intensity_stats(
     ray_py = zeros(num_rays)
     xrange = range(0, T, step = dt) 
     area = zeros(length(xrange))
+    max_I = zeros(length(xrange))
     intensity = zeros(length(ys))
     background = (num_rays/length(ys))
     bckgnd_density = background/(dy*num_rays)
@@ -305,8 +316,9 @@ function quasi2d_smoothed_intensity_stats(
         intensity = pdf(density, ys)* (sim_h / h)
         ind = findall(intensity .> threshold*bckgnd_density) 
         area[k] = length(ind)/length(intensity)  
+        max_I[k] = maximum(intensity)  
     end
 
-    return xrange, area
+    return xrange, area, max_I
 end
 

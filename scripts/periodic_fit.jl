@@ -9,7 +9,7 @@ using LsqFit
 
 
 # Display and compute histograms :
-function compute_histogram(r, a, v0; res = 1000, num_rays = 20000, θ = 0.)
+function compute_histogram(r, a, v0; res = 1000, num_rays = 20000, θ = pi/4)
     xg = range(0, 10*a, length = res) 
     yg = range(-a/2, a/2, length = res)  
     dt = xg[2] - xg[1]; dy = yg[2] - yg[1]
@@ -83,7 +83,7 @@ function get_stats(I, threshold)
 end
 
 
-res = 1000; num_rays = 500000; r = 0.1; a = 1; v0 = 1.
+res = 1000; num_rays = 500000; r = 1.; a = 1; v0 = 1.
 rrange = range(0,1,length=20)
 
 p = zeros(length(rrange))

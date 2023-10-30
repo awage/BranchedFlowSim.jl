@@ -6,6 +6,9 @@ using StaticArrays
 using Peaks
 using DrWatson 
 
+using ImageFiltering
+using LsqFit 
+
 
 
 # Display and compute histograms :
@@ -17,21 +20,24 @@ function compute_area(r, a, v0, dt, T; res = 1000, num_rays = 20000, θ = 0., th
     else 
         pot2 = CosMixedPotential(r, a, v0)
     end
-    xg, area, rmax = quasi2d_get_stats(num_rays, dt, T, yg, pot2; b = 4*dy, threshold = threshold)
-    return xg, yg, area
+    xg, area, max_I, rmax = quasi2d_get_stats(num_rays, dt, T, yg, pot2; b = 4*dy, threshold = threshold)
+    return xg, yg, area, max_I
 end
 
 
 function _get_area(d)
     @unpack r, res, num_rays, a, v0,dt, T, threshold = d # unpack parameters
-    xg, yg, area = compute_area(r, a, v0, dt, T; res = res,  num_rays = num_rays, θ = 0., threshold = threshold)
+    xg, yg, area, max_I = compute_area(r, a, v0, dt, T; res = res,  num_rays = num_rays, θ = 0., threshold = threshold)
     
-    return @strdict(xg, yg, area)
+    return @strdict(xg, yg, area, max_I)
 end
 
+rrange = 0:0.05:1 
+ps = []
+for r in rrange
 
-res = 1000; num_rays = 100000; r = 0.85; a = 1; v0 = 1.; threshold = 1.5; 
-T = 20.; dt = 0.1
+res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; 
+T = 20.; dt = 0.01
 d = @dict(res,num_rays, r, a, v0, threshold, T, dt) # parametros
 
 data, file = produce_or_load(
@@ -39,29 +45,29 @@ data, file = produce_or_load(
     d, # container for parameter
     _get_area, # function
     prefix = "periodic_bf_area_", # prefix for savename
-    force = true, # true for forcing sims
+    force = false, # true for forcing sims
     wsave_kwargs = (;compress = true)
 )
 
-@unpack area,xg,yg = data
-dy = yg[2] - yg[1]
-background = (num_rays/res)
-bckgnd_density = background/(dy*num_rays)
+    @unpack area,xg,yg, max_I = data
+    # smoothing over a cell
+    l = round(Int16, a/dt)
+    aa = imfilter(area, ones(l)./l)
+    # Ajustes las curvas. 
+    model(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
+    # model(x, p) =  p[1] * exp.(-p[2] * x)
+    threshold = 1.5
+    ind = findall(xg .> a) 
+    xdata = xg[ind]
+    ydata = aa[ind]
+    p0 = [0.5, 0.5]
+    fit = curve_fit(model, xdata, ydata, p0)
+    param = fit.param
+    push!(ps, param)  
+end
 
-
-
-# # Ajustes las curvas. 
-# using LsqFit 
-# model(x, p) = p[1] * exp.(-p[2] * x)
-# threshold = 1.5
-# ydata = count_heights(Is, threshold*bckgnd_density)
-# xdata = xg 
-# p0 = [0.5, 0.5]
-# fit = curve_fit(model, xdata, ydata, p0)
-# param = fit.param
-
-
-
+v = [ u[2] for u in ps]
+plot(rrange, v) 
 # TODO: 
 # Probar con potencial aleatorio
 # Pintar ajuste encima de los datos
