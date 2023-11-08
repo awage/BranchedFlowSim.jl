@@ -83,7 +83,7 @@ function get_stats(I, threshold)
 end
 
 
-res = 1000; num_rays = 500000; r = 1.; a = 1; v0 = 1.
+res = 1000; num_rays = 100000; r = 1.; a = 1; v0 = 1.
 rrange = range(0,1,length=20)
 
 p = zeros(length(rrange))

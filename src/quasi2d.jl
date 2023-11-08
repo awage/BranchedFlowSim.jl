@@ -270,10 +270,10 @@ function quasi2d_compute_and_save_num_branches(
     end
 end
 
-function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.003, threshold = 1.5)
+function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.003, threshold = 1.5, x0 = 0)
     rmin,rmax = quasi2d_compute_front_length(1024, dt, T, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
-    xrange, area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, T, ys, potential, b, threshold) 
+    xrange, area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, T, ys, potential, b, threshold, x0) 
     return xrange, area, max_I, (rmin, rmax)
 end
 
@@ -284,7 +284,8 @@ function quasi2d_smoothed_intensity_stats(
     ys::AbstractVector{<:Real},
     potential,
     b, 
-    threshold
+    threshold, 
+    x0 
 )
     dy = ys[2] - ys[1]
     y_end = ys[1] + length(ys) * (ys[2] - ys[1])
@@ -293,7 +294,7 @@ function quasi2d_smoothed_intensity_stats(
     ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
     ray_py = zeros(num_rays)
-    xrange = range(0, T, step = dt) 
+    xrange = range(x0, T+x0, step = dt) 
     area = zeros(length(xrange))
     max_I = zeros(length(xrange))
     intensity = zeros(length(ys))
