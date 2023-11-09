@@ -6,6 +6,7 @@ using StaticArrays
 using Peaks
 using DrWatson 
 using ImageFiltering
+using StatsBase
 using LsqFit 
 
 
@@ -25,11 +26,11 @@ end
 
 
 function _get_area_avg(d)
-    @unpack r, res, num_rays, a, v0,dt, T, threshold = d # unpack parameters
+    @unpack r, res, N, num_rays, a, v0,dt, T, threshold = d # unpack parameters
     maxx_I = []
     area_v = []
     xg = 0; yg = 0;
-    for x0 in range(0,a/2, length = 10) 
+    for x0 in range(0,a/2, length = N) 
         @show x0
         xg, yg, area, max_I = compute_area(r, a, v0, dt, T; res = res,  num_rays = num_rays, θ = 0., threshold = threshold, x0 = x0)
         push!(maxx_I, max_I)
@@ -39,9 +40,9 @@ function _get_area_avg(d)
 end
 
 function get_fit_p(r,T)
-    res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; 
+    res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; N = 30;
     dt = 0.01
-    d = @dict(res,num_rays, r, a, v0, threshold, T, dt) # parametros
+    d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
@@ -69,9 +70,9 @@ end
 
 
 function print_fig_(r, T)
-    res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; 
+    res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; N = 30 
     dt = 0.01
-    d = @dict(res,num_rays, r, a, v0, threshold, T, dt) # parametros
+    d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
@@ -109,7 +110,7 @@ function print_fig_(r, T)
 
 end
 
-rrange = [ 0.1, 0.3, 0.5, 0.7, 0.9, 1.]
+rrange = range(0,1,length = 50)
 ps = []
 for r in rrange
     print_fig_(r, 20)
