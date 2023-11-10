@@ -62,27 +62,7 @@ function _get_lyap_1D(d)
 end
 
 
-function print_fig_lyap(r)
-    res = 150;  a = 1; v0 = 1.; dt = 0.01; T = 10000; θ = 0.
-    d = @dict(res, r, a, v0,  T, dt, θ) # parametros
-    data, file = produce_or_load(
-        datadir("./storage"), # path
-        d, # container for parameter
-        _get_lyap, # function
-        prefix = "periodic_bf_lyap", # prefix for savename
-        force = true, # true for forcing sims
-        wsave_kwargs = (;compress = true)
-    )
-
-    @unpack yrange, pyrange, λ = data
-    fig = Figure(resolution=(800, 600))
-    ax1= Axis(fig[1, 1], title = string("r = ", r) , xlabel = "y", ylabel = "p_y") 
-    hm = heatmap!(ax1, yrange, pyrange, λ)
-    Colorbar(fig[:, end+1], hm)  
-    save(string("../outputs/plot_lyap_periodic_r=", r, ".png"),fig)
-end
-
-function get_lyap_index(r, threshold; res = 150,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
+function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
     d = @dict(res, r, a, v0,  T, dt, θ) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
@@ -93,11 +73,28 @@ function get_lyap_index(r, threshold; res = 150,  a = 1, v0 = 1., dt = 0.01, T =
         wsave_kwargs = (;compress = true)
     )
 
+    @unpack yrange, λ = data
+    s = savename("plot_lyap_1D", d, "png")
+    fig = Figure(resolution=(800, 600))
+    ax1= Axis(fig[1, 1], title = string("r = ", r) , xlabel = L"y", ylabel = L"\lambda_{max}", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
+    hm = scatter!(ax1, yrange, λ)
+    lines!(ax1,[-0.5, 0.5], [0.001, 0.001]; color = :red) 
+    save(string("../outputs/", s),fig)
+end
+
+function get_lyap_index(r, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
+    d = @dict(res, r, a, v0,  T, dt, θ) # parametros
+    data, file = produce_or_load(
+        datadir("./storage"), # path
+        d, # container for parameter
+        _get_lyap_1D, # function
+        prefix = "periodic_bf_lyap_1D", # prefix for savename
+        force = false, # true for forcing sims
+        wsave_kwargs = (;compress = true)
+    )
     @unpack λ = data
     ind = findall(λ .> threshold)
-
     l_index = length(ind)/length(λ) 
-    
     return l_index
 end
 
@@ -105,18 +102,22 @@ end
 #     print_fig_lyap(r)
 # end
 
-rrange = range(0,1, length = 50)
+res = 500;  a = 1; v0 = 1.; dt = 0.01; T = 10000; θ = 0.; threshold = 0.001
+rrange = range(0,0.5, length = 50)
 ll = Float64[]
 for r in rrange
-    lidx = get_lyap_index(r, 0.001)
+    lidx = get_lyap_index(r, 0.001; res, a, v0, dt, T, θ)
     push!(ll, lidx)
 end
 
-res = 150;  a = 1; v0 = 1.; dt = 0.01; T = 10000; θ = 0.
 d = @dict(res, r, a, v0,  T, dt, θ) # parametros
-s = savename("lyap_index",d, ".png")
+s = savename("lyap_index",d, "png")
 fig = Figure(resolution=(800, 600))
-ax1= Axis(fig[1, 1], title = "Volume of trajectories with max lyap exponent above 0.001", xlabel = "r", ylabel = "lyap index") 
+ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = "lyap index", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
 lines!(ax1, rrange, ll, color = :blue)
 save(string("../outputs/",s),fig)
 
+print_fig_lyap(0.0)
+print_fig_lyap(0.12)
+print_fig_lyap(0.25)
+print_fig_lyap(0.5)

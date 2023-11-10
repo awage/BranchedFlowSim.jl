@@ -95,7 +95,7 @@ function print_fig_(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., t
     param = fit.param
 
     fig = Figure(resolution=(800, 600))
-    ax1= Axis(fig[1, 1], title = string("r = ", r, "; f(x) = ", trunc(param[1]; digits = 2), " exp(-", trunc(param[2]; digits = 2), "x)") , xlabel = "x", ylabel = "Lf_{area}")
+    ax1= Axis(fig[1, 1], title = string("r = ", r, "; f(x) = ", trunc(param[1]; digits = 2), "+", trunc(param[2]; digits = 2),  "exp(-", trunc(param[3]; digits = 2), "x)") , xlabel = L"x", ylabel = L"f_{area}", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 30)
     lines!(ax1, xg, area, color = :blue, label = "area")
     # lines!(ax1, xg, aa, color = :black, label = "smoothed datas")
     lines!(ax1, xdata, model(xdata, param), color = :red, label = "exp fit")
@@ -104,20 +104,24 @@ function print_fig_(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., t
 
 end
 
-T = 20; res = 1000; num_rays = 100000;  a = 1; v0 = 1.;hreshold = 1.5; N = 30;  dt = 0.01;
-rrange = range(0,1,length = 50)
+T = 20; res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; N = 30;  dt = 0.01;
+rrange = range(0,0.5,length = 50)
 ps = []
 for r in rrange
-    print_fig_(r; T, res, num_rays, a, v0, threshold, N, dt)
+    # print_fig_(r; T, res, num_rays, a, v0, threshold, N, dt)
     p = get_fit_p(r; T, res, num_rays, a, v0, threshold, N, dt)
     push!(ps, p)
 end
 
+    print_fig_(0.; T, res, num_rays, a, v0, threshold, N, dt)
+    print_fig_(0.12; T, res, num_rays, a, v0, threshold, N, dt)
+    print_fig_(0.25; T, res, num_rays, a, v0, threshold, N, dt)
+    print_fig_(0.5; T, res, num_rays, a, v0, threshold, N, dt)
 
 d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
-s = savename("floor_branches",d, ".png")
+s = savename("floor_branches",d, "png")
 fig = Figure(resolution=(800, 600))
 v = [ a[1] for a in ps]
-ax1= Axis(fig[1, 1], title = "Superwires volume as a function of r", xlabel = "r", ylabel = "lower threshold")
+ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = L"a_1", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40)
 lines!(ax1, rrange, v, color = :blue)
 save(string("../outputs/",s),fig)

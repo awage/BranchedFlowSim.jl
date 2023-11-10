@@ -30,7 +30,7 @@ function plot_curves(r)
 
     s = savename("poincare_r_", @dict(a,v0,dt,r),  "png")
     fig = Figure(resolution = (800, 600))
-    ax = Axis(fig[1,1], ylabel = "py", xlabel = "y", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40, title = string("r = ", r), titlesize = 40)
+    ax = Axis(fig[1,1], ylabel = L"p_y", xlabel = L"y", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40, title = string("r = ", r), titlesize = 40)
     for (j,y) in enumerate(yrange)
         u,t = trajectory(df, T, [0., y, py])
         ind = range(100, T, step = 100)
@@ -39,7 +39,12 @@ function plot_curves(r)
     save(string("../outputs/",s), fig)
 end
 
-rrange = range(0,1, step = 0.1)
-for r in rrange
-    plot_curves(r)
-end
+# rrange = range(0,1, step = 0.1)
+# for r in rrange
+#     plot_curves(r)
+# end
+
+
+
+plot_curves(0.25)
+plot_curves(0.12)
