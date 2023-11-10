@@ -70,7 +70,7 @@ end
 
 
 function print_fig_(r, T)
-    res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; N = 30 
+    res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; N = 40 
     dt = 0.01
     d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
     data, file = produce_or_load(
@@ -110,7 +110,7 @@ function print_fig_(r, T)
 
 end
 
-rrange = range(0,1,length = 50)
+rrange = range(0,0.5,length = 50)
 ps = []
 for r in rrange
     print_fig_(r, 20)
