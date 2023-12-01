@@ -2,9 +2,9 @@ using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
 using LinearAlgebra
-using StaticArrays
 using Peaks
 using DrWatson 
+using CodecZlib
 
 using ImageFiltering
 using LsqFit 
@@ -60,7 +60,7 @@ data, file = produce_or_load(
     ind = findall(xg .> a) 
     xdata = xg[ind]
     ydata = aa[ind]
-    p0 = [0.5, 0.5]
+    p0 = [0.5, 0.5, 0.5]
     fit = curve_fit(model, xdata, ydata, p0)
     param = fit.param
     push!(ps, param)  

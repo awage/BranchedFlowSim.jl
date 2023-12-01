@@ -1,10 +1,8 @@
 using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
-using LinearAlgebra
-using StaticArrays
-using Peaks
 using DrWatson
+using CodecZlib
 using ImageFiltering
 using StatsBase
 using LsqFit
@@ -51,77 +49,53 @@ function get_fit_p(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., th
     )
 
     @unpack area_v,xg,yg, maxx_I = data
-    # smoothing over a cell
     area = mean(area_v)
-    # Ajustes las curvas.
     model(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
     threshold = 1.5
     mx, ind = findmax(area)
-    # ind, vals= findmaxima(area)
-    # xdata = xg[ind]
-    # ydata = area[ind]
-    # ind = findall(xg .> a)
     xdata = xg[ind:end]
     ydata = area[ind:end]
     p0 = [0.15, 0.2, 0.2]
     fit = curve_fit(model, xdata, ydata, p0)
-    return fit.param
+    return fit.param, xg, area, xdata, ydata
 end
 
 
-function print_fig_(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
+function print_fig_lf_vs_x(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
     d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
-    data, file = produce_or_load(
-        datadir("./storage"), # path
-        d, # container for parameter
-        _get_area_avg, # function
-        prefix = "periodic_bf_area_avg", # prefix for savename
-        force = false, # true for forcing sims
-        wsave_kwargs = (;compress = true)
-    )
-
-    @unpack area_v,xg,yg, maxx_I = data
-    area = mean(area_v)
-    l = round(Int16, a/dt)
-    aa = imfilter(area, ones(l)./l)
-    # Ajustes las curvas.
     model(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
-    threshold = 1.5
-    mx, ind = findmax(area)
-    xdata = xg[ind:end]
-    ydata = area[ind:end]
-    p0 = [0.1, 0.2, 0.2]
-    fit = curve_fit(model, xdata, ydata, p0)
-    param = fit.param
+    param,xg,area,xdata,ydata = get_fit_p(r; T, res, num_rays, a, v0, threshold, N, dt)
 
     fig = Figure(resolution=(800, 600))
     ax1= Axis(fig[1, 1], title = string("r = ", r, "; f(x) = ", trunc(param[1]; digits = 2), "+", trunc(param[2]; digits = 2),  "exp(-", trunc(param[3]; digits = 2), "x)") , xlabel = L"x", ylabel = L"f_{area}", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 30)
     lines!(ax1, xg, area, color = :blue, label = "area")
-    # lines!(ax1, xg, aa, color = :black, label = "smoothed datas")
     lines!(ax1, xdata, model(xdata, param), color = :red, label = "exp fit")
     axislegend(ax1);
     save(string("../outputs/plot_fit_periodic_r=", r, ".png"),fig)
+end
 
+function print_fig_a0_vs_r(rrange; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
+    ps = []
+    for r in rrange
+        p,_,_,_,_ = get_fit_p(r; T, res, num_rays, a, v0, threshold, N, dt)
+        push!(ps, p)
+    end
+    d = @dict(N,res,num_rays, a, v0, threshold, T, dt) # parametros
+    s = savename("floor_branches",d, "png")
+    fig = Figure(resolution=(800, 600))
+    v = [ a[1] for a in ps]
+    ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = L"a_1", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40)
+    lines!(ax1, rrange, v, color = :blue)
+    save(string("../outputs/",s),fig)
 end
 
 T = 20; res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; N = 30;  dt = 0.01;
 rrange = range(0,0.5,length = 50)
-ps = []
-for r in rrange
-    # print_fig_(r; T, res, num_rays, a, v0, threshold, N, dt)
-    p = get_fit_p(r; T, res, num_rays, a, v0, threshold, N, dt)
-    push!(ps, p)
-end
 
-    print_fig_(0.; T, res, num_rays, a, v0, threshold, N, dt)
-    print_fig_(0.12; T, res, num_rays, a, v0, threshold, N, dt)
-    print_fig_(0.25; T, res, num_rays, a, v0, threshold, N, dt)
-    print_fig_(0.5; T, res, num_rays, a, v0, threshold, N, dt)
+print_fig_lf_vs_x(0.; T, res, num_rays, a, v0, threshold, N, dt)
+print_fig_lf_vs_x(0.12; T, res, num_rays, a, v0, threshold, N, dt)
+print_fig_lf_vs_x(0.25; T, res, num_rays, a, v0, threshold, N, dt)
+print_fig_lf_vs_x(0.5; T, res, num_rays, a, v0, threshold, N, dt)
+print_fig_a0_vs_r(rrange; T, res, num_rays, a, v0, threshold, N, dt)
 
-d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
-s = savename("floor_branches",d, "png")
-fig = Figure(resolution=(800, 600))
-v = [ a[1] for a in ps]
-ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = L"a_1", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40)
-lines!(ax1, rrange, v, color = :blue)
-save(string("../outputs/",s),fig)
+

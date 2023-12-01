@@ -1,7 +1,4 @@
-using HDF5
 using Statistics
-using Makie
-using CairoMakie
 
 export quasi2d_num_branches, quasi2d_visualize_rays
 export quasi2d_compute_and_save_num_branches
@@ -237,27 +234,6 @@ function quasi2d_compute_and_save_num_branches(
     )
 end
 
-function quasi2d_compute_and_save_num_branches(
-    h5_fname, num_rays, dt, ts, potentials::AbstractArray{<:AbstractPotential},
-    pot_params::Dict{String,Any} = Dict{String,Any}())
-    # TODO: Skip if file already exists with given parameters
-
-    nb_all = quasi2d_num_branches_parallel(num_rays, dt, ts, potentials,
-        basename(h5_fname))
-    nb_mean = vec(mean(nb_all, dims=2))
-
-    h5open(h5_fname, "w") do f
-        f["dt"] = Float64(dt)
-        f["num_rays"] = Int64(num_rays)
-        f["ts"] = Vector{Float64}(ts)
-        f["nb_mean"] = nb_mean
-        f["nb_all"] = nb_all
-        pot = create_group(f, "potential")
-        for (k, v) ∈ pairs(pot_params)
-            pot[k] = v
-        end
-    end
-end
 
 function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.003, threshold = 1.5, x0 = 0)
     rmin,rmax = quasi2d_compute_front_length(1024, dt, T, ys, potential)
