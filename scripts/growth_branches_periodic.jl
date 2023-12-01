@@ -1,8 +1,7 @@
 using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
-using LinearAlgebra
-using StaticArrays
+using StatsBase
 using DrWatson 
 
 
@@ -44,16 +43,17 @@ function get_datas(r; T = 10, num_rays = 100000,  a = 1, v0 = 1., dt = 0.01, N =
     return xg, mean(nbr_v), d
 end
 
-
-    xg, nbr, d = get_datas(0.01)
-    s = savename("init_branches",d, "png")
-    fig = Figure(resolution=(800, 600))
-    ax1= Axis(fig[1, 1], xlabel = L"x", ylabel = L"N_{branches}", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30)
-    lines!(ax1, xg, nbr, color = :blue, label = L"r=0.01")
-    xg, nbr, d = get_datas(0.3)
-    lines!(ax1, xg, nbr, color = :red, label = L"r=0.3")
-    xg, nbr, d = get_datas(0.5)
-    lines!(ax1, xg, nbr, color = :black, label = L"r=0.5")
-    axislegend(ax1);
-    save(s,fig)
+# Print init growth with the Metzger method for three 
+# values of r. 
+xg, nbr, d = get_datas(0.01)
+s = savename("init_branches",d, "png")
+fig = Figure(resolution=(800, 600))
+ax1= Axis(fig[1, 1], xlabel = L"x", ylabel = L"N_{branches}", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30)
+lines!(ax1, xg, nbr, color = :blue, label = L"r=0.01")
+xg, nbr, d = get_datas(0.3)
+lines!(ax1, xg, nbr, color = :red, label = L"r=0.3")
+xg, nbr, d = get_datas(0.5)
+lines!(ax1, xg, nbr, color = :black, label = L"r=0.5")
+axislegend(ax1);
+save(string("../output/",s),fig)
 

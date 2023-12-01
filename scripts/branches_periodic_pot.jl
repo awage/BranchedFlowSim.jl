@@ -2,7 +2,6 @@ using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
 using LinearAlgebra
-using Peaks
 using DrWatson 
 using CodecZlib
 

@@ -4,7 +4,6 @@ using CairoMakie
 using LaTeXStrings
 using LinearAlgebra
 using StaticArrays
-using Peaks
 
 
 function _get_area(d)
@@ -31,21 +30,9 @@ end
 
 
 
-res = 1000; num_rays = 100000;  a = 0.1; v0 = 0.1; threshold = 2.; 
-T = 10.; dt = 0.01
-d = @dict(res,num_rays, a, v0, threshold, T, dt) # parametros
-
-data, file = produce_or_load(
-    datadir("./storage"), # path
-    d, # container for parameter
-    _average, # function
-    prefix = "random_average_area", # prefix for savename
-    force = false, # true for forcing sims
-    wsave_kwargs = (;compress = true)
-)
 
 
-function print_fig_(xg, area, a, threshold)
+function print_fig_(xg, r, area, a, threshold)
 
     # Ajustes las curvas. 
     # model(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
@@ -69,6 +56,19 @@ function print_fig_(xg, area, a, threshold)
 end
 
 
+res = 1000; num_rays = 100000;  a = 0.1; v0 = 0.1; threshold = 2.; 
+T = 10.; dt = 0.01; r = 0.1;
+d = @dict(res,num_rays, a, v0, threshold, T, dt) # parametros
+
+data, file = produce_or_load(
+    datadir("./storage"), # path
+    d, # container for parameter
+    _average, # function
+    prefix = "random_average_area", # prefix for savename
+    force = false, # true for forcing sims
+    wsave_kwargs = (;compress = true)
+)
+
 @unpack area,xg,yg, max_I= data
-plot(xg, area)
-print_fig_(xg,area,a, threshold)
+
+print_fig_(xg, r,area,a, threshold)
