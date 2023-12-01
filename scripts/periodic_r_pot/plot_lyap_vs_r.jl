@@ -115,7 +115,7 @@ s = savename("lyap_index",d, "png")
 fig = Figure(resolution=(800, 600))
 ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = "lyap index", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
 lines!(ax1, rrange, ll, color = :blue)
-save(string("../outputs/",s),fig)
+save(string("./outputs/",s),fig)
 
 print_fig_lyap(0.0)
 print_fig_lyap(0.12)

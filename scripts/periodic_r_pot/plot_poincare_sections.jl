@@ -36,7 +36,7 @@ function plot_curves(r)
         ind = range(100, T, step = 100)
         scatter!(ax, rem.(u[ind,2], a, RoundNearest), u[ind,3], markersize = 1.7, color = Cycled(j), rasterize = 1)
     end
-    save(string("../outputs/",s), fig)
+    save(string("./outputs/",s), fig)
 end
 
 # rrange = range(0,1, step = 0.1)

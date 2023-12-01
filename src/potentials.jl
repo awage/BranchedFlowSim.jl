@@ -19,6 +19,7 @@ export CosSeriesPotential
 export FunctionPotential
 export ZeroPotential
 export CosMixedPotential
+export StdMapPotential
 
 export rotation_matrix, force, force_x, force_y
 export correlated_random_potential
@@ -649,7 +650,22 @@ end
 
 
 function force(V::CosMixedPotential, x, y)
-    x = x*2π/V.a; y = y*2π/V.a; 
-    return SVector(-V.v0*2π/V.a*sin(x)*(2*V.r*cos(y)-V.r+1)/2, 
-                   -V.v0*2π/V.a*sin(y)*(2*V.r*cos(x)-V.r+1)/2 )
+    xp = x*2π/V.a; yp = y*2π/V.a; 
+    return SVector(-V.v0*2π/V.a*sin(xp)*(2*V.r*cos(yp)-V.r+1)/2, 
+                   -V.v0*2π/V.a*sin(yp)*(2*V.r*cos(xp)-V.r+1)/2 )
+end
+
+struct StdMapPotential <: AbstractPotential
+    a::Float64
+    v0::Float64
+end
+
+function (V::StdMapPotential)(x, y)
+    return  -V.v0*sin(y*2π/V.a)
+end
+
+
+function force(V::StdMapPotential, x, y)
+    yp = y*2π/V.a;  
+    return SVector(0, -V.v0*2π/V.a*cos(yp))
 end

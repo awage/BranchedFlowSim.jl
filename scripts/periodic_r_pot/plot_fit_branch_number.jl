@@ -71,7 +71,7 @@ function print_fig_lf_vs_x(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 
     lines!(ax1, xg, area, color = :blue, label = "area")
     lines!(ax1, xdata, model(xdata, param), color = :red, label = "exp fit")
     axislegend(ax1);
-    save(string("../outputs/plot_fit_periodic_r=", r, ".png"),fig)
+    save(string("./outputs/plot_fit_periodic_r=", r, ".png"),fig)
 end
 
 function print_fig_a0_vs_r(rrange; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
@@ -86,7 +86,7 @@ function print_fig_a0_vs_r(rrange; T = 20, res = 1000, num_rays = 100000,  a = 1
     v = [ a[1] for a in ps]
     ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = L"a_1", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40)
     lines!(ax1, rrange, v, color = :blue)
-    save(string("../outputs/",s),fig)
+    save(string("./outputs/",s),fig)
 end
 
 T = 20; res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; N = 30;  dt = 0.01;
