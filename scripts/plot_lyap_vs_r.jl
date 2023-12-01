@@ -5,7 +5,7 @@ using LinearAlgebra
 using StaticArrays
 using Peaks
 using DrWatson 
-using DynamicalSystems
+using ChaosTools
 
 
 function detect_bounded(u,a)

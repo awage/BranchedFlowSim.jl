@@ -2,7 +2,7 @@ using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
 using DrWatson 
-using DynamicalSystems
+using ChaosTools
 
 
 function quasi2d_map!(du,u,p,t)
