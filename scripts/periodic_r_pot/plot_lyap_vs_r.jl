@@ -1,15 +1,13 @@
+using DrWatson 
 using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
 using LinearAlgebra
 using StaticArrays
-using Peaks
-using DrWatson 
 using ChaosTools
 
 
 function detect_bounded(u,a)
-
     ind = findall(abs.(u[:,2]) .> a/2) 
     if length(ind) > 0
         return 0
@@ -28,24 +26,6 @@ function quasi2d_map!(du,u,p,t)
         return nothing
 end
 
-function _get_lyap(d) 
-    @unpack θ , r,  a, v0, dt, T, res = d
-    if θ != 0. 
-        pot2 = RotatedPotential(θ, CosMixedPotential(r,a, v0)) 
-    else 
-        pot2 = CosMixedPotential(r, a, v0)
-    end
-
-    df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4, 0.2], [pot2, dt])
-
-    yrange = range(-0.5, 0.5, res)
-    pyrange = range(0, 1, res)
-    λ = [lyapunov(df, T; u0 = [0., y, py]) for y in yrange, py in pyrange]
-    bnd_traj = [ detect_bounded(trajectory(df, 10000, [0, y, py])[1],a) for y in yrange, py in pyrange]
-
-    return @strdict(λ, bnd_traj, yrange, pyrange, d)
-end
-
 
 function _get_lyap_1D(d) 
     @unpack θ , r,  a, v0, dt, T, res = d
@@ -55,13 +35,14 @@ function _get_lyap_1D(d)
         pot2 = CosMixedPotential(r, a, v0)
     end
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4, 0.2], [pot2, dt])
-    yrange = range(-0.5, 0.5, res)
+    yrange = range(-a/2, a/2, res)
     py = 0.
     λ = [lyapunov(df, T; u0 = [0., y, py]) for y in yrange]
     return @strdict(λ, yrange, d)
 end
 
 
+# print max lyap as a function of y over a range of initial conditions 
 function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
     d = @dict(res, r, a, v0,  T, dt, θ) # parametros
     data, file = produce_or_load(
@@ -98,10 +79,7 @@ function get_lyap_index(r, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T =
     return l_index
 end
 
-# for r in 0:0.1:1 
-#     print_fig_lyap(r)
-# end
-
+# Compute max lyap exp for a range of parameters
 res = 500;  a = 1; v0 = 1.; dt = 0.01; T = 10000; θ = 0.; threshold = 0.001
 rrange = range(0,0.5, length = 50)
 ll = Float64[]
