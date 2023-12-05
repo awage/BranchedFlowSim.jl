@@ -145,15 +145,16 @@ end
 Runs a simulation across a grid defined by `xs` and `ys`, returning a
 matrix of flow intensity computed as a histogram (unsmoothed).
 """
-function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = true)
+function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = true, periodic_bnd = false)
     dt = xs[2] - xs[1]
     dy = ys[2] - ys[1]
     
     # Compute the spread beforehand
-    rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
-
-    # ray_range  = LinRange(rmin, rmax, num_rays)
-    # sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
+    if periodic_bnd == true
+        rmin = ys[1]; rmax = ys[end]
+    else
+        rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
+    end
 
     width = length(xs)
     height = length(ys)
@@ -166,10 +167,16 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = t
         # drift
         ray_y .+= dt .* ray_py
         # Collect
-        for y ∈ ray_y
-            yi = 1 + round(Int, (y - ys[1]) / dy)
+        for k in 1:height
+            if periodic_bnd == true
+                ray_y[k] = rem2pi(ray_y[k],RoundNearest)
+            end
+            yi = 1 + round(Int, (ray_y[k] - ys[1]) / dy)
             if yi >= 1 && yi <= height
                 image[yi, xi] += 1
+            # elseif periodic_bnd == true
+            #     ys = mod(yi, height) + 1
+            #     image[ys, xi] += 1
             end
         end
     end

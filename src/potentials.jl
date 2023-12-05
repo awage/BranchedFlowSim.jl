@@ -661,11 +661,11 @@ struct StdMapPotential <: AbstractPotential
 end
 
 function (V::StdMapPotential)(x, y)
-    return  -V.v0*cos(y*2π/V.a)
+    return  V.v0*cos(y*2π/V.a)
 end
 
 
 function force(V::StdMapPotential, x, y)
     yp = y*2π/V.a;  
-    return SVector(0, -V.v0*2π/V.a*sin(yp))
+    return SVector(0, V.v0*2π/V.a*sin(yp))
 end
