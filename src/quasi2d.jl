@@ -174,9 +174,6 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = t
             yi = 1 + round(Int, (ray_y[k] - ys[1]) / dy)
             if yi >= 1 && yi <= height
                 image[yi, xi] += 1
-            # elseif periodic_bnd == true
-            #     ys = mod(yi, height) + 1
-            #     image[ys, xi] += 1
             end
         end
     end
