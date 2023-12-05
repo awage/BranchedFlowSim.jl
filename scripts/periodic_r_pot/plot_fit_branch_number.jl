@@ -40,7 +40,7 @@ end
 function get_fit_p(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
     d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
     data, file = produce_or_load(
-        datadir("./storage"), # path
+        datadir("storage"), # path
         d, # container for parameter
         _get_area_avg, # function
         prefix = "periodic_bf_area_avg", # prefix for savename

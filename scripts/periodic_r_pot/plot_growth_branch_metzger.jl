@@ -32,7 +32,7 @@ end
 function get_datas(r; T = 10, num_rays = 100000,  a = 1, v0 = 1., dt = 0.01, N = 20)
     d = @dict(N,num_rays, r, a, v0, T, dt) # parametros
     data, file = produce_or_load(
-        datadir("./storage"), # path
+        datadir("storage"), # path
         d, # container for parameter
         _get_branches_avg, # function
         prefix = "periodic_bf_brchs_avg", # prefix for savename
@@ -55,5 +55,6 @@ lines!(ax1, xg, nbr, color = :red, label = L"r=0.3")
 xg, nbr, d = get_datas(0.5)
 lines!(ax1, xg, nbr, color = :black, label = L"r=0.5")
 axislegend(ax1);
-save(string("./output/",s),fig)
+save(string("./outputs/",s),fig)
+
 

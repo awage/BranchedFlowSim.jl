@@ -79,7 +79,7 @@ function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ 
     ax1= Axis(fig[1, 1], title = string("r = ", r) , xlabel = L"y", ylabel = L"\lambda_{max}", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
     hm = scatter!(ax1, yrange, λ)
     lines!(ax1,[-0.5, 0.5], [0.001, 0.001]; color = :red) 
-    save(string("../outputs/", s),fig)
+    save(string("./outputs/", s),fig)
 end
 
 function get_lyap_index(r, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
@@ -110,7 +110,7 @@ for r in rrange
     push!(ll, lidx)
 end
 
-d = @dict(res, r, a, v0,  T, dt, θ) # parametros
+d = @dict(res, a, v0,  T, dt, θ) # parametros
 s = savename("lyap_index",d, "png")
 fig = Figure(resolution=(800, 600))
 ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = "lyap index", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
