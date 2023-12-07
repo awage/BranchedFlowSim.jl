@@ -28,7 +28,12 @@ end
 
 
 function _get_lyap_1D(d) 
-    @unpack r,  a, v0, dt, T, res = d
+    @unpack θ , r,  a, v0, dt, T, res = d
+    if θ != 0. 
+        pot2 = RotatedPotential(θ, CosMixedPotential(r,a, v0)) 
+    else 
+        pot2 = CosMixedPotential(r, a, v0)
+    end
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4, 0.2], [pot2, dt])
     yrange = range(-a/2, a/2, res)
     py = 0.
@@ -38,8 +43,8 @@ end
 
 
 # print max lyap as a function of y over a range of initial conditions 
-function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000)
-    d = @dict(res, r, a, v0,  T, dt) # parametros
+function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
+    d = @dict(res, r, a, v0,  T, dt, θ) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
@@ -58,8 +63,8 @@ function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000)
     save(string("./outputs/", s),fig)
 end
 
-function get_lyap_index(r, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000)
-    d = @dict(res, r, a, v0,  T, dt) # parametros
+function get_lyap_index(r, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
+    d = @dict(res, r, a, v0,  T, dt, θ) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
@@ -75,11 +80,11 @@ function get_lyap_index(r, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T =
 end
 
 # Compute max lyap exp for a range of parameters
-res = 500;  a = 1; v0 = 1.; dt = 0.01; T = 10000;  threshold = 0.001
+res = 500;  a = 1; v0 = 1.; dt = 0.01; T = 10000; θ = 0.; threshold = 0.001
 rrange = range(0,0.5, length = 50)
 ll = Float64[]
 for r in rrange
-    lidx = get_lyap_index(r, 0.001; res, a, v0, dt, T)
+    lidx = get_lyap_index(r, 0.001; res, a, v0, dt, T, θ)
     push!(ll, lidx)
 end
 

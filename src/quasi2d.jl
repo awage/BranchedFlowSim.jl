@@ -71,12 +71,17 @@ The situation being modeled is an infinite vertical wavefront starting
 at x=0 with p_y=0 and p_x=1 (constant). To cover the area defined by xs and ys,
 the actual wavefront being simulated must be taller than ys.
 """
-function quasi2d_smoothed_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030)
+function quasi2d_smoothed_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030, periodic_bnd = false)
     h = length(ys) * (ys[2] - ys[1])
-    rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
+    if periodic_bnd == true
+        rmin = ys[1]; rmax = ys[end]; T = ys[end] - ys[1]
+    else
+        rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
+    end
+    # rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
     sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
-    ints = quasi2d_smoothed_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
+    ints = quasi2d_smoothed_intensity(ray_y, dt, xs, ys, potential, b; periodic_bnd, T) * (sim_h / h)
     return ints, (rmin, rmax)
 end
 
@@ -86,7 +91,9 @@ function quasi2d_smoothed_intensity(
     xs::AbstractVector{<:Real},
     ys::AbstractVector{<:Real},
     potential,
-    b
+    b; 
+    periodic_bnd = false, 
+    T = 0 
 )
     dy = ys[2] - ys[1]
     y_end = ys[1] + length(ys) * (ys[2] - ys[1])
@@ -105,6 +112,9 @@ function quasi2d_smoothed_intensity(
         # drift
         ray_y .+= dt .* ray_py
         x += dt
+        if periodic_bnd == true
+            ray_y = rem.(ray_y, T,RoundNearest)
+        end
         while xi <= length(xs) && xs[xi] <= x
             # Compute intensity
             density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
@@ -151,7 +161,7 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = t
     
     # Compute the spread beforehand
     if periodic_bnd == true
-        rmin = ys[1]; rmax = ys[end]
+        rmin = ys[1]; rmax = ys[end]; T = ys[end] - ys[1]
     else
         rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
     end
@@ -167,11 +177,11 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = t
         # drift
         ray_y .+= dt .* ray_py
         # Collect
-        for k in 1:height
+        for y ∈ ray_y
             if periodic_bnd == true
-                ray_y[k] = rem2pi(ray_y[k],RoundNearest)
+                y = rem(y, T,RoundNearest)
             end
-            yi = 1 + round(Int, (ray_y[k] - ys[1]) / dy)
+            yi = 1 + round(Int, (y - ys[1]) / dy)
             if yi >= 1 && yi <= height
                 image[yi, xi] += 1
             end
@@ -253,10 +263,16 @@ function quasi2d_compute_and_save_num_branches(
 end
 
 
-function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.003, threshold = 1.5, x0 = 0)
+function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.003, threshold = 1.5, x0 = 0, periodic_bnd = false)
+    τ = 0. 
+    if periodic_bnd == true
+        rmin = ys[1]; rmax = ys[end]; τ = ys[end] - ys[1]
+    else
+        rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
+    end
     rmin,rmax = quasi2d_compute_front_length(1024, dt, T, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
-    xrange, area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, T, ys, potential, b, threshold, x0) 
+    xrange, area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, T, ys, potential, b, threshold, x0, periodic_bnd, τ) 
     return xrange, area, max_I, (rmin, rmax)
 end
 
@@ -265,10 +281,12 @@ function quasi2d_smoothed_intensity_stats(
     dt::Real,
     T::Real,
     ys::AbstractVector{<:Real},
-    potential,
-    b, 
-    threshold, 
-    x0 
+    potential::AbstractPotential,
+    b::Real, 
+    threshold::Real, 
+    x0::Real,
+    periodic_bnd::Bool,
+    τ::Real 
 )
     dy = ys[2] - ys[1]
     y_end = ys[1] + length(ys) * (ys[2] - ys[1])
@@ -295,9 +313,14 @@ function quasi2d_smoothed_intensity_stats(
         ray_y .+= dt .* ray_py
         x += dt
 
+        if periodic_bnd == true
+            ray_y = rem.(ray_y, τ,RoundNearest)
+        end
+
         density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
-        intensity = pdf(density, ys)* (sim_h / h)
-        ind = findall(intensity .> threshold*bckgnd_density) 
+        intensity = pdf(density, ys)#*(sim_h / h)
+        # @show sum(intensity)/bckgnd_density
+        ind = findall(intensity .> threshold) #*bckgnd_density) 
         area[k] = length(ind)/length(intensity)  
         max_I[k] = maximum(intensity)  
     end
