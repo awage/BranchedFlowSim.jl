@@ -18,7 +18,7 @@ function compute_area(r, a, v0, dt, T; res = 1000, num_rays = 20000, θ = 0., th
     else
         pot2 = CosMixedPotential(r, a, v0)
     end
-    xg, area, max_I, rmax = quasi2d_get_stats(num_rays, dt, T, yg, pot2; b = 4*dy, threshold = threshold, x0 = x0)
+    xg, area, max_I, rmax = quasi2d_get_stats(num_rays, dt, T, yg, pot2; b = 4*dy, threshold = threshold, x0 = x0, periodic_bnd = true)
     return xg, yg, area, max_I
 end
 
