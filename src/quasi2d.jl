@@ -268,9 +268,8 @@ function quasi2d_get_stats(num_rays::Integer, dt, T, ys, potential; b=0.003, thr
     if periodic_bnd == true
         rmin = ys[1]; rmax = ys[end]; τ = ys[end] - ys[1]
     else
-        rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
+        rmin,rmax = quasi2d_compute_front_length(1024, dt, T, ys, potential)
     end
-    rmin,rmax = quasi2d_compute_front_length(1024, dt, T, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
     xrange, area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, T, ys, potential, b, threshold, x0, periodic_bnd, τ) 
     return xrange, area, max_I, (rmin, rmax)
@@ -289,11 +288,10 @@ function quasi2d_smoothed_intensity_stats(
     τ::Real 
 )
     dy = ys[2] - ys[1]
-    y_end = ys[1] + length(ys) * (ys[2] - ys[1])
     h = length(ys) * (ys[2] - ys[1])
-    sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
-    ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
+    sim_h = (ray_y[2]-ray_y[1]) * num_rays
+    ray_y = Vector{Float64}(ray_y)
     ray_py = zeros(num_rays)
     xrange = range(x0, T+x0, step = dt) 
     area = zeros(length(xrange))
@@ -318,9 +316,9 @@ function quasi2d_smoothed_intensity_stats(
         end
 
         density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
-        intensity = pdf(density, ys)#*(sim_h / h)
-        # @show sum(intensity)/bckgnd_density
-        ind = findall(intensity .> threshold) #*bckgnd_density) 
+        intensity = pdf(density, ys)*(sim_h / h)
+        @show sum(intensity),bckgnd_density
+        ind = findall(intensity .> threshold*bckgnd_density) 
         area[k] = length(ind)/length(intensity)  
         max_I[k] = maximum(intensity)  
     end

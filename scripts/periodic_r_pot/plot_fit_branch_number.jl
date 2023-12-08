@@ -3,7 +3,6 @@ using CairoMakie
 using LaTeXStrings
 using DrWatson
 using CodecZlib
-using ImageFiltering
 using StatsBase
 using LsqFit
 
