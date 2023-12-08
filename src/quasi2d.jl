@@ -317,7 +317,7 @@ function quasi2d_smoothed_intensity_stats(
 
         density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
         intensity = pdf(density, ys)*(sim_h / h)
-        @show sum(intensity),bckgnd_density
+        # @show sum(intensity),bckgnd_density
         ind = findall(intensity .> threshold*bckgnd_density) 
         area[k] = length(ind)/length(intensity)  
         max_I[k] = maximum(intensity)  
