@@ -36,7 +36,7 @@ function _get_area_avg(d)
     return @strdict(xg, yg, area_v, maxx_I)
 end
 
-function get_fit_p(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
+function get_fit_p(r, model, p0; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
     d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
     data, file = produce_or_load(
         datadir("storage"), # path
@@ -49,12 +49,9 @@ function get_fit_p(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., th
 
     @unpack area_v,xg,yg, maxx_I = data
     area = mean(area_v)
-    model(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
-    threshold = 1.5
     mx, ind = findmax(area)
     xdata = xg[ind:end]
     ydata = area[ind:end]
-    p0 = [0.15, 0.2, 0.2]
     fit = curve_fit(model, xdata, ydata, p0)
     return fit.param, xg, area, xdata, ydata
 end
@@ -62,26 +59,39 @@ end
 
 function print_fig_lf_vs_x(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
     d = @dict(N,res,num_rays, r, a, v0, threshold, T, dt) # parametros
-    model(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
-    param,xg,area,xdata,ydata = get_fit_p(r; T, res, num_rays, a, v0, threshold, N, dt)
+    model1(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
+    p0 = [0.15, 0.2, 0.2]
+    param,xg,area,xdata1,ydata = get_fit_p(r, model1, p0; T, res, num_rays, a, v0, threshold, N, dt)
+    ydata1 = model1(xdata1, param)
+    s1 = string("f(x) = ", trunc(param[1]; digits = 2), "+", trunc(param[2]; digits = 2),  "exp(", trunc(param[3]; digits = 2), "x)")
 
-    fig = Figure(resolution=(800, 600))
-    ax1= Axis(fig[1, 1], title = string("r = ", r, "; f(x) = ", trunc(param[1]; digits = 2), "+", trunc(param[2]; digits = 2),  "exp(-", trunc(param[3]; digits = 2), "x)") , xlabel = L"x", ylabel = L"f_{area}", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 30)
+    model2(x, p) = p[1] .+ p[2] * x.^p[3]
+    p0 = [0.15, 0.2, -0.5]
+    param,xg,area,xdata2,ydata = get_fit_p(r, model2, p0; T, res, num_rays, a, v0, threshold, N, dt)
+    ydata2 = model2(xdata2, param)
+    s2 =  string("f(x) = ", trunc(param[1]; digits = 2), "+", trunc(param[2]; digits = 2),  "x^", trunc(param[3]; digits = 2))
+
+    fig = Figure(size=(800, 600))
+    ax1= Axis(fig[1, 1], 
+    title = string("r = ", r, "; ", s1, ";\n ", s2), xlabel = L"x", ylabel = L"f_{area}", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 30)
     lines!(ax1, xg, area, color = :blue, label = "area")
-    lines!(ax1, xdata, model(xdata, param), color = :red, label = "exp fit")
+    lines!(ax1, xdata1, ydata1 , color = :red, label = "exp fit")
+    lines!(ax1, xdata2, ydata2, color = :green, label = "algebraic fit")
     axislegend(ax1);
     save(string("./outputs/plot_fit_periodic_r=", r, ".png"),fig)
 end
 
 function print_fig_a0_vs_r(rrange; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
     ps = []
+    model(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
+    p0 = [0.15, 0.2, 0.2]
     for r in rrange
-        p,_,_,_,_ = get_fit_p(r; T, res, num_rays, a, v0, threshold, N, dt)
+        p,_,_,_,_ = get_fit_p(r, model, p0; T, res, num_rays, a, v0, threshold, N, dt)
         push!(ps, p)
     end
     d = @dict(N,res,num_rays, a, v0, threshold, T, dt) # parametros
     s = savename("floor_branches",d, "png")
-    fig = Figure(resolution=(800, 600))
+    fig = Figure(size=(800, 600))
     v = [ a[1] for a in ps]
     ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = L"a_1", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40)
     lines!(ax1, rrange, v, color = :blue)

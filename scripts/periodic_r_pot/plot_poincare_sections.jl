@@ -15,7 +15,10 @@ function quasi2d_map!(du,u,p,t)
         return nothing
 end
 
-
+# Poincaré sections for the discrete system, 
+# we plot y against py for every x = k * a/dt
+# with "a" the cell size and dt the time step. 
+# Variable y is wrapped around mod "a"
 
 function plot_curves(r) 
     a = 1; v0 = 1.; dt = 0.01; T = 100000; θ = 0.
@@ -33,7 +36,9 @@ function plot_curves(r)
     ax = Axis(fig[1,1], ylabel = L"p_y", xlabel = L"y", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40, title = string("r = ", r), titlesize = 40)
     for (j,y) in enumerate(yrange)
         u,t = trajectory(df, T, [0., y, py])
-        ind = range(100, T, step = 100)
+        # We sample the trajectory for x = k * Npoincare with Npoincare = a/dt
+        Npoincare = a/dt
+        ind = range(Ttr, T, step = Npoincare)
         scatter!(ax, rem.(u[ind,2], a, RoundNearest), u[ind,3], markersize = 1.7, color = Cycled(j), rasterize = 1)
     end
     save(string("./outputs/",s), fig)

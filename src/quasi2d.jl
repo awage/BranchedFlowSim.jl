@@ -322,7 +322,6 @@ function quasi2d_smoothed_intensity_stats(
         area[k] = length(ind)/length(intensity)  
         max_I[k] = maximum(intensity)  
     end
-
     return xrange, area, max_I
 end
 
