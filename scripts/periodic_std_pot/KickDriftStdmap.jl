@@ -36,30 +36,30 @@ function KickDriftStep!(x::Array{Float64},p::Array{Float64},xn::Array{Float64},p
 end
 
 function KickDrift!(k,x0,p0,nt;dens=Float64[],dt=1,traj=false,axps=nothing,axmf=nothing,mff=nothing,mfms=1.0,ms=0.5,msinit=2.0,colinit="r",col="k",cs=[1.0,1.0,1.0])
-    x1=deepcopy(x0)
-    p1=deepcopy(p0)
-    x2=deepcopy(x0)
-    p2=deepcopy(p0)
+    x1 = deepcopy(x0)
+    p1 = deepcopy(p0)
+    x2 = deepcopy(x0)
+    p2 = deepcopy(p0)
 
-    density=length(dens)>0
-    N=length(x0)
+    density = length(dens)>0
+    N = length(x0)
     if density
-        Nx=size(dens)[1]
-        Nt=size(dens)[2]
-        Dt=k.τ/dt
+        Nx = size(dens)[1]
+        Nt = size(dens)[2]
+        Dt = k.τ/dt
     end
     if traj
-        xt=zeros(nt+1,N)
-        pt=zeros(nt+1,N)
-        xt[1,:]=x0
-        pt[1,:]=p0
+        xt = zeros(nt+1,N)
+        pt = zeros(nt+1,N)
+        xt[1,:] = x0
+        pt[1,:] = p0
     end
 
-    if axmf!=nothing 
-        if mff==nothing
-            mffac=1.0
+    if axmf != nothing 
+        if mff == nothing
+            mffac = 1.0
         else 
-            mffac=1.0*mff
+            mffac = 1.0*mff
         end
         axmf.plot(x0, p0,".",markersize=ms,color="k")
     end

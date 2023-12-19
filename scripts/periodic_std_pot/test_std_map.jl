@@ -30,10 +30,10 @@ function quasi2d_map!(du,u,p,t)
         # drift
         du[2] = y + dt .* du[3]
         du[1] = x + dt
-        while du[2] >= π; du[2] -= 2π; end
-        while du[2] < -π; du[2] += 2π; end
-        while du[3] >= π; du[3] -= 2π; end
-        while du[3] < π; du[3] += 2π; end        
+        # while du[2] >= π; du[2] -= 2π; end
+        # while du[2] < -π; du[2] += 2π; end
+        # while du[3] >= π; du[3] -= 2π; end
+        # while du[3] < π; du[3] += 2π; end        
         return nothing
 end
 
@@ -51,17 +51,18 @@ end
 
 
 # Compute max lyap exp for a range of parameters
-res = 5000;  a = 2π; v0 = -0.5; dt = 0.1; T = 100; 
+res = 5000;  a = 1; v0 = 20/(2π); dt = 0.1; T = 300; 
 d = @dict(res, a, v0,  T, dt) # parametros
 dat = _get_orbit(d)
 
 image = zeros(500, T) 
 @unpack tr_v, yrange = dat
-dy = step(range(-pi,pi,500))
+# dy = step(range(-pi,pi,500))
+dy = 1
 for ts in tr_v
     ys = ts[1][:,2]
     for (k,y) in enumerate(ys)
-        yi = 1 + round(Int, (y - (-a/2)) / dy)
+        yi = 1 + 250 + round(Int, (y - (-a/2)) / dy)
         if yi >= 1 && yi <= 500 && k ≤ T
             image[yi, k] += 1
         end
