@@ -65,27 +65,40 @@ function runkickdrift(K;Nt=40,ntr=400,h=1.0)
     x0=Array{Float64}(range(0.0,stop=1.0,length=ntraj))
     p0=zeros(ntraj)
     println("Full flow")
-    yt,pt=KickDrift!(k,x0,p0,Nt)
-    return yt, pt
+    xt,pt=KickDrift!(k,x0,p0,Nt)
+    return xt, pt
 end
+
+
+using Interpolations 
+
+function interp_x(itp_x,t) 
+    xit = [ x(t) for x in itp_x]
+    return xit
+end
+
 
 K=3.7
 Nt=30
 h=1.0
 
-yt, pt = runkickdrift(K,Nt=Nt,h=h)
-
-time = Observable(1)
 
 
-xs_1 = @lift(yt[$time,:])
-ys_1 = @lift(pt[$time,:])
 
-fig = scatter(xs_1, ys_1, color = :blue, linewidth = 4)
+xt, pt = runkickdrift(K,Nt=Nt,h=h)
 
-framerate = 5
-timestamps = range(1, Nt, step=1)
+# Interpolate each time series between time points 0:Nt
+itp_x = [linear_interpolation(0:Nt, x) for x in eachcol(xt)]
+itp_p = [linear_interpolation(0:Nt, p) for p in eachcol(pt)]
 
+# Animation begins
+time = Observable(0.)
+xs_1 = @lift(mod.(interp_x(itp_x,$time),1))
+ys_1 = @lift(interp_x(itp_p,$time))
+fig = scatter(xs_1, ys_1, color = :blue, linewidth = 4, 
+axis = (title = @lift("t = $(round($time, digits = 1))"),))
+framerate = 10
+timestamps = range(0, Nt, step=0.05)
 record(fig, "time_animation.mp4", timestamps;
         framerate = framerate) do t
     time[] = t
