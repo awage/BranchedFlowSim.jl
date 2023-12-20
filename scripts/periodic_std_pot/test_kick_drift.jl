@@ -47,8 +47,7 @@ function KickDrift!(k,x0,p0,nt;axmf=nothing,mff=nothing,mfms=1.0, ms = 0.5)
             if axmf!=nothing 
                 plot!(axmf, x2, p2*mffac .+ i; markersize=mfms,markeredgecolor="none",markeredgewidth=0)
             end
-            (x1,x2)=(x2,x1)
-            (p1,p2)=(p2,p1)
+            x1 = x2; p1 = p2
     end
 
   return (x1,p1)
@@ -58,7 +57,7 @@ function initKick(K;ϕ=0.0,τ=1.0,h=1.0,L=10.0)::KickData
     KickData(K,ϕ,L,τ,h)
 end
 
-function runkickdrift(K;Nt=40,save=false,dpi=400,ntr=10000,h=1.0)
+function runkickdrift(K;Nt=40,save=false,dpi=400,ntr=1000,h=1.0)
     k=initKick(K,L=ceil(Int,2*h*K*Nt/2π),h=h)
     x0=Array{Float64}(range(0.0,stop=1.0,length=ntr))
     p0=zeros(ntr)
