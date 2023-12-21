@@ -50,14 +50,44 @@ function get_density_mat(Nx, Ny, d, itp_y)
     return yrange, xrange, image
 end
 
+function interp_x(itp_x,t) 
+    xit = [ x(t) for x in itp_x]
+    return xit
+end
+
 # Compute max lyap exp for a range of parameters
-ntraj = 5000;  a = 1; v0 = 3.7; dt = 1; T = 10; 
+ntraj = 10000;  a = 1; v0 = 3.7; dt = 1; T = 5; 
 d = @dict(ntraj, a, v0,  T, dt) # parametros
 dat = _get_orbit(d)
 @unpack tr_v, yrange = dat
 Ny = 1000
 Nx = T*20 # Interpolation factor
 itp_y = [linear_interpolation(range(0,T,step = dt), x[:,1]) for x in tr_v]
+itp_p = [linear_interpolation(range(0,T,step = dt), x[:,2]) for x in tr_v]
 yr, xr, image = get_density_mat(Nx, Ny, d, itp_y)
 fig = heatmap(yr, xr, image)
 save("density_1.png",fig)
+
+
+# Animation begins
+time = Observable(0.)
+xs_1 = @lift(mod.(interp_x(itp_y,$time),1))
+ys_1 = @lift(interp_x(itp_p,$time))
+fig = Figure()
+gb = fig[1,1] = GridLayout()
+ax1 = Axis(gb[1,1], ylabel = L"y", xlabel = L"p_y", title = @lift("t = $(round($time, digits = 1))"),)
+# Scatter plot for phase space.
+scatter!(ax1, xs_1, ys_1, color = :blue, linewidth = 4)
+ax2 = Axis(gb[1,2], ylabel = L"x", xlabel = L"y")
+# Density plot to track the trajectory
+heatmap!(ax2, yr, xr, image)
+lines!(ax2,[yr[1]; yr[end]],@lift([$time; $time]); color = :red)
+
+framerate = 10
+timestamps = range(0, T, step=0.01)
+record(fig, "time_animation.mp4", timestamps;
+        framerate = framerate) do t
+    time[] = t
+end
+
+
