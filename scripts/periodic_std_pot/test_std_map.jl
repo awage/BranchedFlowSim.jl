@@ -79,7 +79,6 @@ function _produce_animation(T, itp_y, itp_p, xr, yr, image)
             framerate = framerate) do t
         time[] = t
     end
-
 end
 
 # Compute max lyap exp for a range of parameters
