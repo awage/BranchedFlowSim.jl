@@ -59,7 +59,7 @@ function initKick(K;ϕ=0.0,τ=1.0,h=1.0,L=10.0)::KickData
 end
 
 
-function runkickdrift(K;Nt=40,ntr=400,h=1.0)
+function runkickdrift(K;Nt=40,ntr=4000,h=1.0)
     k=initKick(K,L=ceil(Int,2*h*K*Nt/2π),h=h)
     ntraj=ntr
     x0=Array{Float64}(range(0.0,stop=1.0,length=ntraj))

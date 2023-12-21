@@ -45,7 +45,6 @@ function KickDrift!(k,x0,p0,nt;dens=Float64[],dt=1,traj=false,axps=nothing,axmf=
         KickDriftStep!(x1,p1,x2,p2,k)
         if density
             for j in 1:N
-                #println(j,":",(i-1)*Dt," ",x1[j]," ",i*Dt," ",x2[j])
                 drawLine!(dens,(i-1)*Dt,(x1[j]/k.L+0.5)*Nx,i*Dt,(x2[j]/k.L+0.5)*Nx,ds=dsX,mody=false,cscale=cs)
             end
         end
@@ -74,8 +73,9 @@ function show(dens,ax,k,Nt;Log=true,fac=20,title=nothing)
     else
         id=min.(fac*(id .- mind)./(maxd-mind),1)
     end
-    heatmap!(ax, id[:,:,3])
-    return id
+    yr =   range(-k.L/2, k.L/2, length=size(dens,1))
+    xr =   range(0,Nt,length=size(dens,2))
+    heatmap!(ax, yr, xr, id[:,:,3])
 end
 
 
@@ -94,18 +94,17 @@ function runkickdrift(K;Nt=40,ntr=40000,h=1.0)
     
     x0=Array{Float64}(range(0.0,stop=1.0,length=ntraj))
     p0=zeros(ntraj)
-    println("Full flow")
     xt,pt=KickDrift!(k,x0,p0,Nt,dens=dens,dt=k.τ*Nt/ntdens;cs=[0, 0., 1.])
 
     fig = Figure(size=(800, 600))
-    ax1= Axis(fig[1, 1], title = "on top of full flow (log)")
-    id = show(dens,ax1,k,Nt)
-    return fig, id
+    ax1= Axis(fig[1, 1], title = "full flow (log)")
+    show(dens,ax1,k,Nt)
+    return fig
 end
 
 K=3.7
-Nt=30
+Nt=10
 h=1.0
 
-fig, id = runkickdrift(K,Nt=Nt,h=h)
+fig = runkickdrift(K,Nt=Nt,h=h)
 save("density_2.png",fig)
