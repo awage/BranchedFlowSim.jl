@@ -22,7 +22,7 @@ function _get_lyap_1D(d)
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4], [pot, dt])
     region = HRectangle([0, 0],[1, 1])
     sampler, = statespace_sampler(region, 1234)
-    λ = [lyapunov(df, T; u0 = sampler()) for _ in 1:ntraj]
+    λ = [lyapunov(df, T; u0 = sampler(), Ttr = Int(10e4) ) for _ in 1:ntraj]
     # yrange = range(-a/2, a/2, ntraj)
     # py = 0.
     # λ = [lyapunov(df, T; u0 = [y, py]) for y in yrange]
@@ -37,19 +37,19 @@ function get_lyap_dat(ntraj = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000)
         d, # container for parameter
         _get_lyap_1D, # function
         prefix = "periodic_bf_lyap_1D", # prefix for savename
-        force = true, # true for forcing sims
+        force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
 end
 
 # Compute max lyap exp for a range of parameters
-ntraj = 20000;  a = 1; v0 = 1.; dt = 1; T = 10000; Krange = range(0., 5, length = 50); threshold = 0.001
+ntraj = 500;  a = 1; v0 = 1.; dt = 1; T = 10000; Krange = range(0., 5, length = 50); threshold = 0.001
 ll = Float64[]
 for v0 in Krange
     dat = get_lyap_dat(ntraj, a, v0, dt, T)
     @unpack λ = dat
-    ind = findall(λ .> threshold)
+    ind = findall(λ .< threshold)
     l_index = length(ind)/length(λ) 
     push!(ll, l_index)
 end
@@ -60,5 +60,4 @@ fig = Figure(resolution=(800, 600))
 ax1= Axis(fig[1, 1],  xlabel = L"K", ylabel = "lyap index", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
 lines!(ax1, Krange, ll, color = :blue)
 save(s,fig)
-
 
