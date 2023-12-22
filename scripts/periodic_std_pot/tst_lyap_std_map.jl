@@ -20,9 +20,12 @@ function _get_lyap_1D(d)
     @unpack  a, v0, dt, T, ntraj = d
     pot = StdMapPotential(a, v0)
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4], [pot, dt])
-    yrange = range(-a/2, a/2, ntraj)
-    py = 0.
-    λ = [lyapunov(df, T; u0 = [y, py]) for y in yrange]
+    region = HRectangle([0, 0],[1, 1])
+    sampler, = statespace_sampler(region, 1234)
+    λ = [lyapunov(df, T; u0 = sampler()) for _ in 1:ntraj]
+    # yrange = range(-a/2, a/2, ntraj)
+    # py = 0.
+    # λ = [lyapunov(df, T; u0 = [y, py]) for y in yrange]
     return @strdict(λ, yrange, d)
 end
 
@@ -34,14 +37,14 @@ function get_lyap_dat(ntraj = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000)
         d, # container for parameter
         _get_lyap_1D, # function
         prefix = "periodic_bf_lyap_1D", # prefix for savename
-        force = false, # true for forcing sims
+        force = true, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
 end
 
 # Compute max lyap exp for a range of parameters
-ntraj = 500;  a = 1; v0 = 1.; dt = 1; T = 10000; Krange = range(0., 5, length = 50); threshold = 0.001
+ntraj = 20000;  a = 1; v0 = 1.; dt = 1; T = 10000; Krange = range(0., 5, length = 50); threshold = 0.001
 ll = Float64[]
 for v0 in Krange
     dat = get_lyap_dat(ntraj, a, v0, dt, T)
