@@ -6,27 +6,26 @@ using CodecZlib
 using ChaosTools
 using Interpolations
 
-function quasi2d_map!(du,u,p,t)
-    y,py = u; potential, dt = p
+function std_map!(du,u,p,t)
+    y,py = u; a,v0 = p
     # kick
-    du[2] = py + dt * force_y(potential, t, y)
+    du[2] = py + v0/(2π)*sin(y*2π)
     # drift
-    du[1] = y + dt * du[2]
+    du[1] = y + du[2]
     return nothing
 end
 
 
 function _get_lyap_1D(d) 
     @unpack  a, v0, dt, T, ntraj = d
-    pot = StdMapPotential(a, v0)
-    df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4], [pot, dt])
+    df = DeterministicIteratedMap(std_map!, [0., 0.4], [a, v0])
     region = HRectangle([0, 0],[1, 1])
     sampler, = statespace_sampler(region, 1234)
-    λ = [lyapunov(df, T; u0 = sampler(), Ttr = Int(10e4) ) for _ in 1:ntraj]
+    λ = [lyapunov(df, T; u0 = sampler(), Ttr = Int(1e5) ) for _ in 1:ntraj]
     # yrange = range(-a/2, a/2, ntraj)
     # py = 0.
     # λ = [lyapunov(df, T; u0 = [y, py]) for y in yrange]
-    return @strdict(λ, yrange, d)
+    return @strdict(λ,  d)
 end
 
 
@@ -44,7 +43,7 @@ function get_lyap_dat(ntraj = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000)
 end
 
 # Compute max lyap exp for a range of parameters
-ntraj = 500;  a = 1; v0 = 1.; dt = 1; T = 10000; Krange = range(0., 5, length = 50); threshold = 0.001
+ntraj = 40000;  a = 1; v0 = 1.; dt = 1; T = 10000; Krange = range(0., 11, length = 100); threshold = 0.0001
 ll = Float64[]
 for v0 in Krange
     dat = get_lyap_dat(ntraj, a, v0, dt, T)
@@ -54,7 +53,7 @@ for v0 in Krange
     push!(ll, l_index)
 end
 
-d = @dict(res, a, T, dt) # parametros
+d = @dict(ntraj, a, T, dt) # parametros
 s = savename("lyap_index_std",d, "png")
 fig = Figure(resolution=(800, 600))
 ax1= Axis(fig[1, 1],  xlabel = L"K", ylabel = "lyap index", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
