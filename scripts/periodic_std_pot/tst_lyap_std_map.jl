@@ -25,7 +25,7 @@ function _get_lyap_1D(d)
     @unpack  a, v0, dt, T, ntraj = d
     df = DeterministicIteratedMap(std_map!, [0., 0.4], [a, v0])
     region = HRectangle([0, 0],[1, 1])
-    sampler, = statespace_sampler(region, 1234)
+    sampler, = statespace_sampler(region, 1235)
     λ = [lyapunov(df, T; u0 = sampler(), Ttr = 0 ) for _ in 1:ntraj]
     # yrange = range(-a/2, a/2, ntraj)
     # py = 0.
@@ -48,7 +48,7 @@ function get_lyap_dat(ntraj = 500,  a = 1, v0 = 1., dt = 0.01, T = 100000)
 end
 
 # Compute max lyap exp for a range of parameters
-ntraj = 40000;  a = 1; v0 = 1.; dt = 1; T = 10000; Krange = range(0., 11, step = 0.01); threshold = 0.0001
+ntraj = 5000;  a = 1; v0 = 1.; dt = 1; T = 100000; Krange = range(0., 3.95, step = 0.01); threshold = 0.0001
 ll = Float64[]
 for v0 in Krange
     dat = get_lyap_dat(ntraj, a, v0, dt, T)
@@ -63,5 +63,5 @@ s = savename("lyap_index_std",d, "png")
 fig = Figure(resolution=(800, 600))
 ax1= Axis(fig[1, 1],  xlabel = L"K", ylabel = "lyap index", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
 lines!(ax1, Krange, ll, color = :blue)
-save(s,fig)
+# save(s,fig)
 
