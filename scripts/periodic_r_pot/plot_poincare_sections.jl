@@ -23,6 +23,7 @@ end
 
 function plot_curves(r) 
     a = 1; v0 = 1.; dt = 0.01; T = 100000; θ = 0.
+    Ttr = 1
     pot2 = 0 
     if θ != 0. 
         pot2 = RotatedPotential(θ, CosMixedPotential(r,a, v0)) 
@@ -38,7 +39,7 @@ function plot_curves(r)
     for (j,y) in enumerate(yrange)
         u,t = trajectory(df, T, [0., y, py])
         # We sample the trajectory for x = k * Npoincare with Npoincare = a/dt
-        Npoincare = a/dt
+        Npoincare = round(Int, a/dt)
         ind = range(Ttr, T, step = Npoincare)
         scatter!(ax, rem.(u[ind,2], a, RoundNearest), u[ind,3], markersize = 1.7, color = Cycled(j), rasterize = 1)
     end

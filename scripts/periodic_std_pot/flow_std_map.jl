@@ -93,6 +93,7 @@ itp_y = [linear_interpolation(range(0,T,step = 1), x[:,1]) for x in tr_v]
 itp_p = [linear_interpolation(range(0,T,step = 1), x[:,2]) for x in tr_v]
 yr, xr, image = get_density_mat(Nx, Ny, d, itp_y)
 fig = heatmap(yr, xr, image)
-save("density_1.png",fig)
+s = savename("density_std",d, "png")
+save(plotsdir(s),fig)
 
 # _produce_animation(T, itp_y, itp_p, xr, yr, image)

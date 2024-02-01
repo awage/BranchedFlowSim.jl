@@ -44,7 +44,7 @@ end
 
 
 # print max lyap as a function of y over a range of initial conditions 
-function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
+function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 1000, θ = 0.)
     d = @dict(res, r, a, v0,  T, dt, θ) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
