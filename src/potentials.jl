@@ -20,7 +20,6 @@ export FunctionPotential
 export ZeroPotential
 export CosMixedPotential
 export StdMapPotential
-export SinexpPotential
 
 export rotation_matrix, force, force_x, force_y
 export correlated_random_potential
@@ -671,17 +670,3 @@ function force(V::StdMapPotential, x, y)
 end
 
 
-struct SinexpPotential <: AbstractPotential
-    a::Float64
-    k::Float64
-    v0::Float64
-end
-
-function (V::SinexpPotential)(x, y)
-    return  V.v0*sin(y*2π/V.a)*sin(x*2π/V.a)^V.k
-end
-
-function force(V::SinexpPotential, x, y)
-    yp = y*2π/V.a; xp = x*2π/V.a  
-    return SVector(0, V.v0*(2π*V.a)*sin(xp)*cos(yp)*sin(yp)^V.k-1)
-end
