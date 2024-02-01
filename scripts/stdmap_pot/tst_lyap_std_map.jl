@@ -6,24 +6,42 @@ using CodecZlib
 using ChaosTools
 using Interpolations
 
-function std_map!(du,u,p,t)
-    y,py = u; a,v0 = p
+function quasi2d_map!(du,u,p,t)
+    y,py = u; potential, dt = p
     # kick
-    du[2] = py + v0/(2π)*sin(y*2π)
+    du[2] = py + dt * force_y(potential, t, y)
     # drift
-    du[1] = y + du[2]
-    # while du[2] > a; du[2] - a; end
-    # while du[2] < 0; du[2] + a; end
-    # while du[1] > a; du[1] - a; end
-    # while du[1] < 0; du[1] + a; end
-
+    du[1] = y + dt * du[2]
     return nothing
 end
 
+function _get_orbit(d) 
+    @unpack dt, pot, T, a, ntraj = d
+    df = DeterministicIteratedMap(quasi2d_map!, [0.4, 0.2], [pot, dt])
+    yrange = range(0, a, ntraj)
+    py = 0.
+    tr_v = [trajectory(df, T,[y, py])[1] for y in yrange]
+    return @strdict(tr_v, yrange, d)
+end
+ 
+# function std_map!(du,u,p,t)
+#     y,py = u; a,v0 = p
+#     # kick
+#     du[2] = py + v0/(2π)*sin(y*2π)
+#     # drift
+#     du[1] = y + du[2]
+#     # while du[2] > a; du[2] - a; end
+#     # while du[2] < 0; du[2] + a; end
+#     # while du[1] > a; du[1] - a; end
+#     # while du[1] < 0; du[1] + a; end
+
+#     return nothing
+# end
+
 
 function _get_lyap_1D(d) 
-    @unpack  a, v0, dt, T, ntraj = d
-    df = DeterministicIteratedMap(std_map!, [0., 0.4], [a, v0])
+    @unpack  a, v0, dt, T, ntraj, pot = d
+    df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4], [pot, dt])
     region = HRectangle([0, 0],[1, 1])
     sampler, = statespace_sampler(region, 1235)
     λ = [lyapunov(df, T; u0 = sampler(), Ttr = 0 ) for _ in 1:ntraj]
@@ -34,8 +52,8 @@ function _get_lyap_1D(d)
 end
 
 
-function get_lyap_dat(ntraj = 500,  a = 1, v0 = 1., dt = 0.01, T = 100000)
-    d = @dict(ntraj, a, v0,  T, dt) # parametros
+function get_lyap_dat(ntraj = 500, v0 = 1., pot, dt = 1, T = 100000)
+    d = @dict(pot, ntraj, a, v0,  T, dt) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
@@ -49,9 +67,10 @@ end
 
 # Compute max lyap exp for a range of parameters
 ntraj = 15000;  a = 1; v0 = 1.; dt = 1; T = 1000; Krange = range(0., 5.3, step = 0.1); threshold = 0.00001
+pot = StdMapPotential(a, v0)
 ll = Float64[]
 for v0 in Krange
-    dat = get_lyap_dat(ntraj, a, v0, dt, T)
+    dat = get_lyap_dat(ntraj, v0, pot, dt, T)
     @unpack λ = dat
     ind = findall(abs.(λ) .< threshold)
     # if !isempty(ind);  @show λ[ind]; end
