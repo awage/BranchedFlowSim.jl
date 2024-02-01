@@ -29,13 +29,9 @@ end
 
 
 function _get_lyap_1D(d) 
-    @unpack θ , r,  a, v0, dt, T, res = d
-    if θ != 0. 
-        pot2 = RotatedPotential(θ, CosMixedPotential(r,a, v0)) 
-    else 
-        pot2 = CosMixedPotential(r, a, v0)
-    end
-    df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4, 0.2], [pot2, dt])
+    @unpack pot, dt, T, res = d
+    df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4, 0.2], [pot, dt])
+    a = pot.a
     yrange = range(-a/2, a/2, res)
     py = 0.
     λ = [lyapunov(df, T; u0 = [0., y, py]) for y in yrange]
@@ -44,8 +40,8 @@ end
 
 
 # print max lyap as a function of y over a range of initial conditions 
-function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 1000, θ = 0.)
-    d = @dict(res, r, a, v0,  T, dt, θ) # parametros
+function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 1000)
+    d = @dict(res, r, a, v0,  T, dt) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
@@ -64,8 +60,8 @@ function print_fig_lyap(r; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 1000, θ =
     save(plotsdir(s),fig)
 end
 
-function get_lyap_index(r, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000, θ = 0.)
-    d = @dict(res, r, a, v0,  T, dt, θ) # parametros
+function get_lyap_index(r, pot, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T = 10000)
+    d = @dict(res, r, a, v0,  T, dt, pot) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
@@ -81,22 +77,23 @@ function get_lyap_index(r, threshold; res = 500,  a = 1, v0 = 1., dt = 0.01, T =
 end
 
 # Compute max lyap exp for a range of parameters
-res = 500;  a = 1; v0 = 1.; dt = 0.01; T = 10000; θ = 0.; threshold = 0.001
+res = 500;  a = 1; v0 = 1.; dt = 0.01; T = 10000; threshold = 0.001
 rrange = range(0,0.5, length = 50)
 ll = Float64[]
 for r in rrange
-    lidx = get_lyap_index(r, 0.001; res, a, v0, dt, T, θ)
+    V = CosMixedPotential(r,a,v0)
+    lidx = get_lyap_index(r, V, 0.001; res, a, v0, dt, T)
     push!(ll, lidx)
 end
 
-d = @dict(res, a, v0,  T, dt, θ) # parametros
+d = @dict(res, a, v0,  T, dt) # parametros
 s = savename("lyap_index",d, "png")
 fig = Figure(resolution=(800, 600))
 ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = "lyap index", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40) 
 lines!(ax1, rrange, ll, color = :blue)
 save(plotsdir(s),fig)
 
-print_fig_lyap(0.0)
-print_fig_lyap(0.12)
-print_fig_lyap(0.25)
-print_fig_lyap(0.5)
+print_fig_lyap(0.0; a, v0, dt, T)
+print_fig_lyap(0.12; a, v0, dt, T)
+print_fig_lyap(0.25; a, v0, dt, T)
+print_fig_lyap(0.5; a, v0, dt, T)
