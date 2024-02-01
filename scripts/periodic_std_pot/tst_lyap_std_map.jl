@@ -48,15 +48,18 @@ function get_lyap_dat(ntraj = 500,  a = 1, v0 = 1., dt = 0.01, T = 100000)
 end
 
 # Compute max lyap exp for a range of parameters
-ntraj = 5000;  a = 1; v0 = 1.; dt = 1; T = 100000; Krange = range(0., 3.95, step = 0.01); threshold = 0.0001
+ntraj = 15000;  a = 1; v0 = 1.; dt = 1; T = 1000; Krange = range(0., 5.3, step = 0.1); threshold = 0.00001
 ll = Float64[]
 for v0 in Krange
     dat = get_lyap_dat(ntraj, a, v0, dt, T)
     @unpack λ = dat
-    ind = findall(λ .< threshold)
+    ind = findall(abs.(λ) .< threshold)
+    # if !isempty(ind);  @show λ[ind]; end
     l_index = length(ind)/length(λ) 
     push!(ll, l_index)
 end
+
+_log(x) = x > 0 ? log(x) : -10
 
 d = @dict(ntraj, a, T, dt) # parametros
 s = savename("lyap_index_std",d, "png")

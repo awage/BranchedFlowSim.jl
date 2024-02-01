@@ -16,8 +16,7 @@ function quasi2d_map!(du,u,p,t)
 end
 
 function _get_orbit(d) 
-    @unpack a, v0, dt, T, ntraj = d
-    pot = StdMapPotential(a, v0)
+    @unpack dt, pot, T, a, ntraj = d
     df = DeterministicIteratedMap(quasi2d_map!, [0.4, 0.2], [pot, dt])
     yrange = range(0, a, ntraj)
     py = 0.
@@ -29,7 +28,7 @@ end
 # trace the rays between two time points n and n+1
 function get_density_mat(Nx, Ny, d, itp_y)
     @unpack a, v0, dt, T, ntraj = d
-    ymin = -round(T*v0/2π); ymax = round(T*v0/2π)
+    ymin = -round(2*T*v0/2π); ymax = round(2*T*v0/2π)
     xrange = range(0,T, length = Nx)
     yrange = range(ymin,ymax, length = Ny)
     image = zeros(Ny, Nx) 
@@ -82,16 +81,17 @@ function _produce_animation(T, itp_y, itp_p, xr, yr, image)
 end
 
 # Compute max lyap exp for a range of parameters
-ntraj = 10000;  a = 1; v0 = 3.7; dt = 1; T = 5; 
-d = @dict(ntraj, a, v0,  T, dt) # parametros
+ntraj = 10000;  a = 1; v0 = 3; dt = 1; T = 10; 
+pot = StdMapPotential(a, v0)
+d = @dict(ntraj, pot, a, v0, T, dt) # parametros
 dat = _get_orbit(d)
 @unpack tr_v, yrange = dat
 Ny = 1000
 Nx = T*20 # Interpolation factor
-itp_y = [linear_interpolation(range(0,T,step = dt), x[:,1]) for x in tr_v]
-itp_p = [linear_interpolation(range(0,T,step = dt), x[:,2]) for x in tr_v]
+itp_y = [linear_interpolation(range(0,T,step = 1), x[:,1]) for x in tr_v]
+itp_p = [linear_interpolation(range(0,T,step = 1), x[:,2]) for x in tr_v]
 yr, xr, image = get_density_mat(Nx, Ny, d, itp_y)
 fig = heatmap(yr, xr, image)
 save("density_1.png",fig)
 
-_produce_animation(T, itp_y, itp_p, xr, yr, image)
+# _produce_animation(T, itp_y, itp_p, xr, yr, image)
