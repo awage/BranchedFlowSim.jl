@@ -29,7 +29,8 @@ end
 # trace the rays between two time points n and n+1
 function get_density_mat(Nx, Ny, d, itp_y)
     @unpack a, v0, dt, T, ntraj = d
-    ymin = -round(2*T*v0/2π); ymax = round(2*T*v0/2π)
+    # ymin = -round(2*T*v0/2π); ymax = round(2*T*v0/2π)
+    ymin = -10; ymax = 10
     xrange = range(0,T, length = Nx)
     yrange = range(ymin,ymax, length = Ny)
     image = zeros(Ny, Nx) 
@@ -55,7 +56,7 @@ function interp_x(itp_x,t)
     return xit
 end
 
-function _produce_animation(T, itp_y, itp_p, xr, yr, image)
+function _produce_animation(K, T, itp_y, itp_p, xr, yr, image)
 # Animation begins
     time = Observable(0.)
     # the time series xs_1 and ys_1 are parametrized by the 
@@ -74,15 +75,16 @@ function _produce_animation(T, itp_y, itp_p, xr, yr, image)
     lines!(ax2,[yr[1]; yr[end]],@lift([$time; $time]); color = :red)
 
     framerate = 10
-    timestamps = range(0, T, step=0.01)
-    record(fig, "time_animation.mp4", timestamps;
+    timestamps = range(0, T, step=0.1)
+    s = savename("time_anim",@dict(K,T), "mp4")
+    record(fig, s, timestamps;
             framerate = framerate) do t
         time[] = t
     end
 end
 
 # Compute max lyap exp for a range of parameters
-ntraj = 10000;  a = 1; v0 = 3; dt = 1; T = 10; 
+ntraj = 10000;  a = 1; v0 = 1.9; dt = 1; T = 10; 
 pot = StdMapPotential(a, v0)
 d = @dict(ntraj, pot, a, v0, T, dt) # parametros
 dat = _get_orbit(d)
@@ -96,4 +98,4 @@ fig = heatmap(yr, xr, image)
 s = savename("density_std",d, "png")
 save(plotsdir(s),fig)
 
-# _produce_animation(T, itp_y, itp_p, xr, yr, image)
+# _produce_animation(v0, T, itp_y, itp_p, xr, yr, image)
