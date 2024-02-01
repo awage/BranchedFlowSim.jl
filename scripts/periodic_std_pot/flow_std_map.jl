@@ -1,7 +1,8 @@
+using DrWatson
+@quickactivate
 using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
-using DrWatson
 using CodecZlib
 using ChaosTools
 using Interpolations

@@ -1,7 +1,8 @@
+using DrWatson
+@quickactivate
 using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
-using DrWatson
 using CodecZlib
 using StatsBase
 using LsqFit
@@ -78,7 +79,7 @@ function print_fig_lf_vs_x(r; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 
     lines!(ax1, xdata1, ydata1 , color = :red, label = "exp fit")
     lines!(ax1, xdata2, ydata2, color = :green, label = "algebraic fit")
     axislegend(ax1);
-    save(string("./outputs/plot_fit_periodic_r=", r, ".png"),fig)
+    save(plotsdir(string("plot_fit_periodic_r=", r, ".png")),fig)
 end
 
 function print_fig_a0_vs_r(rrange; T = 20, res = 1000, num_rays = 100000,  a = 1, v0 = 1., threshold = 1.5, N = 30,  dt = 0.01)
@@ -95,7 +96,7 @@ function print_fig_a0_vs_r(rrange; T = 20, res = 1000, num_rays = 100000,  a = 1
     v = [ a[1] for a in ps]
     ax1= Axis(fig[1, 1],  xlabel = L"r", ylabel = L"a_1", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40)
     lines!(ax1, rrange, v, color = :blue)
-    save(string("./outputs/",s),fig)
+    save(plotsdir(s),fig)
 end
 
 T = 20; res = 1000; num_rays = 100000;  a = 1; v0 = 1.; threshold = 1.5; N = 30;  dt = 0.01;

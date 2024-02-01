@@ -1,8 +1,9 @@
+using DrWatson 
+@quickactivate
 using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
 using StatsBase
-using DrWatson 
 
 
 
@@ -55,6 +56,6 @@ lines!(ax1, xg, nbr, color = :red, label = L"r=0.3")
 xg, nbr, d = get_datas(0.5)
 lines!(ax1, xg, nbr, color = :black, label = L"r=0.5")
 axislegend(ax1);
-save(string("./outputs/",s),fig)
+save(plotsdir(s),fig)
 
 

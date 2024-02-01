@@ -1,7 +1,8 @@
+using DrWatson 
+@quickactivate
 using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
-using DrWatson 
 using ChaosTools
 
 
@@ -41,7 +42,7 @@ function plot_curves(r)
         ind = range(Ttr, T, step = Npoincare)
         scatter!(ax, rem.(u[ind,2], a, RoundNearest), u[ind,3], markersize = 1.7, color = Cycled(j), rasterize = 1)
     end
-    save(string("./outputs/",s), fig)
+    save(plotsdir(s), fig)
 end
 
 # rrange = range(0,1, step = 0.1)
