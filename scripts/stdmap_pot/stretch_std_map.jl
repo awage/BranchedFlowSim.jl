@@ -17,14 +17,10 @@ function quasi2d_map!(du,u,p,t)
     return nothing
 end
 
- 
 
 function _get_stretch(d) 
-    @unpack  a, v0, dt, T, ntraj, pot = d
+    @unpack  a, dt, T, ntraj, pot = d
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4], [pot, dt])
-    # region = HRectangle([0, 0],[1, 1])
-    # sampler, = statespace_sampler(region, 1235)
-    # λ = [lyapunov(df, T; u0 = sampler(), Ttr = 0 ) for _ in 1:ntraj]
     yrange = range(0, a, ntraj)
     py = 0.
     points = [ [y, py] for y in yrange] 
@@ -33,29 +29,32 @@ function _get_stretch(d)
 end
 
 
-function get_dat(ntraj, v0, pot, dt, T)
-    d = @dict(pot, ntraj, a, v0,  T, dt) # parametros
+function get_dat(ntraj, K, pot, dt, T)
+    d = @dict(pot, ntraj, a, K,  T, dt) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
         _get_stretch, # function
         prefix = "stdmap_stretch", # prefix for savename
-        force = true, # true for forcing sims
+        force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
 end
 
-# Compute max lyap exp for a range of parameters
-ntraj = 1500;  a = 1; v0 = 3.5; dt = 1; T = 10;
-pot = StdMapPotential(a, v0)
-dat = get_dat(ntraj, v0, pot, dt, T)
-@unpack λ = dat
+ntraj = 1500;  a = 1; K = 0.5; dt = 1; T = 5;
+Kv = range(0.1,4,step = 0.1)
+m = zeros(length(Kv)); s = zeros(length(Kv))  
+for (n,K) in enumerate(Kv)
+    pot = StdMapPotential(a, K)
+    dat = get_dat(ntraj, K, pot, dt, T)
+    @unpack λ = dat
+    m[n] = mean(vec(mean(λ, dims = 2)))
+    s[n] = mean(vec(std(λ, dims = 2)))
+end
 
-m = vec(mean(λ, dims = 2))
-s = vec(std(λ, dims = 2))
 
-hist(m)
+# hist(m)
 
 # d = @dict(ntraj, a, T, dt) # parametros
 # s = savename("lyap_index_std",d, "png")
