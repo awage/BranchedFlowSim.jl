@@ -52,7 +52,7 @@ function plot_fit(d,K,xdata, ydata, model, param)
 end
 
 
-ntraj = 30000000;  a = 1; K = 2.9; dt = 1; T = 20; 
+ntraj = 3000000;  a = 1; K = 0.1; dt = 1; T = 50; 
 Kv = range(0.1, 4, step = 0.1)
 α = zeros(length(Kv))
 for (n,K) in enumerate(Kv)

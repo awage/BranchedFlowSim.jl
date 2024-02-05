@@ -84,7 +84,7 @@ function _produce_animation(K, T, itp_y, itp_p, xr, yr, image)
 end
 
 # Compute max lyap exp for a range of parameters
-ntraj = 10000;  a = 1; v0 = 1.9; dt = 1; T = 10; 
+ntraj = 100000;  a = 1; v0 = 1.5; dt = 1; T = 100; 
 pot = StdMapPotential(a, v0)
 d = @dict(ntraj, pot, a, v0, T, dt) # parametros
 dat = _get_orbit(d)

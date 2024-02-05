@@ -10,6 +10,7 @@ using FFTW
 using Interpolations
 using KernelDensity
 using LaTeXStrings
+using Random:Xoshiro
 
 export AbstractPotential
 export FermiDotPotential, LatticePotential, PeriodicGridPotential
@@ -543,6 +544,34 @@ function correlated_random_potential(width,
     pot_arr = v0 * gaussian_correlated_random(xs, ys, correlation_scale, seed)
     return PeriodicGridPotential(xs, ys, pot_arr)
 end
+
+"""
+    gaussian_correlated_random(xs, ys, scale, seed=rand(UInt))
+
+Returns random potential matrix of Gaussian correlated random values.
+"""
+function gaussian_correlated_random(xs, ys, scale, seed=rand(UInt))
+    # See scripts/verify_correlated_random.jl for testing this
+    rng = Xoshiro(seed)
+    ymid = middle(ys)
+    xmid = middle(xs)
+    # TODO: Explain this. 
+    # dist2 = ((ys .- ymid) .^ 2) .+ transpose()
+    xcorr = exp.(-(xs .- xmid) .^ 2 ./ (scale^2))
+    ycorr = exp.(-(ys .- ymid) .^ 2 ./ (scale^2))
+    corr =  ComplexF64.(ycorr .* transpose(xcorr))
+        # exp.( -dist2 ./ (scale^2)))
+    # Convert DFT result to fourier series
+    fcorr = fft!(corr)
+    num_points = length(xs) * length(ys)
+    # phase = rand(rng, length(ys), length(xs))
+    # TODO: Not sure why the factor 2 is included here inside sqrt
+    ft = num_points .* sqrt.((2/num_points).*fcorr) .* cis.(2pi .* rand.(rng))
+    ifft!(ft)
+    # vrand = ifft(num_points * sqrt.(fcorr) .* cis.(2pi .* phase))
+    return real(ft)
+end
+
 
 """
     random_fermi_potential(width, height, lattice_a, dot_radius, v0;
