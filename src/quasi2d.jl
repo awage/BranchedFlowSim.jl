@@ -179,7 +179,9 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = t
         # Collect
         for y ∈ ray_y
             if periodic_bnd == true
-                y = rem(y, T,RoundNearest)
+                # y = rem(y, T,RoundNearest)
+                while y < rmin; y += T; end
+                while y > rmax; y -= T; end
             end
             yi = 1 + round(Int, (y - ys[1]) / dy)
             if yi >= 1 && yi <= height
@@ -288,6 +290,7 @@ function quasi2d_smoothed_intensity_stats(
     τ::Real 
 )
     dy = ys[2] - ys[1]
+    rmin = ys[1]; rmax = ys[end];
     h = length(ys) * (ys[2] - ys[1])
     num_rays = length(ray_y)
     sim_h = (ray_y[2]-ray_y[1]) * num_rays
@@ -312,12 +315,15 @@ function quasi2d_smoothed_intensity_stats(
         x += dt
 
         if periodic_bnd == true
-            ray_y = rem.(ray_y, τ,RoundNearest)
+            # ray_y = rmin .+ rem.(ray_y, τ,RoundNearest)
+            for y ∈ ray_y
+                while y < rmin; y += T; end
+                while y > rmax; y -= T; end
+            end
         end
 
         density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
         intensity = pdf(density, ys)*(sim_h / h)
-        # @show sum(intensity),bckgnd_density
         ind = findall(intensity .> threshold*bckgnd_density) 
         area[k] = length(ind)/length(intensity)  
         max_I[k] = maximum(intensity)  

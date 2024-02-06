@@ -8,7 +8,6 @@ using StatsBase
 using LsqFit
 
 
-
 # Display and compute histograms :
 function compute_area(r, a, v0, dt, T; res = 1000, num_rays = 20000, θ = 0., threshold = 1.5, x0 = 0)
     yg = range(-a/2, a/2, length = res)
