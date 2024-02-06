@@ -11,7 +11,7 @@ using ProgressMeter
 
 # Display and compute histograms :
 function compute_area(V, a, dt, T; res = 1000, num_rays = 20000, threshold = 1.5, x0 = 0)
-    yg = range(0, a, length = res)
+    yg = range(0, 5*a, length = res)
     dy = step(yg)
     xg, area, max_I, rmax = quasi2d_get_stats(num_rays, dt, T, yg, V; b = 4*dy, threshold = threshold, x0 = x0, periodic_bnd = true)
     return xg, yg, area, max_I
@@ -44,15 +44,25 @@ function compute_area_decay(V, a, num_angles, num_rays, T, threshold, dt, res; p
         d, # container for parameter
         _get_area_avg, # function
         prefix = prefix, # prefix for savename
-        force = true, # true for forcing sims
+        force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
 end 
 
+function get_fit(xg, yg)
+    model(x, p) = p[1] .+ p[2] * x.^p[3]
+    mx, ind = findmax(yg)
+    xdata = xg[ind:end]
+    ydata = yg[ind:end]
+    p0 = [0.15, 0.2, -1]
+    fit = curve_fit(model, xdata, ydata, p0)
+    return fit.param, model, xdata
+end
+
 # Comon parameters
-num_rays = 40000; v0 = 0.1
-dt = 0.01; T = 100; 
+num_rays = 100000; v0 = 0.04
+dt = 0.01; T = 30; 
 res = 1000; threshold = 1.5; 
 num_angles = 10
 
@@ -87,15 +97,23 @@ ax1= Axis(fig[1, 1], xlabel = L"x,t", ylabel = L"Area meas", yticklabelsize = 30
 # m = vec(mean(nb_arr;dims = 2))
 m = nb_arr
 lines!(ax1, xg, m, color = :blue, label = L"Fermi Lattice")
+p, model, xdata = get_fit(xg,m) 
+lines!(ax1, xdata, model(xdata,p), color = :blue, label = L"Fermi Lattice")
 
 @unpack xg, nb_arr = data_cos[1]
 # m = vec(mean(nb_arr;dims = 2))
 m = nb_arr
 lines!(ax1, xg, m, color = :black, label = L"Integrable Cos Pot")
+p, model, xdata = get_fit(xg,m) 
+lines!(ax1, xdata, model(xdata,p), color = :black, label = L" Fit cos n = 1")
+
 @unpack xg, nb_arr = data_cos[2]
 # m = vec(mean(nb_arr;dims = 2))
 m = nb_arr
 lines!(ax1, xg, m, color = :green, label = L"Cos Pot deg = 6")
+p, model, xdata = get_fit(xg,m) 
+lines!(ax1, xdata, model(xdata,p), color = :green, label = L" Fit cos n = 6")
+
 s = "quick_comparison_decay_area.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
