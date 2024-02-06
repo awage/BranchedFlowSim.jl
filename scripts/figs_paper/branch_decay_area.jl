@@ -21,17 +21,18 @@ end
 function _get_area_avg(d)
     @unpack V, res, num_angles, num_rays, a, dt, T, threshold = d # unpack parameters
     xg = range(0,T, step = dt); yg = 0;
-    angles = range(-0.01, 0.01, length = num_angles + 1)
-    angles = angles[1:end-1]
-    p = Progress(num_angles, "Potential calc")
-    nb_arr = zeros(length(xg), num_angles)
-    Threads.@threads for i ∈ 1:num_angles
-        potential = V(angles[i])
+    # angles = range(-0.01, 0.01, length = num_angles + 1)
+    # angles = angles[1:end-1]
+    # p = Progress(num_angles, "Potential calc")
+    # nb_arr = zeros(length(xg), num_angles)
+    # Threads.@threads for i ∈ 1:num_angles
+        # potential = V(angles[i])
+        potential = V(0.)
         xg, yg, area, max_I = compute_area(potential, a, dt, T; res = res,  num_rays = num_rays, threshold = threshold, x0 = 0)
-        nb_arr[:, i] = area
-            
-        next!(p)
-    end
+        nb_arr = area
+        # nb_arr[:, i] = area
+        # next!(p)
+    # end
     return @strdict(xg, yg, nb_arr)
 end
 
@@ -43,14 +44,14 @@ function compute_area_decay(V, a, num_angles, num_rays, T, threshold, dt, res; p
         d, # container for parameter
         _get_area_avg, # function
         prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
+        force = true, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
 end 
 
 # Comon parameters
-num_rays = 1000; v0 = 0.01
+num_rays = 40000; v0 = 0.1
 dt = 0.01; T = 100; 
 res = 1000; threshold = 1.5; 
 num_angles = 10
@@ -83,14 +84,17 @@ fig = Figure(resolution=(1600, 1600))
 ax1= Axis(fig[1, 1], xlabel = L"x,t", ylabel = L"Area meas", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
 
 @unpack xg, nb_arr = data_fermi
-m = vec(mean(nb_arr;dims = 2))
+# m = vec(mean(nb_arr;dims = 2))
+m = nb_arr
 lines!(ax1, xg, m, color = :blue, label = L"Fermi Lattice")
 
 @unpack xg, nb_arr = data_cos[1]
-m = vec(mean(nb_arr;dims = 2))
+# m = vec(mean(nb_arr;dims = 2))
+m = nb_arr
 lines!(ax1, xg, m, color = :black, label = L"Integrable Cos Pot")
 @unpack xg, nb_arr = data_cos[2]
-m = vec(mean(nb_arr;dims = 2))
+# m = vec(mean(nb_arr;dims = 2))
+m = nb_arr
 lines!(ax1, xg, m, color = :green, label = L"Cos Pot deg = 6")
 s = "quick_comparison_decay_area.png"
 axislegend(ax1);

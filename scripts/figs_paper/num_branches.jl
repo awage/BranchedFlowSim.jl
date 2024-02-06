@@ -73,7 +73,7 @@ end
 # quick plot:
 
 
-fig = Figure(resolution=(1600, 1600))
+fig = Figure(resolution=(800, 800))
 ax1= Axis(fig[1, 1], xlabel = L"x,t", ylabel = L"N_{branches}", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
 
 @unpack mean_nbr = data_fermi
@@ -84,7 +84,7 @@ lines!(ax1, ts, mean_nbr, color = :red, label = L"Rand Correlated")
 lines!(ax1, ts, mean_nbr, color = :black, label = L"Integrable Cos Pot")
 @unpack mean_nbr = data_cos[6]
 lines!(ax1, ts, mean_nbr, color = :green, label = L"Cos Pot deg = 6")
-s = "quick_comparison_pot.png"
+s = "Branch_number_comparison.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
 

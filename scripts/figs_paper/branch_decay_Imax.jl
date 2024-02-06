@@ -11,14 +11,15 @@ using LsqFit
 function _get_max_I(d)
     @unpack V, xres, yres, num_angles, num_rays, a, dt, T, smoothing_b = d # unpack parameters
     xg = range(0,T, length = T*xres); yg = 0;
-    yg = sample_midpoints(0, lattice_a, yres)
+    yg = sample_midpoints(0, 5*lattice_a, yres)
+    dy = step(yg)
     angles = range(0, π/2, length = num_angles + 1)
     angles = angles[1:end-1]
     p = Progress(num_angles, "Potential calc")
     nb_arr = zeros(length(xg), num_angles)
     Threads.@threads for i ∈ 1:num_angles
         potential = V(angles[i])
-        int, (rmin, rmax) = quasi2d_intensity(num_rays, dt, xg, yg, potential, b=smoothing_b)
+        int, (rmin, rmax) = quasi2d_intensity(num_rays, dt, xg, yg, potential, b = smoothing_b)
         nb_arr[:, i] = maximum_intensity(int)
         next!(p)
     end
@@ -33,7 +34,7 @@ function compute_decay(V, a, num_angles, num_rays, T, smoothing_b, dt, xres, yre
         d, # container for parameter
         _get_max_I, # function
         prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
+        force = true, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
@@ -63,10 +64,10 @@ function maximum_intensity(int)
 end
 
 # Comon parameters
-num_rays = 4000; v0 = 0.04
+num_rays = 40000; v0 = 0.04
 dt = 0.01; T = 100; 
-num_angles = 40; smoothing_b = 0.003 
-xres = 20; yres = 1024
+num_angles = 10; smoothing_b = 0.003 
+xres = 10; yres = 1024
 
 # Fermi lattice
 lattice_a = 0.2; dot_radius = 0.2*0.25
@@ -96,6 +97,7 @@ ax1= Axis(fig[1, 1], xlabel = L"x,t", ylabel = L"I_{max}", yticklabelsize = 30, 
 
 @unpack xg, nb_arr = data_fermi
 m = vec(mean(nb_arr;dims = 2))
+# m = vec(maximum(nb_arr;dims = 1))
 lines!(ax1, xg, m, color = :blue, label = L"Fermi Lattice")
 p, model, xdata = get_fit(xg,m) 
 lines!(ax1, xdata, model(xdata,p), color = :blue, label = L"Fermi Lattice")
@@ -103,12 +105,14 @@ lines!(ax1, xdata, model(xdata,p), color = :blue, label = L"Fermi Lattice")
 
 @unpack xg, nb_arr = data_cos[1]
 m = vec(mean(nb_arr;dims = 2))
+# m = vec(maximum(nb_arr;dims = 1))
 lines!(ax1, xg, m, color = :black, label = L"Integrable Cos Pot")
 p, model, xdata = get_fit(xg,m) 
 lines!(ax1, xdata, model(xdata,p), color = :black, label = L" Fit cos n = 1")
 
 @unpack xg, nb_arr = data_cos[2]
 m = vec(mean(nb_arr;dims = 2))
+# m = vec(maximum(nb_arr;dims = 1))
 lines!(ax1, xg, m, color = :green, label = L"Cos Pot deg = 6")
 p, model, xdata = get_fit(xg,m) 
 lines!(ax1, xdata, model(xdata,p), color = :green, label = L" Fit cos n = 6")
