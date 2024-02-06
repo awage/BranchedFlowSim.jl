@@ -11,7 +11,7 @@ using ProgressMeter
 
 # Display and compute histograms :
 function compute_area(V, a, dt, T; res = 1000, num_rays = 20000, threshold = 1.5, x0 = 0)
-    yg = range(-a/2, a/2, length = res)
+    yg = range(0, a, length = res)
     dy = step(yg)
     xg, area, max_I, rmax = quasi2d_get_stats(num_rays, dt, T, yg, V; b = 4*dy, threshold = threshold, x0 = x0, periodic_bnd = true)
     return xg, yg, area, max_I
@@ -21,7 +21,7 @@ end
 function _get_area_avg(d)
     @unpack V, res, num_avg, num_rays, a, dt, T, threshold = d # unpack parameters
     xg = range(0,T, step = dt); yg = 0;
-    xi = range(0, lattice_a, length = num_avg)
+    xi = range(0, a, length = num_avg)
     p = Progress(num_avg, "Potential calc")
     nb_arr = zeros(length(xg), num_avg)
     Threads.@threads for i ∈ eachindex(xi)
@@ -87,7 +87,7 @@ function compute_area_decay(V, a, num_avg, num_rays, T, threshold, dt, res; pref
         d, # container for parameter
         _get_area_avg, # function
         prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
+        force = true, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
@@ -95,10 +95,10 @@ end
 
 # Comon parameters
 num_rays = 1000; sim_height = 1.
-sim_width = 10.; v0 = 0.04
+sim_width = 10.; v0 = 0.1
 dt = 0.01; T = 40; 
 res = 1000; threshold = 1.5; 
-num_avg = 10
+num_avg = 2
 
 # Fermi lattice
 lattice_a = 0.2; dot_radius = 0.2*0.25
@@ -110,11 +110,12 @@ data_fermi = compute_area_decay(V, lattice_a, num_avg, num_rays, T, threshold, d
 # Cosine sum 
 max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
 softness = 0.2; 
-degrees = collect(1:max_degree)
+degrees = [1, 6]
 data_cos = Vector{typeof(data_fermi)}()
 for degree ∈ degrees
-    cos_pot = fermi_dot_lattice_cos_series(degree,  
-        lattice_a, dot_radius, v0; softness)
+    cos_pot = RotatedPotential(0, 
+        fermi_dot_lattice_cos_series(degree,  
+        lattice_a, dot_radius, v0; softness))
     s = savename("decay_cos_xavg", @dict(degree))
     data = compute_area_decay(cos_pot, lattice_a, num_avg, num_rays, T, threshold, dt, res; prefix = s)
     # data = get_datas(cos_pot, num_rays, num_angles, ts, dt, s)
@@ -133,7 +134,7 @@ lines!(ax1, xg, m, color = :blue, label = L"Fermi Lattice")
 @unpack xg, nb_arr = data_cos[1]
 m = vec(mean(nb_arr;dims = 2))
 lines!(ax1, xg, m, color = :black, label = L"Integrable Cos Pot")
-@unpack xg, nb_arr = data_cos[6]
+@unpack xg, nb_arr = data_cos[2]
 m = vec(mean(nb_arr;dims = 2))
 lines!(ax1, xg, m, color = :green, label = L"Cos Pot deg = 6")
 s = "quick_comparison_decay_avg_x.png"
