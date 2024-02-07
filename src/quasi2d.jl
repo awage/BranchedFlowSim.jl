@@ -1,12 +1,9 @@
 using Statistics
 
-export quasi2d_num_branches, quasi2d_visualize_rays
-export quasi2d_compute_and_save_num_branches
-export quasi2d_num_branches_parallel
+export quasi2d_num_branches 
 export quasi2d_smoothed_intensity
 export quasi2d_histogram_intensity
 export quasi2d_get_stats
-export quasi2d_intensity
 
 
 """
@@ -74,16 +71,15 @@ the actual wavefront being simulated must be taller than ys.
 """
 function quasi2d_smoothed_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030, periodic_bnd = false)
     h = length(ys) * (ys[2] - ys[1])
-    T = 0 
+    τ = 0 
     if periodic_bnd == true
-        rmin = ys[1]; rmax = ys[end]; T = ys[end] - ys[1]
+        rmin = ys[1]; rmax = ys[end]; τ = ys[end] - ys[1]
     else
         rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
     end
-    # rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
     ray_y = LinRange(rmin, rmax, num_rays)
     sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
-    ints = quasi2d_smoothed_intensity(ray_y, dt, xs, ys, potential, b; periodic_bnd, T) * (sim_h / h)
+    ints = quasi2d_smoothed_intensity(ray_y, dt, xs, ys, potential, b; periodic_bnd, τ) * (sim_h / h)
     return ints, (rmin, rmax)
 end
 
@@ -95,7 +91,7 @@ function quasi2d_smoothed_intensity(
     potential,
     b; 
     periodic_bnd = false, 
-    T = 0 
+    τ = 0 
 )
     dy = ys[2] - ys[1]
     rmin = ys[1]; rmax = ys[end]
@@ -103,7 +99,7 @@ function quasi2d_smoothed_intensity(
     ray_y = Vector{Float64}(ray_y)
     num_rays = length(ray_y)
     ray_py = zeros(num_rays)
-    xi = 1; x = 0.0
+    xi = 1; x = xs[1]
     intensity = zeros(length(ys), length(xs))
     boundary = (
         ys[1] - dy - 4*b,
@@ -118,8 +114,8 @@ function quasi2d_smoothed_intensity(
         if periodic_bnd == true
             # ray_y = rem.(ray_y, T,RoundNearest)
             for y ∈ ray_y
-                while y < rmin; y += T; end
-                while y > rmax; y -= T; end
+                while y < rmin; y += τ; end
+                while y > rmax; y -= τ; end
             end
         end
         while xi <= length(xs) && xs[xi] <= x
@@ -205,72 +201,8 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = t
     return image 
 end
 
-"""
-    quasi2d_visualize_rays(path, xs, ys, potential;
-        triple_y=false,
-        height=(if triple_y 3*length(ys) else length(ys) end)
-     )
 
-TBW
-"""
-function quasi2d_visualize_rays(path, num_rays, sim_width, potential;
-    triple_y=false
-)
-    pixel_scale = 600
-    ys = LinRange(0, 1, pixel_scale)
-    if triple_y
-        ys = LinRange(-1, 2, 3*pixel_scale)
-    end
-    xs = LinRange(0, sim_width, pixel_scale * sim_width)
-    image = quasi2d_histogram_intensity(num_rays, xs, ys, potential)
-    scene = Scene(camera=campixel!, resolution=size(image'))
-    pot_values = [
-        potential(x, y) for x ∈ xs, y ∈ ys
-    ]
-    heatmap!(scene, pot_values; colormap=:Greens_3)
-    heatmap!(scene, image'; colormap=[
-            RGBA(0, 0, 0, 0), RGBA(0, 0, 0, 1),
-        ],
-        colorrange=(0, 15)
-    )
-    save(path, scene)
-end
-
-function quasi2d_num_branches_parallel(
-    num_rays, dt, ts, potentials, progress_text="")
-    p = Progress(length(potentials), progress_text)
-    nb_arr = zeros(length(ts), length(potentials))
-    Threads.@threads for i ∈ 1:length(potentials)
-        potential = potentials[i]
-        nb_arr[:, i] =
-            quasi2d_num_branches(num_rays, dt, ts, potential)
-        next!(p)
-    end
-    return nb_arr
-end
-
-"""
-    quasi2d_compute_and_save_num_branches(
-    h5_fname, num_rays, dt, ts, potentials::AbstractArray{<:AbstractPotential},
-    pot_params::NamedTuple)
-
-Computes the number of branches for given potentials and stores
-the results in a HDF5 file at `h5_fname`. pot_params is a NamedTuple
-describing parameters used to generate the potentials.
-"""
-function quasi2d_compute_and_save_num_branches(
-    h5_fname, num_rays, dt, ts, potentials::AbstractArray{<:AbstractPotential},
-    pot_params::NamedTuple)
-    dict_params = 
-        Dict{String,Any}([
-            String(k) => v for (k,v) ∈ pairs(pot_params)
-        ])
-    quasi2d_compute_and_save_num_branches(
-        h5_fname, num_rays, dt, ts, potentials,
-        dict_params
-    )
-end
-
+# This function computes average area and the maximum intensity
 function quasi2d_get_stats(num_rays::Integer, dt, xs::AbstractVector, ys::AbstractVector, potential; b=0.003, threshold = 1.5, periodic_bnd = false)
     τ = 0. 
     if periodic_bnd == true
@@ -280,9 +212,10 @@ function quasi2d_get_stats(num_rays::Integer, dt, xs::AbstractVector, ys::Abstra
     end
     ray_y = LinRange(rmin, rmax, num_rays)
     area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, xs, ys, potential, b, threshold, periodic_bnd, τ) 
-    return xs, area, max_I, (rmin, rmax)
+    return area, max_I, (rmin, rmax)
 end
 
+# In this version you provide dt, T and x0. 
 function quasi2d_get_stats(num_rays::Integer, dt, T::Real, ys::AbstractVector, potential; b=0.003, threshold = 1.5, x0 = 0, periodic_bnd = false)
     τ = 0. 
     if periodic_bnd == true
@@ -317,14 +250,23 @@ function quasi2d_smoothed_intensity_stats(
     area = zeros(length(xs))
     max_I = zeros(length(xs))
     intensity = zeros(length(ys))
-    background = (num_rays/length(ys))
-    bckgnd_density = background/(dy*num_rays)
+    background = (num_rays/length(ys));  bckgnd_density = background/(dy*num_rays)
     xi = 1; x = xs[1]
     boundary = (
         ys[1] - dy - 4*b,
         ys[end] + dy + 4*b,
     )
-    while x <= xs[end]
+    while x <= xs[end] + dt
+
+        while xi <= length(xs) &&  abs(xs[xi]- x) < dt/2 
+            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
+            intensity = pdf(density, ys)*(sim_h / h)
+            ind = findall(intensity .> threshold*bckgnd_density) 
+            area[xi] = length(ind)/length(intensity)  
+            max_I[xi] = maximum(intensity)  
+            xi += 1
+        end
+
         # kick
         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
         # drift
@@ -338,76 +280,68 @@ function quasi2d_smoothed_intensity_stats(
             end
         end
 
-        while xi <= length(xs) && xs[xi] <= x
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
-            intensity = pdf(density, ys)*(sim_h / h)
-            ind = findall(intensity .> threshold*bckgnd_density) 
-            area[xi] = length(ind)/length(intensity)  
-            max_I[xi] = maximum(intensity)  
-            xi += 1
-        end
     end
     return area, max_I
 end
 
 ### 
 #
-function quasi2d_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030)
-    h = length(ys) * (ys[2] - ys[1])
-    T = xs[end] - xs[1]
+# function quasi2d_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030)
+#     h = length(ys) * (ys[2] - ys[1])
+#     T = xs[end] - xs[1]
     
-    # First shoot some rays to figure out how wide they spread in the given time.
-    # Then use this to decide how tall to make the initial wavefront.
-    num_canary_rays = 1024
-    canary_ray_y = Vector(sample_midpoints(ys[1], ys[end], num_canary_rays))
-    ray_y = copy(canary_ray_y)
-    ray_py = zero(ray_y)
-    for x ∈ 0:dt:xs[end]
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        ray_y .+= dt .* ray_py
-    end
-    max_travel = maximum(abs.(ray_y - canary_ray_y))
-    rmin = ys[1] - max_travel
-    rmax = ys[end] + max_travel
-    # println("ray spread: $rmin .. $rmax")
-    ray_y = LinRange(rmin, rmax, num_rays)
-    sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
-    ints = quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
-    return ints, (rmin, rmax)
-end
+#     # First shoot some rays to figure out how wide they spread in the given time.
+#     # Then use this to decide how tall to make the initial wavefront.
+#     num_canary_rays = 1024
+#     canary_ray_y = Vector(sample_midpoints(ys[1], ys[end], num_canary_rays))
+#     ray_y = copy(canary_ray_y)
+#     ray_py = zero(ray_y)
+#     for x ∈ 0:dt:xs[end]
+#         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+#         ray_y .+= dt .* ray_py
+#     end
+#     max_travel = maximum(abs.(ray_y - canary_ray_y))
+#     rmin = ys[1] - max_travel
+#     rmax = ys[end] + max_travel
+#     # println("ray spread: $rmin .. $rmax")
+#     ray_y = LinRange(rmin, rmax, num_rays)
+#     sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
+#     ints = quasi2d_intensity(ray_y, dt, xs, ys, potential, b) * (sim_h / h)
+#     return ints, (rmin, rmax)
+# end
 
-function quasi2d_intensity(
-    ray_y::AbstractVector{<:Real},
-    dt::Real,
-    xs::AbstractVector{<:Real},
-    ys::AbstractVector{<:Real},
-    potential,
-    b=0.0030
-)
-    dy = ys[2] - ys[1]
-    y_end = ys[1] + length(ys) * (ys[2] - ys[1])
-    ray_y = Vector{Float64}(ray_y)
-    num_rays = length(ray_y)
-    ray_py = zeros(num_rays)
-    xi = 1
-    x = 0.0
-    intensity = zeros(length(ys), length(xs))
-    boundary = (
-        ys[1] - dy - 4*b,
-        ys[end] + dy + 4*b,
-    )
-    while xi <= length(xs)
-        # kick
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # drift
-        ray_y .+= dt .* ray_py
-        x += dt
-        while xi <= length(xs) && xs[xi] <= x
-            # Compute intensity
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
-            intensity[:, xi] = pdf(density, ys)
-            xi += 1
-        end
-    end
-    return intensity
-end
+# function quasi2d_intensity(
+#     ray_y::AbstractVector{<:Real},
+#     dt::Real,
+#     xs::AbstractVector{<:Real},
+#     ys::AbstractVector{<:Real},
+#     potential,
+#     b=0.0030
+# )
+#     dy = ys[2] - ys[1]
+#     y_end = ys[1] + length(ys) * (ys[2] - ys[1])
+#     ray_y = Vector{Float64}(ray_y)
+#     num_rays = length(ray_y)
+#     ray_py = zeros(num_rays)
+#     xi = 1
+#     x = 0.0
+#     intensity = zeros(length(ys), length(xs))
+#     boundary = (
+#         ys[1] - dy - 4*b,
+#         ys[end] + dy + 4*b,
+#     )
+#     while xi <= length(xs)
+#         # kick
+#         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
+#         # drift
+#         ray_y .+= dt .* ray_py
+#         x += dt
+#         while xi <= length(xs) && xs[xi] <= x
+#             # Compute intensity
+#             density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
+#             intensity[:, xi] = pdf(density, ys)
+#             xi += 1
+#         end
+#     end
+#     return intensity
+# end

@@ -680,8 +680,9 @@ end
 
 function force(V::CosMixedPotential, x, y)
     xp = x*2π/V.a; yp = y*2π/V.a; 
-    return SVector(-V.v0*2π/V.a*sin(xp)*(2*V.r*cos(yp)-V.r+1)/2, 
-                   -V.v0*2π/V.a*sin(yp)*(2*V.r*cos(xp)-V.r+1)/2 )
+    return SVector(0,-V.v0*2π/V.a*sin(yp)*(2*V.r*cos(xp)-V.r+1)/2)
+    # return SVector(-V.v0*2π/V.a*sin(xp)*(2*V.r*cos(yp)-V.r+1)/2, 
+    #                -V.v0*2π/V.a*sin(yp)*(2*V.r*cos(xp)-V.r+1)/2 )
 end
 
 struct StdMapPotential <: AbstractPotential
