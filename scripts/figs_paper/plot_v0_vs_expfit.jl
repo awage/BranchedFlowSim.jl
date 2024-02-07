@@ -32,7 +32,7 @@ for (k,v0) in enumerate(v0_range)
     data_fermi = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
     @unpack xg, mx_arr = data_fermi
     p, m, x = get_fit(xg, mx_arr)
-    f1[k],f2[k] = p 
+    f1[k] = p[1]; f2[k] = p[3] 
     
     # Cosine sum 
     max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
@@ -48,7 +48,7 @@ for (k,v0) in enumerate(v0_range)
         @unpack xg, mx_arr = data_fermi
         p, m, x = get_fit(xg, mx_arr)
         c1[k,degree] = p[1]
-        c2[k,degree] = p[2]
+        c2[k,degree] = p[3]
     end
 end
 

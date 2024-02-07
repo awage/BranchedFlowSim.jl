@@ -40,7 +40,8 @@ function get_data_decay(V, a, num_angles, num_rays, T, threshold, dt, xres, yres
 end 
 
 function get_fit(xg, yg)
-    model(x, p) = p[1] .+ p[2] * x.^p[3]
+    model1(x, p) = p[1] .+ p[2] * exp.(-p[3] * x)
+    # model(x, p) = p[1] .+ p[2] * x.^p[3]
     mx, ind = findmax(yg)
     xdata = xg[ind:end]
     ydata = yg[ind:end]
