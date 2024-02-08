@@ -4,7 +4,7 @@ export quasi2d_num_branches
 export quasi2d_smoothed_intensity
 export quasi2d_histogram_intensity
 export quasi2d_get_stats
-
+export sample_midpoints 
 
 """
     sample_midpoints(a,b, n)
@@ -221,7 +221,7 @@ function quasi2d_get_stats(num_rays::Integer, dt, T::Real, ys::AbstractVector, p
     if periodic_bnd == true
         rmin = ys[1]; rmax = ys[end]; τ = ys[end] - ys[1]
     else
-        rmin,rmax = quasi2d_compute_front_length(1024, dt, T, ys, potential)
+        rmin,rmax = quasi2d_compute_front_length(2*1024, dt, T, ys, potential)
     end
     ray_y = LinRange(rmin, rmax, num_rays)
     xs = range(x0, T+x0, step = dt) 
@@ -258,14 +258,6 @@ function quasi2d_smoothed_intensity_stats(
     )
     while x <= xs[end] + dt
 
-        while xi <= length(xs) &&  abs(xs[xi]- x) < dt/2 
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
-            intensity = pdf(density, ys)*(sim_h / h)
-            ind = findall(intensity .> threshold*bckgnd_density) 
-            area[xi] = length(ind)/length(intensity)  
-            max_I[xi] = maximum(intensity)  
-            xi += 1
-        end
 
         # kick
         ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
@@ -280,6 +272,14 @@ function quasi2d_smoothed_intensity_stats(
             end
         end
 
+        while xi <= length(xs) &&  xs[xi] <= x 
+            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
+            intensity = pdf(density, ys)*(sim_h / h)
+            ind = findall(intensity .> threshold*bckgnd_density) 
+            area[xi] = length(ind)/length(intensity)  
+            max_I[xi] = maximum(intensity)  
+            xi += 1
+        end
     end
     return area, max_I
 end

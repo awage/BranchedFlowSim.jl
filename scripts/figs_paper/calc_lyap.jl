@@ -54,6 +54,7 @@ threshold = 0.001
 v0_range = range(0.01, 0.11, step = 0.01)
 l_fermi = zeros(length(v0_range))
 l_cos = zeros(length(v0_range),6)
+l_rand = zeros(length(v0_range))
 
 for (k,v0) in enumerate(v0_range)
     # Fermi lattice
@@ -73,9 +74,18 @@ for (k,v0) in enumerate(v0_range)
             fermi_dot_lattice_cos_series(degree,  
             lattice_a, dot_radius, v0; softness))
         s = savename("lyap_cos", @dict(v0,degree))
-        l = get_lyap_index(cos_pot, threshold; res = 500, a = lattice_a, v0 = v0, dt = dt, T = 10000, prefix = s)
+        l = get_lyap_index(cos_pot, threshold; res = num_rays, a = lattice_a, v0 , dt, T , prefix = s)
         l_cos[k,degree] = l
     end
+
+    # Correlated random pot 
+    correlation_scale = 0.1;
+    sim_width = T; sim_height = 1. 
+    Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 100)
+    s = savename("lyap_rand", @dict(v0))
+    l = get_lyap_index(Vr, threshold; res = num_rays, a = correlation_scale, v0, dt, T, prefix = s)
+    l_rand[k] = l   
+
 end
 
 fig = Figure(size=(800, 600))
@@ -87,6 +97,7 @@ lines!(ax1, v0_range, l_cos[:,4], color = :pink, label = "Cos n=4")
 lines!(ax1, v0_range, l_cos[:,5], color = :purple, label = "Cos n=5")
 lines!(ax1, v0_range, l_cos[:,6], color = :cyan, label = "Cos n=6")
 lines!(ax1, v0_range, l_fermi, color = :blue, linestyle = :dash, label = "Fermi")
+lines!(ax1, v0_range, l_rand, color = :olive, linestyle = :dash, label = "rand")
 
 s = "comparison_lyap_index.png"
 axislegend(ax1);

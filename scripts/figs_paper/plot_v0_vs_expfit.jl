@@ -11,33 +11,31 @@ using ProgressMeter
 include("utils_decay_comp.jl")
 
 # Comon parameters
-num_rays = 50000; 
-dt = 0.01; T = 100; xres = 20
-yres = 1000; threshold = 1.5; 
-num_angles = 100
+num_rays = 100000; 
+dt = 0.01; T = 40; xres = 20
+yres = 1024; threshold = 1.5; 
+num_angles = 25
 
-v0_range = range(0.01, 0.27, step = 0.01)
-f1 = zeros(length(v0_range))
-f2 = zeros(length(v0_range))
-c1 = zeros(length(v0_range),6)
-c2 = zeros(length(v0_range),6)
+v0_range = range(0.04, 0.4, step = 0.04)
+f_p = zeros(length(v0_range),3)
+c_p = zeros(length(v0_range),6,3)
+r_p = zeros(length(v0_range),3)
 
 for (k,v0) in enumerate(v0_range)
     # Fermi lattice
     lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; 
+    softness = 0.2; T = 80
     a = lattice_a;
     V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
     s = savename("decay_fermi", @dict(v0))
     data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
     @unpack xg, mx_arr = data
     p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
-    f1[k] = p[1]; f2[k] = p[3] 
+    f_p[k,:] = p 
     
     # Cosine sum 
     max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; 
-    degrees = 1:6
+    softness = 0.2; degrees = 1:6; T = 80;
     for degree ∈ degrees
         cos_pot(θ) = RotatedPotential(θ,              
             fermi_dot_lattice_cos_series(degree,  
@@ -46,21 +44,32 @@ for (k,v0) in enumerate(v0_range)
         data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
         @unpack xg, mx_arr = data
         p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
-        c1[k,degree] = p[1]
-        c2[k,degree] = p[3]
+        c_p[k,degree,:] = p
     end
+ 
+    # Correlated random pot 
+    correlation_scale = 0.1; T = 20;
+    sim_width = T; sim_height = 10.;  
+    Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
+    s = savename("decay_rand", @dict(v0))
+    data = get_data_decay(Vr, correlation_scale, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+    @unpack xg, mx_arr = data
+    p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
+    r_p[k,:] = p
+
 end
 
 
 fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Exp fit", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
-lines!(ax1, v0_range, f1, color = :blue, label = "Fermi a1")
-lines!(ax1, v0_range, c1[:,1], color = :black, label = "Cos n=1 a1")
-lines!(ax1, v0_range, c1[:,2], color = :red, label = "Cos n=2 a1")
-lines!(ax1, v0_range, c1[:,3], color = :green, label = "Cos n=3 a1")
-lines!(ax1, v0_range, c1[:,4], color = :pink, label = "Cos n=4 a1")
-lines!(ax1, v0_range, c1[:,5], color = :purple, label = "Cos n=5 a1")
-lines!(ax1, v0_range, c1[:,6], color = :cyan, label = "Cos n=6 a1")
+lines!(ax1, v0_range, f_p[:,1], color = :blue, label = "Fermi a1")
+lines!(ax1, v0_range, r_p[:,1], color = :orange, label = "Rand a1")
+lines!(ax1, v0_range, c1[:,1,1], color = :black, label = "Cos n=1 a1")
+lines!(ax1, v0_range, c1[:,2,1], color = :red, label = "Cos n=2 a1")
+lines!(ax1, v0_range, c1[:,3,1], color = :green, label = "Cos n=3 a1")
+lines!(ax1, v0_range, c1[:,4,1], color = :pink, label = "Cos n=4 a1")
+lines!(ax1, v0_range, c1[:,5,1], color = :purple, label = "Cos n=5 a1")
+lines!(ax1, v0_range, c1[:,6,1], color = :cyan, label = "Cos n=6 a1")
 s = "comparison_fit_coeff_a1.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
@@ -68,14 +77,14 @@ save(plotsdir(s),fig)
 
 fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Exp fit", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
-lines!(ax1, v0_range, c2[:,1], linestyle = :dash, color = :black, label = " Cos n=1 a2")
-lines!(ax1, v0_range, c2[:,2], color = :red, label = "Cos n=2 a1")
-lines!(ax1, v0_range, c2[:,3], color = :green, label = "Cos n=3 a1")
-lines!(ax1, v0_range, c2[:,4], color = :pink, label = "Cos n=4 a1")
-lines!(ax1, v0_range, c2[:,5], color = :purple, label = "Cos n=5 a1")
-lines!(ax1, v0_range, c2[:,6], color = :cyan, label = "Cos n=6 a1")
-lines!(ax1, v0_range, f2, color = :blue, linestyle = :dash, label = "Fermi a2")
-
+lines!(ax1, v0_range, f_p[:,3], color = :blue, label = "Fermi a2")
+lines!(ax1, v0_range, r_p[:,3], color = :orange, label = "Rand a2")
+lines!(ax1, v0_range, c1[:,1,3], color = :black, label = "Cos n=1 a2")
+lines!(ax1, v0_range, c1[:,2,3], color = :red, label = "Cos n=2 a2")
+lines!(ax1, v0_range, c1[:,3,3], color = :green, label = "Cos n=3 a2")
+lines!(ax1, v0_range, c1[:,4,3], color = :pink, label = "Cos n=4 a2")
+lines!(ax1, v0_range, c1[:,5,3], color = :purple, label = "Cos n=5 a1")
+lines!(ax1, v0_range, c1[:,6,3], color = :cyan, label = "Cos n=6 a1")
 
 
 

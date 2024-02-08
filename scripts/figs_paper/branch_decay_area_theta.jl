@@ -11,10 +11,10 @@ using ProgressMeter
 include("utils_decay_comp.jl")
 
 # Comon parameters
-num_rays = 20000; v0 = 0.04
-dt = 0.01; T = 100; xres = 10
-yres = 1000; threshold = 1.5; 
-num_angles = 50
+num_rays = 40000; v0 = 0.04
+dt = 0.01; T = 20; xres = 20
+yres = 1024; threshold = 1.5; 
+num_angles = 10
 
 # Fermi lattice
 lattice_a = 0.2; dot_radius = 0.2*0.25
@@ -38,6 +38,13 @@ for degree ∈ degrees
     data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
     push!(data_cos, data)
 end
+
+# Correlated random pot 
+correlation_scale = 0.1;
+sim_width = T; sim_height = 10. 
+Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
+s = savename("decay_rand", @dict(v0))
+data_rand = get_data_decay(Vr, correlation_scale, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
 
 
 include("plot_branch_decay.jl")

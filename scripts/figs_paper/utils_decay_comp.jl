@@ -1,23 +1,24 @@
 
 # Display and compute histograms :
 function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.003)
-    yg = range(0, a, length = yres)
-    xg = range(0+x0, T+x0, length = xres*T)
+    yg = sample_midpoints(0, 1, yres)
+    xg = range(0+x0, T+x0, length = round(Int,xres*T))
     area, max_I, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = false)
+    @show x0, rmax, T
     return xg, yg, area, max_I
 end
 
 function compute_average_theta(d)
     @unpack V, xres, yres, num_angles, num_rays, a, dt, T, threshold = d # unpack parameters
     xg = 0; yg = 0;
-    angles = range(0, π/2, length = num_angles + 1)
+    angles = range(0, π/4, length = num_angles + 1)
     angles = angles[1:end-1]
     p = Progress(num_angles, "Potential calc")
     nb_arr = zeros(T*xres, num_angles)
     mx_arr = zeros(T*xres, num_angles)
     Threads.@threads for i ∈ 1:num_angles
         potential = V(angles[i])
-        xg, yg, area, max_I = compute_area(potential, a, dt, T; xres = xres, yres = yres,  num_rays = num_rays, threshold = threshold)
+        xg, yg, area, max_I = compute_area(potential, a, dt, T; xres, yres,  num_rays, threshold)
         nb_arr[:, i] = area
         mx_arr[:, i] = max_I
         next!(p)
@@ -45,7 +46,7 @@ function get_fit(xg, yg)
     mx, ind = findmax(yg)
     xdata = xg[ind:end]
     ydata = yg[ind:end]
-    p0 = [15., 2., -1.]
+    p0 = [5., 2., -1.]
     fit = curve_fit(model, xdata, ydata, p0)
     return fit.param, model, xdata
 end
