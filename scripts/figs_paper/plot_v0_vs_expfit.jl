@@ -16,7 +16,7 @@ dt = 0.01; T = 100; xres = 20
 yres = 1000; threshold = 1.5; 
 num_angles = 100
 
-v0_range = range(0.01, 0.11, step = 0.01)
+v0_range = range(0.01, 0.27, step = 0.01)
 f1 = zeros(length(v0_range))
 f2 = zeros(length(v0_range))
 c1 = zeros(length(v0_range),6)
@@ -37,7 +37,7 @@ for (k,v0) in enumerate(v0_range)
     # Cosine sum 
     max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
     softness = 0.2; 
-    degrees = [1, 6]
+    degrees = 1:6
     for degree ∈ degrees
         cos_pot(θ) = RotatedPotential(θ,              
             fermi_dot_lattice_cos_series(degree,  
@@ -56,6 +56,11 @@ fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Exp fit", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, f1, color = :blue, label = "Fermi a1")
 lines!(ax1, v0_range, c1[:,1], color = :black, label = "Cos n=1 a1")
+lines!(ax1, v0_range, c1[:,2], color = :red, label = "Cos n=2 a1")
+lines!(ax1, v0_range, c1[:,3], color = :green, label = "Cos n=3 a1")
+lines!(ax1, v0_range, c1[:,4], color = :pink, label = "Cos n=4 a1")
+lines!(ax1, v0_range, c1[:,5], color = :purple, label = "Cos n=5 a1")
+lines!(ax1, v0_range, c1[:,6], color = :cyan, label = "Cos n=6 a1")
 s = "comparison_fit_coeff_a1.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
@@ -64,7 +69,17 @@ save(plotsdir(s),fig)
 fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Exp fit", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, c2[:,1], linestyle = :dash, color = :black, label = " Cos n=1 a2")
+lines!(ax1, v0_range, c2[:,2], color = :red, label = "Cos n=2 a1")
+lines!(ax1, v0_range, c2[:,3], color = :green, label = "Cos n=3 a1")
+lines!(ax1, v0_range, c2[:,4], color = :pink, label = "Cos n=4 a1")
+lines!(ax1, v0_range, c2[:,5], color = :purple, label = "Cos n=5 a1")
+lines!(ax1, v0_range, c2[:,6], color = :cyan, label = "Cos n=6 a1")
 lines!(ax1, v0_range, f2, color = :blue, linestyle = :dash, label = "Fermi a2")
+
+
+
+
+
 s = "comparison_fit_coeff_a2.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
