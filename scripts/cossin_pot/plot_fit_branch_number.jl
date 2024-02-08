@@ -24,14 +24,18 @@ end
 
 function _get_area_avg(d)
     @unpack r, res, N, num_rays, a, v0,dt, T, threshold = d # unpack parameters
-    maxx_I = []
-    area_v = []
+     
+    maxx_I = zeros(length(range(0, T, step = dt),N))
+    area_v = zeros(length(range(0, T, step = dt),N))
     xg = 0; yg = 0;
-    for x0 in range(0,a/2, length = N)
+    xi = range(0,a/2, length = N)
+    nb_arr = zeros(T*xres, num_angles)
+    mx_arr = zeros(T*xres, num_angles)
+    Threads.@threads for k in eachindex(xi)
         @show x0
-        xg, yg, area, max_I = compute_area(r, a, v0, dt, T; res = res,  num_rays = num_rays, θ = 0., threshold = threshold, x0 = x0)
-        push!(maxx_I, max_I)
-        push!(area_v, area)
+        xg, yg, area, max_I = compute_area(r, a, v0, dt, T; res = res,  num_rays = num_rays, θ = 0., threshold = threshold, x0 = xi[k])
+        maxx_I[:,k] =  max_I
+        area_v[:,k] =  area
     end
     return @strdict(xg, yg, area_v, maxx_I)
 end
