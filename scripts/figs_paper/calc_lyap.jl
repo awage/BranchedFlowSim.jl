@@ -51,7 +51,7 @@ num_rays = 1000;
 dt = 0.01; T = 10000; 
 threshold = 0.001
 
-v0_range = range(0.01, 0.11, step = 0.01)
+v0_range = range(0.01, 0.4, step = 0.01)
 l_fermi = zeros(length(v0_range))
 l_cos = zeros(length(v0_range),6)
 

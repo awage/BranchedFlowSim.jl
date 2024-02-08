@@ -25,14 +25,12 @@ end
 function _get_area_avg(d)
     @unpack r, res, N, num_rays, a, v0,dt, T, threshold = d # unpack parameters
      
-    maxx_I = zeros(length(range(0, T, step = dt),N))
-    area_v = zeros(length(range(0, T, step = dt),N))
+    maxx_I = zeros(length(range(0, T, step = dt)),N)
+    area_v = zeros(length(range(0, T, step = dt)),N)
     xg = 0; yg = 0;
     xi = range(0,a/2, length = N)
-    nb_arr = zeros(T*xres, num_angles)
-    mx_arr = zeros(T*xres, num_angles)
     Threads.@threads for k in eachindex(xi)
-        @show x0
+        @show xi[k]
         xg, yg, area, max_I = compute_area(r, a, v0, dt, T; res = res,  num_rays = num_rays, θ = 0., threshold = threshold, x0 = xi[k])
         maxx_I[:,k] =  max_I
         area_v[:,k] =  area
@@ -52,7 +50,7 @@ function get_fit_p(r, model, p0; T = 20, res = 1000, num_rays = 100000,  a = 1, 
     )
 
     @unpack area_v,xg,yg, maxx_I = data
-    area = mean(area_v)
+    area = vec(mean(area_v; dims = 2))
     mx, ind = findmax(area)
     xdata = xg[ind:end]
     ydata = area[ind:end]
