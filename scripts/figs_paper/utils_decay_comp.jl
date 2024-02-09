@@ -3,7 +3,7 @@
 function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.003)
     yg = sample_midpoints(0, a, yres)
     xg = range(0+x0, T+x0, length = round(Int,xres*T))
-    area, max_I, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = true)
+    area, max_I, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = false)
     # @show x0, rmax, T
     return xg, yg, area, max_I
 end
@@ -34,7 +34,7 @@ function get_data_decay(V, a, num_angles, num_rays, T, threshold, dt, xres, yres
         d, # container for parameter
         compute_average_theta, # function
         prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
+        force = true, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
