@@ -62,33 +62,30 @@ end
 
 fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Exp fit", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
-lines!(ax1, v0_range, f_p[:,1], color = :blue, label = "Fermi a1")
-lines!(ax1, v0_range, r_p[:,1], color = :orange, label = "Rand a1")
-lines!(ax1, v0_range, c_p[:,1,1], color = :black, label = "Cos n=1 a1")
-lines!(ax1, v0_range, c_p[:,2,1], color = :red, label = "Cos n=2 a1")
-lines!(ax1, v0_range, c_p[:,3,1], color = :green, label = "Cos n=3 a1")
-lines!(ax1, v0_range, c_p[:,4,1], color = :pink, label = "Cos n=4 a1")
-lines!(ax1, v0_range, c_p[:,5,1], color = :purple, label = "Cos n=5 a1")
-lines!(ax1, v0_range, c_p[:,6,1], color = :cyan, label = "Cos n=6 a1")
-s = "comparison_fit_coeff_a1.png"
+lines!(ax1, v0_range, f_p[:,1], color = :blue, linestyle = :dash, label = L"Fermi $C$")
+lines!(ax1, v0_range, r_p[:,1], color = :orange, label = L"Rand $C$")
+lines!(ax1, v0_range, c_p[:,1,1], color = :black, linestyle = :dash, label = L"V_{Cos} n = 1 $C$")
+# lines!(ax1, v0_range, c_p[:,2,1], color = :red, label = "Cos n=2 a1")
+# lines!(ax1, v0_range, c_p[:,3,1], color = :green, label = "Cos n=3 a1")
+# lines!(ax1, v0_range, c_p[:,4,1], color = :pink, label = "Cos n=4 a1")
+# lines!(ax1, v0_range, c_p[:,5,1], color = :purple, label = "Cos n=5 a1")
+lines!(ax1, v0_range, c_p[:,6,1], color = :cyan, label = L"$V_{Cos}$ n = 6 $C$")
+s = "comparison_fit_coeff_C.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
 
 
 fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Exp fit", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
-lines!(ax1, v0_range, f_p[:,3], color = :blue, label = "Fermi a2")
-lines!(ax1, v0_range, r_p[:,3], color = :orange, label = "Rand a2")
-lines!(ax1, v0_range, c_p[:,1,3], color = :black, label = "Cos n=1 a2")
-lines!(ax1, v0_range, c_p[:,2,3], color = :red, label = "Cos n=2 a2")
-lines!(ax1, v0_range, c_p[:,3,3], color = :green, label = "Cos n=3 a2")
-lines!(ax1, v0_range, c_p[:,4,3], color = :pink, label = "Cos n=4 a2")
-lines!(ax1, v0_range, c_p[:,5,3], color = :purple, label = "Cos n=5 a1")
-lines!(ax1, v0_range, c_p[:,6,3], color = :cyan, label = "Cos n=6 a1")
+lines!(ax1, v0_range, f_p[:,3], color = :blue, linestyle=:dash, label = L"Fermi $\Omega$")
+lines!(ax1, v0_range, r_p[:,3], color = :orange, label = L"Rand $\Omega$")
+lines!(ax1, v0_range, c_p[:,1,3], color = :black, linestyle = :dash, label = L"Cos n=1 $\Omega$")
+# lines!(ax1, v0_range, c_p[:,2,3], color = :red, label = "Cos n=2 a2")
+# lines!(ax1, v0_range, c_p[:,3,3], color = :green, label = "Cos n=3 a2")
+# lines!(ax1, v0_range, c_p[:,4,3], color = :pink, label = "Cos n=4 a2")
+# lines!(ax1, v0_range, c_p[:,5,3], color = :purple, label = "Cos n=5 a1")
+lines!(ax1, v0_range, c_p[:,6,3], color = :cyan, linestyle = :dash, label = L"Cos n=6 $\Omega$")
 
-
-
-
-s = "comparison_fit_coeff_a2.png"
+s = "comparison_fit_coeff_omega.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
