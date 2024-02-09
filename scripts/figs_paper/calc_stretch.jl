@@ -7,15 +7,13 @@ using LinearAlgebra
 using StaticArrays
 using ChaosTools
 
-
 function quasi2d_map!(du,u,p,t)
-        x,y,py = u; potential, dt = p
-        # kick
-        du[3] = py + dt * force_y(potential, x, y)
-        # drift
-        du[2] = y + dt .* du[3]
-        du[1] = x + dt
-        return nothing
+    y,py = u; potential, dt = p
+    # kick
+    du[2] = py + dt * force_y(potential, t, y)
+    # drift
+    du[1] = y + dt * du[2]
+    return nothing
 end
 
 function _get_stretch(d) 

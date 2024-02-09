@@ -9,14 +9,14 @@ using ChaosTools
 
 
 function quasi2d_map!(du,u,p,t)
-        x,y,py = u; potential, dt = p
-        # kick
-        du[3] = py + dt * force_y(potential, x, y)
-        # drift
-        du[2] = y + dt .* du[3]
-        du[1] = x + dt
-        return nothing
+    y,py = u; potential, dt = p
+    # kick
+    du[2] = py + dt * force_y(potential, t, y)
+    # drift
+    du[1] = y + dt * du[2]
+    return nothing
 end
+
 
 function _get_stretch(d) 
     @unpack V, dt, a, T, res = d
@@ -30,10 +30,10 @@ end
 
 function _get_lyap_1D(d) 
     @unpack V, dt, a, T, res = d
-    df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4, 0.2], [V, dt])
+    df = DeterministicIteratedMap(quasi2d_map!, [0.4, 0.2], [V, dt])
     yrange = range(0, a, res)
     py = 0.
-    λ = [lyapunov(df, T; u0 = [0., y, py]) for y in yrange]
+    λ = [lyapunov(df, T; u0 = [y, py]) for y in yrange]
     return @strdict(λ, yrange, d)
 end
 
