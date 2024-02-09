@@ -85,7 +85,7 @@ for (k,v0) in enumerate(v0_range)
     softness = 0.2; I = rotation_matrix(0)
     V = LatticePotential(lattice_a*I, dot_radius, v0; softness=softness)
     s = savename("strectch_fermi", @dict(v0))
-    l = get_lyap_index(V, threshold; res = num_rays, a = lattice_a, v0, dt, T, prefix = s)
+    l = get_stretch_index(V, threshold; res = num_rays, a = lattice_a, v0, dt, T, prefix = s)
     l_fermi[k] = l   
 
     # Cosine sum 
@@ -97,7 +97,7 @@ for (k,v0) in enumerate(v0_range)
             fermi_dot_lattice_cos_series(degree,  
             lattice_a, dot_radius, v0; softness))
         s = savename("stretch_cos", @dict(v0,degree))
-        l = get_lyap_index(cos_pot, threshold; res = num_rays, a = lattice_a, v0 , dt, T , prefix = s)
+        l = get_stretch_index(cos_pot, threshold; res = num_rays, a = lattice_a, v0 , dt, T , prefix = s)
         l_cos[k,degree] = l
     end
 
@@ -106,13 +106,13 @@ for (k,v0) in enumerate(v0_range)
     sim_width = 20; sim_height = 1. 
     Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 100)
     s = savename("stretch_rand", @dict(v0))
-    l = get_lyap_index(Vr, threshold; res = num_rays, a = correlation_scale, v0, dt, T, prefix = s)
+    l = get_stretch_index(Vr, threshold; res = num_rays, a = correlation_scale, v0, dt, T, prefix = s)
     l_rand[k] = l   
 
 end
 
 fig = Figure(size=(800, 600))
-ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Lyap index", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
+ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Stretch index", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, l_cos[:,1], linestyle = :dash, color = :black, label = " Cos n=1")
 lines!(ax1, v0_range, l_cos[:,2], color = :red, label = "Cos n=2")
 lines!(ax1, v0_range, l_cos[:,3], color = :green, label = "Cos n=3")
