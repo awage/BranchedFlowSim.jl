@@ -26,30 +26,6 @@ function _get_stretch(d)
     return @strdict(λ,  d)
 end
 
-function _get_lyap_1D(d) 
-    @unpack V, dt, a, T, res = d
-    df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4, 0.2], [V, dt])
-    yrange = range(0, a, res)
-    py = 0.
-    λ = [lyapunov(df, T; u0 = [0., y, py]) for y in yrange]
-    return @strdict(λ, yrange, d)
-end
-
-function get_lyap_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T = 10000, prefix = "lyap")
-    d = @dict(res,  a, v0,  T, dt, V) # parametros
-    data, file = produce_or_load(
-        datadir("./storage"), # path
-        d, # container for parameter
-        _get_lyap_1D, # function
-        prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
-        wsave_kwargs = (;compress = true)
-    )
-    @unpack λ = data
-    ind = findall(λ .> threshold)
-    l_index = length(ind)/length(λ) 
-    return l_index
-end
 
 function get_stretch_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T = 10000, prefix = "lyap")
     d = @dict(res,  a, v0,  T, dt, V) # parametros
@@ -82,7 +58,7 @@ for (k,v0) in enumerate(v0_range)
     lattice_a = 0.2; dot_radius = 0.2*0.25
     softness = 0.2; I = rotation_matrix(0)
     V = LatticePotential(lattice_a*I, dot_radius, v0; softness=softness)
-    s = savename("strectch_fermi", @dict(v0))
+    s = savename("stretch_fermi", @dict(v0))
     l = get_stretch_index(V, threshold; res = num_rays, a = lattice_a, v0, dt, T, prefix = s)
     l_fermi[k] = l   
 
