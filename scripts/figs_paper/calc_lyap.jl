@@ -53,58 +53,69 @@ end
 
 
 # Comon parameters
-num_rays = 5000; 
+num_rays = 500; 
 dt = 0.001; T = 10000; 
 threshold = 0.001
 
-v0_range = range(0.01, 0.4, step = 0.01)
+num_angle = 25
+angles = range(0, π/4, length = num_angles + 1)
+angles = angles[1:end-1]
+
+v0_range = range(0.04, 0.4, step = 0.02)
 # v0_range = [0.04, 0.4] 
-l_fermi = zeros(length(v0_range))
-l_cos = zeros(length(v0_range),6)
-l_rand = zeros(length(v0_range))
+l_fermi = zeros(length(v0_range), num_angles)
+l_cos = zeros(length(v0_range),num_angles,6)
+l_rand = zeros(length(v0_range),num_angles)
 
-for (k,v0) in enumerate(v0_range)
-    # Fermi lattice
-    lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; II = rotation_matrix(0)
-    V = LatticePotential(lattice_a*II, dot_radius, v0; softness=softness)
-    s = savename("lyap_fermi", @dict(v0))
-    l = get_lyap_index(V, threshold; res = num_rays, a = lattice_a, v0, dt, T, prefix = s)
-    l_fermi[k] = l   
+for (j, θ) in enumerate(angles)
+    for (k,v0) in enumerate(v0_range)
+        # Fermi lattice
+        lattice_a = 0.2; dot_radius = 0.2*0.25
+        softness = 0.2; II = rotation_matrix(θ)
+        V = LatticePotential(lattice_a*II, dot_radius, v0; softness=softness)
+        s = savename("lyap_fermi", @dict(v0,θ))
+        l = get_lyap_index(V, threshold; res = num_rays, a = lattice_a, v0, dt, T, prefix = s)
+        l_fermi[k,j] = l   
 
-    # Cosine sum 
-    max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; 
-    degrees = 1:max_degree
-    for degree ∈ degrees
-        cos_pot = RotatedPotential(0,              
-            fermi_dot_lattice_cos_series(degree,  
-            lattice_a, dot_radius, v0; softness))
-        s = savename("lyap_cos", @dict(v0,degree))
-        l = get_lyap_index(cos_pot, threshold; res = num_rays, a = lattice_a, v0 , dt, T , prefix = s)
-        l_cos[k,degree] = l
+        # Cosine sum 
+        max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
+        softness = 0.2; 
+        degrees = [1, 6] #1:max_degree
+        for degree ∈ degrees
+            cos_pot = RotatedPotential(θ,              
+                fermi_dot_lattice_cos_series(degree,  
+                lattice_a, dot_radius, v0; softness))
+            s = savename("lyap_cos", @dict(v0,θ,degree))
+            l = get_lyap_index(cos_pot, threshold; res = num_rays, a = lattice_a, v0 , dt, T , prefix = s)
+            l_cos[k,j,degree] = l
+        end
+
+        # Correlated random pot 
+        correlation_scale = 0.1;
+        sim_width = 20; sim_height = 4. 
+        Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, j)
+        s = savename("lyap_rand", @dict(v0,j))
+        l = get_lyap_index(Vr, threshold; res = num_rays, a = 1, v0, dt, T, prefix = s)
+        l_rand[k,j] = l   
     end
-
-    # Correlated random pot 
-    correlation_scale = 0.1;
-    sim_width = 20; sim_height = 4. 
-    Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 100)
-    s = savename("lyap_rand", @dict(v0))
-    l = get_lyap_index(Vr, threshold; res = num_rays, a = 1, v0, dt, T, prefix = s)
-    l_rand[k] = l   
-
 end
+
+mcos = mean(l_cos; dims = 2)
+lc1 = vec(mcos[:,:,1])
+lc6 = vec(mcos[:,:,6])
+lf = vec(mean(l_fermi, dims =2))
+lr = vec(mean(l_rand, dims =2))
 
 fig = Figure(size=(600, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Lyap index", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
-lines!(ax1, v0_range, l_cos[:,1], linestyle = :dash, color = :black, label = L"V_{cos} ~ n = 1")
+lines!(ax1, v0_range, lc1, linestyle = :dash, color = :black, label = L"V_{cos} ~ n = 1")
 # lines!(ax1, v0_range, l_cos[:,2], color = :red, label = "Cos n=2")
 # lines!(ax1, v0_range, l_cos[:,3], color = :green, label = "Cos n=3")
 # lines!(ax1, v0_range, l_cos[:,4], color = :pink, label = "Cos n=4")
 # lines!(ax1, v0_range, l_cos[:,5], color = :purple, label = "Cos n=5")
-lines!(ax1, v0_range, l_cos[:,6], color = :cyan, label = L"V_{cos} ~ n=6")
-lines!(ax1, v0_range, l_fermi, color = :blue, linestyle = :dash, label = L"Fermi")
-lines!(ax1, v0_range, l_rand, color = :orange, label = L"Rand")
+lines!(ax1, v0_range, lc6, color = :cyan, label = L"V_{cos} ~ n=6")
+lines!(ax1, v0_range, lf, color = :blue, linestyle = :dash, label = L"Fermi")
+lines!(ax1, v0_range, lr, color = :orange, label = L"Rand")
 
 s = "comparison_lyap_index.png"
 axislegend(ax1);
