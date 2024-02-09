@@ -10,7 +10,7 @@ using Interpolations
 function quasi2d_map!(du,u,p,t)
     y,py = u; potential, dt = p
     # kick
-    du[2] = py + dt * force_y(potential, t, y)
+    du[2] = py + dt * force_y(potential, dt*t, y)
     # drift
     du[1] = y + dt * du[2]
     return nothing
