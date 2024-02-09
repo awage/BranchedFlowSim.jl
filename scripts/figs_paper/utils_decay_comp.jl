@@ -4,7 +4,7 @@ function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, thr
     yg = sample_midpoints(0, 1, yres)
     xg = range(0+x0, T+x0, length = round(Int,xres*T))
     area, max_I, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = false)
-    @show x0, rmax, T
+    # @show x0, rmax, T
     return xg, yg, area, max_I
 end
 
