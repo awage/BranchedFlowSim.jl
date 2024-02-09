@@ -7,6 +7,8 @@ using LinearAlgebra
 using StaticArrays
 using ChaosTools
 
+include(srcdir("utils.jl"))
+
 function quasi2d_map!(du,u,p,t)
     y,py = u; potential, dt = p
     # kick
@@ -19,7 +21,7 @@ end
 function _get_stretch(d) 
     @unpack V, dt, a, T, res = d
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4], [V, dt])
-    yrange = range(0, a, ntraj)
+    yrange = range(0, a, res)
     py = 0.
     points = [ [y, py] for y in yrange] 
     λ = transverse_growth_rates(df, points; Δt = T)
@@ -44,11 +46,11 @@ function get_stretch_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T
 end
 
 # Comon parameters
-num_rays = 10000; 
+num_rays = 1000; 
 dt = 0.001; T = 40; 
 threshold = 0.001
 
-v0_range = range(0.01, 0.4, step = 0.01)
+v0_range = range(0.01, 0.4, step = 0.1)
 l_fermi = zeros(length(v0_range))
 l_cos = zeros(length(v0_range),6)
 l_rand = zeros(length(v0_range))
