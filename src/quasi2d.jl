@@ -112,10 +112,9 @@ function quasi2d_smoothed_intensity(
         ray_y .+= dt .* ray_py
         x += dt
         if periodic_bnd == true
-            # ray_y = rem.(ray_y, T,RoundNearest)
-            for y ∈ ray_y
-                while y < rmin; y += τ; end
-                while y > rmax; y -= τ; end
+            for k in eachindex(ray_y)
+                while ray_y[k] < rmin; ray_y[k] += τ; end
+                while ray_y[k] > rmax; ray_y[k] -= τ; end
             end
         end
         while xi <= length(xs) && xs[xi] <= x
@@ -182,7 +181,6 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = t
         # Collect
         for y ∈ ray_y
             if periodic_bnd == true
-                # y = rem(y, T,RoundNearest)
                 while y < rmin; y += T; end
                 while y > rmax; y -= T; end
             end
@@ -266,9 +264,9 @@ function quasi2d_smoothed_intensity_stats(
         x += dt
 
         if periodic_bnd == true
-            for y ∈ ray_y
-                while y < rmin; y += τ; end
-                while y > rmax; y -= τ; end
+            for k in eachindex(ray_y)
+                while ray_y[k] < rmin; ray_y[k] += τ; end
+                while ray_y[k] > rmax; ray_y[k] -= τ; end
             end
         end
 
