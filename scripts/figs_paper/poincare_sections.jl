@@ -21,8 +21,6 @@ end
 # with "a" the cell size and dt the time step. 
 # Variable y is wrapped around mod "a"
 
-
-
 function plot_curves(V; a = 1, v0 = 1., dt = 0.01, T = 100000, x0 = 0, prefix = "poincare")
     Ttr = 1
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4, 0.2], [V, dt])
@@ -54,8 +52,6 @@ lattice_a = 0.2; dot_radius = 0.2*0.25
 softness = 0.2; I = rotation_matrix(0)
 V = LatticePotential(lattice_a*I, dot_radius, v0; softness=softness)
 plot_curves(V; a = lattice_a, v0 = v0, dt = dt, T = 10000, prefix = "poincare_fermi")
-
-
 
 # Cosine sum 
 max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25

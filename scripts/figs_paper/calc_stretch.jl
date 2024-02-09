@@ -4,15 +4,16 @@ using BranchedFlowSim
 using CairoMakie
 using LaTeXStrings
 using LinearAlgebra
-using StaticArrays
-using ChaosTools
+using StatsBase
+# using StaticArrays
+# using ChaosTools
 
 include(srcdir("utils.jl"))
 
 function quasi2d_map!(du,u,p,t)
     y,py = u; potential, dt = p
     # kick
-    du[2] = py + dt * force_y(potential, t, y)
+    du[2] = py + dt * force_y(potential, dt*t, y)
     # drift
     du[1] = y + dt * du[2]
     return nothing
@@ -36,21 +37,24 @@ function get_stretch_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T
         d, # container for parameter
         _get_stretch, # function
         prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
+        force = true, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     @unpack λ = data
-    ind = findall(λ .> threshold)
-    l_index = length(ind)/length(λ) 
+    ml = vec(mean(λ; dims = 2))
+    @show ml
+    ind = findall(ml .> threshold)
+    l_index = length(ind)/res 
     return l_index
 end
 
 # Comon parameters
-num_rays = 1000; 
-dt = 0.001; T = 40; 
-threshold = 0.001
+num_rays = 100; 
+dt = 0.01; T = 1000; 
+threshold = 0.0
 
 v0_range = range(0.01, 0.4, step = 0.1)
+v0_range = [0.01, 0.4]
 l_fermi = zeros(length(v0_range))
 l_cos = zeros(length(v0_range),6)
 l_rand = zeros(length(v0_range))
@@ -58,8 +62,8 @@ l_rand = zeros(length(v0_range))
 for (k,v0) in enumerate(v0_range)
     # Fermi lattice
     lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; I = rotation_matrix(0)
-    V = LatticePotential(lattice_a*I, dot_radius, v0; softness=softness)
+    softness = 0.2; II = rotation_matrix(0)
+    V = LatticePotential(lattice_a*II, dot_radius, v0; softness=softness)
     s = savename("stretch_fermi", @dict(v0))
     l = get_stretch_index(V, threshold; res = num_rays, a = lattice_a, v0, dt, T, prefix = s)
     l_fermi[k] = l   
@@ -79,12 +83,11 @@ for (k,v0) in enumerate(v0_range)
 
     # Correlated random pot 
     correlation_scale = 0.1;
-    sim_width = 20; sim_height = 1. 
+    sim_width = 20; sim_height = 2.
     Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 100)
     s = savename("stretch_rand", @dict(v0))
-    l = get_stretch_index(Vr, threshold; res = num_rays, a = correlation_scale, v0, dt, T, prefix = s)
+    l = get_stretch_index(Vr, threshold; res = num_rays, a = 2, v0, dt, T, prefix = s)
     l_rand[k] = l   
-
 end
 
 fig = Figure(size=(800, 600))
