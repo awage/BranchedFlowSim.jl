@@ -110,7 +110,7 @@ function quasi2d_smoothed_intensity(
         for k in eachindex(ray_y)
             y = ray_y[k]
             F = force_x(potential, x*cos(y) + x0, x*sin(y) + y0)*(-x*sin(y)) 
-                + force_y(potential, x*cos(y) + x0, y*sin(y) + y0)*x*cos(y)
+                + force_y(potential, x*cos(y) + x0, x*sin(y) + y0)*x*cos(y)
             ray_py[k] += dt * F
             # drift
             ray_y[k] += dt*ray_py[k]/x^2
@@ -189,10 +189,14 @@ function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = t
         for k in eachindex(ray_y)
             y = ray_y[k]
             F = force_x(potential, x*cos(y) + x0, x*sin(y) + y0)*(-x*sin(y)) 
-                + force_y(potential, x*cos(y) + x0, y*sin(y) + y0)*x*cos(y)
+                + force_y(potential, x*cos(y) + x0, x*sin(y) + y0)*x*cos(y)
+            # F = -0.04*2*pi/0.2*(-cos(2*pi/0.2*(x*cos(y)))*x*sin(y) + cos(2*pi/0.2*(x*sin(y)))*x*cos(y))
+            # F = -4*cos(x*cos(y))*x*sin(y)
+            # F = -0.1
             ray_py[k] += dt * F
             # drift
             ray_y[k] += dt*ray_py[k]/x^2
+            # ray_y[k] += dt*ray_py[k]
         end
         x += dt
         # # kick
