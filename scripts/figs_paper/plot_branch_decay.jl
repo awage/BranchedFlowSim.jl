@@ -40,7 +40,7 @@ v0 = 0.04
     end
 
     # Correlated random pot
-    correlation_scale = 0.1; T = 20;
+    correlation_scale = 0.1; 
     sim_width = T; sim_height = 10.;
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand_polar", @dict(v0))
@@ -75,7 +75,7 @@ lines!(ax1, xdata, model(xdata,p), linestyle = :dash, color = :black, label = " 
 # p, model, xdata = get_fit(rg,m)
 # lines!(ax1, xdata, model(xdata,p), color = :green, label = L" Fit cos n = 6")
 
-xlims!(ax1, 0, 20)
+# xlims!(ax1, 0, 20)
 s = "quick_comparison_decay_area_polar.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
@@ -111,7 +111,7 @@ lines!(ax1, xdata, model(xdata,p), color = :black, linestyle = :dash, label = " 
 # lines!(ax1, rg, m, color = :green, label = L"Cos Pot deg = 6")
 # p, model, xdata = get_fit(rg,m)
 # lines!(ax1, xdata, model(xdata,p), color = :green, label = L" Fit cos n = 6")
-xlims!(ax1, 0, 20)
+# xlims!(ax1, 0, 20)
 s = "quick_comparison_decay_Imax_polar.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
