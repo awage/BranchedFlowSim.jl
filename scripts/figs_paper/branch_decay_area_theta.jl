@@ -21,7 +21,7 @@ lattice_a = 0.2; dot_radius = 0.2*0.25
 softness = 0.2; 
 a = lattice_a;
 V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
-s = savename("decay_fermi", @dict(v0))
+s = savename("decay_fermi_pol", @dict(v0))
 data_fermi = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
 
 

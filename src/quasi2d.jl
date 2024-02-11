@@ -68,99 +68,48 @@ The situation being modeled is an infinite vertical wavefront starting
 at x=0 with p_y=0 and p_x=1 (constant). To cover the area defined by xs and ys,
 the actual wavefront being simulated must be taller than ys.
 """
-function quasi2d_smoothed_intensity(num_rays::Integer, dt, xs, ys, potential; b=0.0030, periodic_bnd = false, x0 , y0)
-    h = length(ys) * (ys[2] - ys[1])
-    τ = 0 
-    if periodic_bnd == true
-        rmin = ys[1]; rmax = ys[end]; τ = ys[end] - ys[1]
-    else
-        rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
-    end
-    ray_y = LinRange(rmin, rmax, num_rays)
-    sim_h = (ray_y[2]-ray_y[1]) * length(ray_y)
-    ints = quasi2d_smoothed_intensity(ray_y, dt, xs, ys, potential, b; periodic_bnd, τ, x0, y0) 
-    return ints, (rmin, rmax)
-end
-
-function quasi2d_smoothed_intensity(
-    ray_y::AbstractVector{<:Real},
-    dt::Real,
-    xs::AbstractVector{<:Real},
-    ys::AbstractVector{<:Real},
-    potential,
-    b; 
-    periodic_bnd = false, 
-    τ = 0,
-    x0, y0 
-)
-    dy = ys[2] - ys[1]
-    rmin = ys[1]; rmax = ys[end]
-    y_end = ys[1] + length(ys) * (ys[2] - ys[1])
-    ray_y = Vector{Float64}(ray_y)
-    num_rays = length(ray_y)
-    ray_py = zeros(num_rays)
-    xi = 1; x = dt
-    intensity = zeros(length(ys), length(xs))
+function quasi2d_smoothed_intensity(num_rays::Integer, dt, rs, θs, potential; b=0.0030, x0 = 0, y0 = 0, threshold = 1.5)
+    width = length(rs)
+    height = length(θs)
+    area = zeros(length(rs))
+    max_I = zeros(length(rs))
+    area = zeros(length(rs))
+    image = zeros(height, width)
+    ray_θ = collect(LinRange(-pi, pi, num_rays))
+    ray_pθ = zeros(num_rays)
+    r = rs[1]; ri = 1; dt = step(rs); dθ = step(θs)
+    intensity = zeros(length(θs), length(rs))
     boundary = (
         -pi ,
         pi 
     )
-    while xi <= length(xs)
-        # kick and drift polar
-        for k in eachindex(ray_y)
-            y = ray_y[k]
-            F = force_x(potential, x*cos(y) + x0, x*sin(y) + y0)*(-x*sin(y)) 
-                + force_y(potential, x*cos(y) + x0, x*sin(y) + y0)*x*cos(y)
-            ray_py[k] += dt * F
-            # drift
-            ray_y[k] += dt*ray_py[k]/x^2
-        end
-        x += dt
-        ray_y .= rem2pi.(ray_y, RoundNearest) 
-        # # kick
-        # ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # # drift
-        # ray_y .+= dt .* ray_py
-        # x += dt
-        # if periodic_bnd == true
-            # for k in eachindex(ray_y)
-            #     while ray_y[k] < rmin; ray_y[k] += τ; end
-            #     while ray_y[k] > rmax; ray_y[k] -= τ; end
-            # end
+    while r < rs[end] 
+        # for k in eachindex(ray_θ)
+        #     θ = ray_θ[k]; pθ = ray_pθ[k]
+        #     x = r*cos(θ); y = r*sin(θ)
+        #     F = sum(force(potential, x + x0, y + y0).*[-y, x])
+        #     ray_pθ[k] = pθ + dt * F
+        #     ray_θ[k]  = θ + dt*ray_pθ[k]/r^2
         # end
-        while xi <= length(xs) && xs[xi] <= x
+        # Kick
+        ray_pθ .+=  dt .* force_polar.(Ref(potential), r, ray_θ; x0, y0)
+        # drift
+        ray_θ .+= dt .* ray_pθ/r^2
+        r += dt
+        ray_θ .= rem2pi.(ray_θ, RoundNearest) 
+
+        while ri <= length(rs) && rs[ri] <= r
             # Compute intensity
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
-            intensity[:, xi] = pdf(density, ys)*2π
-            xi += 1
+            density = kde(ray_θ, bandwidth=b, npoints=16 * 1024, boundary=boundary)
+            intensity[:, ri] = pdf(density, θs)*2π
+            ind = findall(intensity[:,ri] .> threshold) 
+            area[ri] = length(ind)/length(intensity[:,ri])
+            max_I[ri] = maximum(intensity[:,ri])  
+            ri += 1
         end
     end
-    return intensity
+    return intensity, area, max_I
 end
-
-# First shoot some rays to figure out how wide they spread in the given time.
-# Then use this to decide how tall to make the initial wavefront.
-function quasi2d_compute_front_length(num_canary_rays, dt, xs::AbstractVector{<:Real}, ys, potential)
-    T = xs[end] - xs[1]
-    return quasi2d_compute_front_length(num_canary_rays, dt, T, ys, potential)
-end
-
-function quasi2d_compute_front_length(num_canary_rays, dt, T::Real, ys, potential)
-    canary_ray_y = Vector(sample_midpoints(ys[1], ys[end], num_canary_rays))
-    ray_y = copy(canary_ray_y)
-    ray_py = zero(ray_y)
-    for x ∈ 0:dt:T
-        ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        ray_y .+= dt .* ray_py
-    end
-    max_travel = maximum(abs.(ray_y - canary_ray_y))
-    # Front coordinates:
-    rmin = ys[1] - max_travel
-    rmax = ys[end] + max_travel
-    return rmin, rmax
-end
-            
-     
 
 """
     quasi2d_histogram_intensity(ray_y, xs, ys, potential)
@@ -168,58 +117,36 @@ end
 Runs a simulation across a grid defined by `xs` and `ys`, returning a
 matrix of flow intensity computed as a histogram (unsmoothed).
 """
-function quasi2d_histogram_intensity(num_rays, xs, ys, potential; normalized = true, periodic_bnd = false, x0 = 0, y0 =0)
-    dt = xs[2] - xs[1]
-    dy = ys[2] - ys[1]
-    
-    # Compute the spread beforehand
-    # if periodic_bnd == true
-    #     rmin = ys[1]; rmax = ys[end]; T = ys[end] - ys[1]
-    # else
-    #     rmin,rmax = quasi2d_compute_front_length(1024, dt, xs, ys, potential)
-    # end
-
-    width = length(xs)
-    height = length(ys)
-    area = zeros(length(xs))
+function quasi2d_histogram_intensity(num_rays, rs, θs, potential; normalized = false, periodic_bnd = false, x0 = 0, y0 =0, threshold = 1.5)
+    width = length(rs)
+    height = length(θs)
+    area = zeros(length(rs))
     image = zeros(height, width)
-    ray_y = collect(LinRange(-pi, pi, num_rays))
-    ray_py = zeros(num_rays)
-    for (xi, x) ∈ enumerate(xs)
-        for k in eachindex(ray_y)
-            y = ray_y[k]
-            F = force_x(potential, x*cos(y) + x0, x*sin(y) + y0)*(-x*sin(y)) 
-                + force_y(potential, x*cos(y) + x0, x*sin(y) + y0)*x*cos(y)
-            # F = -0.04*2*pi/0.2*(-cos(2*pi/0.2*(x*cos(y)))*x*sin(y) + cos(2*pi/0.2*(x*sin(y)))*x*cos(y))
-            # F = -4*cos(x*cos(y))*x*sin(y)
-            # F = -0.1
-            ray_py[k] += dt * F
-            # drift
-            ray_y[k] += dt*ray_py[k]/x^2
-            # ray_y[k] += dt*ray_py[k]
+    ray_θ = collect(LinRange(-pi, pi, num_rays))
+    ray_pθ = zeros(num_rays)
+    r = rs[1]; ri = 1; dt = step(rs); dθ = step(θs)
+    while r < rs[end] 
+        for k in eachindex(ray_θ)
+            θ = ray_θ[k]; pθ = ray_pθ[k]
+            x = r*cos(θ); y = r*sin(θ)
+            F = sum(force(potential, x + x0, y + y0).*[-y, x])
+            ray_pθ[k] = pθ + dt * F
+            ray_θ[k]  = θ + dt*ray_pθ[k]/r^2
         end
-        x += dt
-        # # kick
-        ray_y .= rem2pi.(ray_y, RoundNearest) 
-        # ray_py .+= dt .* force_y.(Ref(potential), x, ray_y)
-        # # drift
-        # ray_y .+= dt .* ray_py
-        # # Collect
-        for y ∈ ray_y
-            # if periodic_bnd == true
-            #     while y < rmin; y += T; end
-            #     while y > rmax; y -= T; end
-            # end
-            yi = 1 + round(Int, (y - (-pi)) / dy)
-            if yi >= 1 && yi <= height
-                image[yi, xi] += 1
+        r += dt
+        ray_θ .= rem2pi.(ray_θ, RoundNearest) 
+        for θ ∈ ray_θ
+            θi = 1 + round(Int, (θ - (-pi)) / dθ)
+            if θi >= 1 && θi <= height
+                image[θi, ri] += 1
             end
         end
+        ri += 1
     end
     if normalized 
-        for k in 1:length(xs)
-            image[:,k] .= image[:,k]/sum(image[:,k])/dy
-            ind = findall(image[:,k]*2*pi .> 1.5)
+        for k in 1:length(rs)
+            image[:,k] .= image[:,k]/sum(image[:,k])/dθ
+            ind = findall(image[:,k]*2*pi .> threshold)
             area[k] = length(ind)/length(image[:,1])    
         end
     end
@@ -229,94 +156,46 @@ end
 
 
 # This function computes average area and the maximum intensity
-function quasi2d_get_stats(num_rays::Integer, dt, xs::AbstractVector, ys::AbstractVector, potential; b=0.003, threshold = 1.5, periodic_bnd = false, x0 = 0, y0 = 0)
-    τ = 0. 
-    # if periodic_bnd == true
-        # rmin = ys[1]; rmax = ys[end]; τ = ys[end] - ys[1]
-    # else
-        # rmin,rmax = quasi2d_compute_front_length(1024, dt, xs[end], ys, potential)
-    # end
-    ray_y = LinRange(ys[1], ys[end], num_rays)
-    area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, xs, ys, potential, b, threshold, periodic_bnd, τ, x0, y0) 
-    return area, max_I
-end
-
-# In this version you provide dt, T and x0. 
-function quasi2d_get_stats(num_rays::Integer, dt, T::Real, ys::AbstractVector, potential; b=0.003, threshold = 1.5, x0 = 0, y0 = 0,  periodic_bnd = false)
-    τ = 0. 
-    # if periodic_bnd == true
-    #     rmin = ys[1]; rmax = ys[end]; τ = ys[end] - ys[1]
-    # else
-    #     rmin,rmax = quasi2d_compute_front_length(2*1024, dt, T, ys, potential)
-    # end
-    # ray_y = LinRange(rmin, rmax, num_rays)
-    ray_y = LinRange(ys[1], ys[end], num_rays)
-
-    xs = range(0, T, step = dt) 
-    area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, xs, ys, potential, b, threshold, periodic_bnd, τ, x0, y0) 
-    return xs, area, max_I, (rmin, rmax)
-end
-
-function quasi2d_smoothed_intensity_stats(
-    ray_y::AbstractVector{<:Real},
-    dt::Real,
-    xs::AbstractVector{<:Real},
-    ys::AbstractVector{<:Real},
-    potential::AbstractPotential,
-    b::Real, 
-    threshold::Real, 
-    periodic_bnd::Bool,
-    τ::Real,
-    x0, y0 
-)
-    dy = ys[2] - ys[1]
-    rmin = ys[1]; rmax = ys[end];
-    h = length(ys) * (ys[2] - ys[1])
-    num_rays = length(ray_y)
-    sim_h = (ray_y[2]-ray_y[1]) * num_rays
-    ray_y = Vector{Float64}(ray_y)
-    ray_py = zeros(num_rays)
-    area = zeros(length(xs))
-    max_I = zeros(length(xs))
-    intensity = zeros(length(ys))
-    background = (num_rays/length(ys));  bckgnd_density = background/(dy*num_rays)
-    xi = 1; x = dt
-    # boundary = (
-    #     ys[1] - dy - 4*b,
-    #     ys[end] + dy + 4*b,
-    # )
-    boundary = (-2*pi, 2*pi)
-    while x <= xs[end] + dt
-
-        
-        # kick and drift polar
-        for k in eachindex(ray_y)
-            r = x; θ = ray_y[k]; 
-            xr = r*cos(θ); yr = r*sin(θ)
-            F = sum(force(potential, xr + x0, yr + y0).*[-yr ,  xr])
-            ray_py[k] += dt * F
-            # drift
-            ray_y[k] += dt*ray_py[k]/x^2
-        end
-        x += dt
-
-        ray_y .= rem2pi.(ray_y, RoundNearest) 
-
-        # if periodic_bnd == true
-        #     for k in eachindex(ray_y)
-        #         while ray_y[k] < rmin; ray_y[k] += τ; end
-        #         while ray_y[k] > rmax; ray_y[k] -= τ; end
-        #     end
+function quasi2d_get_stats(num_rays::Integer, dt, rs::AbstractVector, θs::AbstractVector, potential; b=0.003, threshold = 1.5,  x0 = 0, y0 = 0)
+    width = length(rs)
+    height = length(θs)
+    area = zeros(length(rs))
+    max_I = zeros(length(rs))
+    area = zeros(length(rs))
+    image = zeros(height, width)
+    ray_θ = collect(LinRange(-pi, pi, num_rays))
+    ray_pθ = zeros(num_rays)
+    r = rs[1]; ri = 1; dt = step(rs); dθ = step(θs)
+    intensity = zeros(length(θs))
+    boundary = (
+        -pi ,
+        pi 
+    )
+    while r < rs[end] 
+        # for k in eachindex(ray_θ)
+        #     θ = ray_θ[k]; pθ = ray_pθ[k]
+        #     x = r*cos(θ); y = r*sin(θ)
+        #     F = sum(force(potential, x + x0, y + y0).*[-y, x])
+        #     ray_pθ[k] = pθ + dt * F
+        #     ray_θ[k]  = θ + dt*ray_pθ[k]/r^2
         # end
+        # F = force_polar.(Ref(potential), Ref(r), ray_θ; x0, y0)
+        # Kick
+        ray_pθ .+=  dt .* force_polar.(Ref(potential), Ref(r), ray_θ; x0, y0)
+        # drift
+        ray_θ .+= dt .* ray_pθ/r^2
+        r += dt
 
-        while xi <= length(xs) &&  xs[xi] <= x 
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
-            intensity = pdf(density, ys)*2π
-            ind = findall(intensity .> threshold*bckgnd_density) 
-            # area[xi] = abs(mean(exp.(im*ray_y)))  
-            area[xi] = length(ind)/length(intensity)
-            max_I[xi] = maximum(intensity)  
-            xi += 1
+        ray_θ .= rem2pi.(ray_θ, RoundNearest) 
+
+        while ri <= length(rs) && rs[ri] <= r
+            # Compute intensity
+            density = kde(ray_θ, bandwidth=b, npoints=16 * 1024, boundary=boundary)
+            intensity = pdf(density, θs)*2π
+            ind = findall(intensity .> threshold) 
+            area[ri] = length(ind)/length(intensity)
+            max_I[ri] = maximum(intensity)  
+            ri += 1
         end
     end
     return area, max_I

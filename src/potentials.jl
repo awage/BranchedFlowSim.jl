@@ -23,12 +23,18 @@ export CosMixedPotential
 export StdMapPotential
 
 export rotation_matrix, force, force_x, force_y
+export force_polar
 export correlated_random_potential
 export random_fermi_potential
 export fermi_dot_lattice_cos_series
 export complex_separable_potential
 export shaken_fermi_lattice_potential
 export grid_eval
+
+
+
+
+
 
 """
 We consider an object V to be a Potential if it is callable with two floats
@@ -44,7 +50,7 @@ end
 # NOTE: AbstractPotential is used as a subtype for potentials with custom force
 # functions,
 abstract type AbstractPotential end;
-# This is the most abstract potential 
+# This is the most abstract potential
 
 struct FermiDotPotential <: AbstractPotential
     radius::Float64
@@ -71,6 +77,17 @@ function force(V::FermiDotPotential, x::Real, y::Real)::SVector{2,Float64}
     z = @inline exp(power)
     return SVector(x, y) * (V.v0 * z * V.inv_α / (d * (1 + z)^2))
 end
+
+
+
+function force_polar(V::AbstractPotential, r, θ; x0 = 0, y0 = 0)
+    x = r*cos(θ); y = r*sin(θ);
+    # return(sum(force(V, x + x0, y + y0).*[-y, x])
+    v  = [-y x]*force(V, x + x0, y + y0)
+    return(v[1])
+end
+
+
 
 """
 LatticePotential
@@ -395,7 +412,7 @@ function (V::CosSeriesPotential)(x, y)
 end
 
 function force(V::CosSeriesPotential, x, y)
-    # Uncomment for debug 
+    # Uncomment for debug
     # return BranchedFlowSim.force_diff(V, x, y)
     # Compute gradient
     len = size(V.w)[1]
@@ -555,7 +572,7 @@ function gaussian_correlated_random(xs, ys, scale, seed=rand(UInt))
     rng = Xoshiro(seed)
     ymid = middle(ys)
     xmid = middle(xs)
-    # TODO: Explain this. 
+    # TODO: Explain this.
     # dist2 = ((ys .- ymid) .^ 2) .+ transpose()
     xcorr = exp.(-(xs .- xmid) .^ 2 ./ (scale^2))
     ycorr = exp.(-(ys .- ymid) .^ 2 ./ (scale^2))
@@ -623,7 +640,7 @@ displaced by a normal distribution with deviation `pos_dev`. Height of
 each bump is perturbed by a normal distribution with deviation `v_dev`
 (either deviation can be set to 0.)
 
-Returned potential is made fully periodic by repeating the random 
+Returned potential is made fully periodic by repeating the random
 """
 function shaken_fermi_lattice_potential(A, dot_radius, v0; pos_dev, v_dev,
     softness=0.2, period_n = 21)
@@ -642,7 +659,7 @@ function shaken_fermi_lattice_potential(A, dot_radius, v0; pos_dev, v_dev,
         end
     end
     # With softness=0.2 the potential decays to 2e-9 at distance 5.
-    dot_size = dot_radius + 3 * dot_radius * softness / 0.2 
+    dot_size = dot_radius + 3 * dot_radius * softness / 0.2
     comp = CompositePotential(locations, potentials, dot_size)
     # Make it periodic
     return LatticePotential(
@@ -679,9 +696,9 @@ end
 
 
 function force(V::CosMixedPotential, x, y)
-    xp = x*2π/V.a; yp = y*2π/V.a; 
+    xp = x*2π/V.a; yp = y*2π/V.a;
     # return SVector(0,-V.v0*2π/V.a*sin(yp)*(2*V.r*cos(xp)-V.r+1)/2)
-    return SVector(-V.v0*2π/V.a*sin(xp)*(2*V.r*cos(yp)-V.r+1)/2, 
+    return SVector(-V.v0*2π/V.a*sin(xp)*(2*V.r*cos(yp)-V.r+1)/2,
                    -V.v0*2π/V.a*sin(yp)*(2*V.r*cos(xp)-V.r+1)/2 )
 end
 
@@ -695,8 +712,6 @@ function (V::StdMapPotential)(x, y)
 end
 
 function force(V::StdMapPotential, x, y)
-    yp = y*2π/V.a;  
+    yp = y*2π/V.a;
     return SVector(0, V.v0/(2π*V.a)*sin(yp))
 end
-
-
