@@ -27,7 +27,7 @@ for (k,v0) in enumerate(v0_range)
     softness = 0.2;
     a = lattice_a;
     V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
-    s = savename("decay_fermi", @dict(v0))
+    s = savename("decay_fermi_polar", @dict(v0))
     data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
     @unpack rg, mx_arr = data
     p, m, x = get_fit(rg, vec(mean(mx_arr; dims =2)))
@@ -40,7 +40,7 @@ for (k,v0) in enumerate(v0_range)
         cos_pot(θ) = RotatedPotential(θ,
             fermi_dot_lattice_cos_series(degree,
             lattice_a, dot_radius, v0; softness))
-        s = savename("decay_cos", @dict(degree, v0))
+        s = savename("decay_cos_polar", @dict(degree, v0))
         data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
         @unpack rg, mx_arr = data
         p, m, x = get_fit(rg, vec(mean(mx_arr; dims =2)))
@@ -51,7 +51,7 @@ for (k,v0) in enumerate(v0_range)
     correlation_scale = 0.1;
     sim_width = 20; sim_height = 10.;
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
-    s = savename("decay_rand", @dict(v0))
+    s = savename("decay_rand_polar", @dict(v0))
     data = get_data_decay(Vr, 1., num_angles, num_rays, sim_width, threshold, dt, xres, yres; prefix = s)
     @unpack rg, mx_arr = data
     p, m, x = get_fit(rg, vec(mean(mx_arr; dims =2)))
@@ -69,7 +69,7 @@ lines!(ax1, v0_range, c_p[:,1,1], color = :black, linestyle = :dash, label = L"V
 # lines!(ax1, v0_range, c_p[:,4,1], color = :pink, label = "Cos n=4 a1")
 # lines!(ax1, v0_range, c_p[:,5,1], color = :purple, label = "Cos n=5 a1")
 lines!(ax1, v0_range, c_p[:,6,1], color = :cyan, label = L"V_{cos} ~ n = 6")
-s = "comparison_fit_coeff_C.png"
+s = "comparison_fit_coeff_C_polar.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
 
@@ -85,6 +85,6 @@ lines!(ax1, v0_range, -c_p[:,1,3], color = :black, linestyle = :dash, label = L"
 # lines!(ax1, v0_range, c_p[:,5,3], color = :purple, label = "Cos n=5 a1")
 lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
 
-s = "comparison_fit_coeff_omega.png"
+s = "comparison_fit_coeff_omega_polar.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
