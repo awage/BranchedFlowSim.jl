@@ -1,9 +1,9 @@
 
 # Display and compute histograms :
-function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.003)
+function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, y0 = 0, smoothing_b = 0.003)
     θg = range(-pi, pi, length = yres)
     rg = range(dt, T, length = round(Int,xres*T))
-    area, max_I = quasi2d_get_stats(num_rays, dt, rg, θg, V; b = smoothing_b, threshold, x0)
+    area, max_I = quasi2d_get_stats(num_rays, dt, rg, θg, V; b = smoothing_b, threshold, x0, y0)
     return rg, θg, area, max_I
 end
 
@@ -16,7 +16,7 @@ function compute_average_theta(d)
     mx_arr = zeros(T*xres, num_angles)
     potential = V(rand()*2π)
     Threads.@threads for i ∈ 1:num_angles
-        rg, θg, area, max_I = compute_area(potential, a, dt, T; xres, yres,  num_rays, threshold, x0 = x0[i])
+        rg, θg, area, max_I = compute_area(potential, a, dt, T; xres, yres,  num_rays, threshold, x0 = rand()*a, y0 = rand()*a)
         nb_arr[:, i] = area
         mx_arr[:, i] = max_I
         next!(p)

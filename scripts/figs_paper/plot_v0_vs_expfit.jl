@@ -19,10 +19,10 @@ function print_f(x,y, xp, yp,s)
 end
 
 # Comon parameters
-num_rays = 20000;
+num_rays = 5000;
 dt = 0.01; T = 100; xres = 20
 yres = 1024; threshold = 1.5;
-num_angles = 100
+num_angles = 200
 
 v0_range = range(0.04, 0.4, step = 0.04)
 f_p = zeros(length(v0_range),3)
