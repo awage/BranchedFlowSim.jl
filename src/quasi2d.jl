@@ -8,7 +8,7 @@ export sample_midpoints
 
 
 function entropy(pdf, dθ)
-    _xlogx(x) = (x< 0) ? 0. : x*log(x) 
+    _xlogx(x) = (x <= 0) ? 0. : x*log(x) 
     H = 0
     for p in pdf
         H += _xlogx(p*dθ)
@@ -195,7 +195,6 @@ function quasi2d_get_stats(num_rays::Integer, dt, rs::AbstractVector, θs::Abstr
         # drift
         ray_θ .+= dt .* ray_pθ/r^2
         r += dt
-
         ray_θ .= rem2pi.(ray_θ, RoundNearest) 
 
         while ri <= length(rs) && rs[ri] <= r
