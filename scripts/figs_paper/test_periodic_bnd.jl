@@ -19,12 +19,12 @@ v0 = 0.04
 # Cosine sum 
 max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
 softness = 0.2; 
-V = RotatedPotential(rand()*2*pi, CosMixedPotential(0.4, lattice_a, v0))
+V = RotatedPotential(rand()*2*pi, CosMixedPotential(0., lattice_a, v0))
 # V = correlated_random_potential(20, 20, 0.1, v0, 2)
-# V = LatticePotential(lattice_a*rotation_matrix(0.), dot_radius, v0; softness=softness)
+# V = LatticePotential(lattice_a*rotation_matrix(rand()*2*pi), dot_radius, v0; softness=softness)
 # V = RotatedPotential(0.,              
 #     fermi_dot_lattice_cos_series(1,  
-#     lattice_a, dot_radius, v0; softness))
+    # lattice_a, dot_radius, v0; softness))
 x0 = 0.; y0 = 0.0
 rg = range(0.01, T, step = dt) 
 θg = range(-π, π, length =yres)
@@ -39,7 +39,7 @@ rg = range(0.01, T, step = dt)
 
 area_v = zeros(length(rg), num_angles)
 max_Iv = zeros(length(rg), num_angles)
-for n in 1:num_angles
+Threads.@threads for n in 1:num_angles
     x0 = rand()*5; y0 = rand()*5
     # ima, area, max_I = quasi2d_smoothed_intensity(num_rays, dt, rg, θg, V; b = 0.003,  x0 , y0, threshold = 1.5)
     area, max_I = quasi2d_get_stats(num_rays, dt, rg, θg, V; b = 0.003,  x0 , y0, threshold = 1.5)

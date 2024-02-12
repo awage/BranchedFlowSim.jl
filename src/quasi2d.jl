@@ -1,9 +1,20 @@
 using Statistics
+
 export quasi2d_num_branches 
 export quasi2d_smoothed_intensity
 export quasi2d_histogram_intensity
 export quasi2d_get_stats
 export sample_midpoints 
+
+
+function entropy(pdf, dθ)
+    _xlogx(x) = (x< 0) ? 0. : x*log(x) 
+    H = 0
+    for p in pdf
+        H += _xlogx(p*dθ)
+    end
+    return H
+end
 
 """
     sample_midpoints(a,b, n)
@@ -157,12 +168,11 @@ end
 
 # This function computes average area and the maximum intensity
 function quasi2d_get_stats(num_rays::Integer, dt, rs::AbstractVector, θs::AbstractVector, potential; b=0.003, threshold = 1.5,  x0 = 0, y0 = 0)
+    dθ = step(θs)
     width = length(rs)
     height = length(θs)
-    area = zeros(length(rs))
+    entrop = zeros(length(rs))
     max_I = zeros(length(rs))
-    area = zeros(length(rs))
-    image = zeros(height, width)
     ray_θ = collect(LinRange(-pi, pi, num_rays))
     ray_pθ = zeros(num_rays)
     r = rs[1]; ri = 1; dt = step(rs); dθ = step(θs)
@@ -193,11 +203,12 @@ function quasi2d_get_stats(num_rays::Integer, dt, rs::AbstractVector, θs::Abstr
             density = kde(ray_θ, bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity = pdf(density, θs)*2π
             ind = findall(intensity .> threshold) 
-            area[ri] = length(ind)/length(intensity)
+            entrop[ri] = entropy(intensity, dθ)
+            # area[ri] = length(ind)/length(intensity)
             max_I[ri] = maximum(intensity)  
             ri += 1
         end
     end
-    return area, max_I
+    return entrop, max_I
 end
 

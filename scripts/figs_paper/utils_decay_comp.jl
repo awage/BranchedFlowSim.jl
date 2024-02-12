@@ -41,10 +41,12 @@ end
 function get_fit(xg, yg)
     model(x, p) = p[1] .+ p[2] * exp.(p[3] * x)
     # model(x, p) = p[1] .+ p[2] * x.^p[3]
-    mx, ind = findmax(yg)
+    # mx, ind = findmax(yg)
+    ind = findall(xg .> 2); ind = ind[1]
     xdata = xg[ind:end]
     ydata = yg[ind:end]
-    p0 = [yg[end], 2., 0.1]
+    p0 = [yg[end], 2., 0.01]
     fit = curve_fit(model, xdata, ydata, p0)
-    return fit.param, model, xdata
+    # return fit.param, model, xdata
+    return [yg[end], fit.param[2], fit.param[3]], model, xdata
 end
