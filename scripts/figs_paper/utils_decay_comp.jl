@@ -34,7 +34,7 @@ function get_data_decay(V, a, num_angles, num_rays, T, threshold, dt, xres, yres
         d, # container for parameter
         compute_average_theta, # function
         prefix = prefix, # prefix for savename
-        force = true, # true for forcing sims
+        force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
@@ -44,10 +44,13 @@ function get_fit(xg, yg)
     model(x, p) = p[1] .+ p[2] * exp.(p[3] * x)
     # model(x, p) = p[1] .+ p[2] * x.^p[3]
     mx, ind = findmax(yg)
+    # mx, ind = findall(xg .> 2); ind = ind[1] 
+
     xdata = xg[ind:end]
     ydata = yg[ind:end]
-    p0 = [5., 2., -1.]
+    p0 = [yg[end], 2., -0.2]
     fit = curve_fit(model, xdata, ydata, p0)
-    return fit.param, model, xdata
+    # return [yg[end],fit.param[2], fit.param[3]], model, xdata
+    return  fit.param, model, xdata
 end
 

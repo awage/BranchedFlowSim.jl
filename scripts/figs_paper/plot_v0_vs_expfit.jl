@@ -10,6 +10,14 @@ using ProgressMeter
 
 include("utils_decay_comp.jl")
 
+function print_f(x,y, xp, yp,s) 
+    fig = Figure(size=(900, 600))
+    ax1= Axis(fig[1, 1], xlabel = L"xg", ylabel = L"Imax", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
+    lines!(ax1, x, y, color = :blue, linestyle=:dash)
+    lines!(ax1, xp, yp, color = :orange)
+    save(plotsdir(string(s,".png")),fig)
+end
+
 # Comon parameters
 num_rays = 500000; 
 dt = 0.01; T = 80; xres = 20
@@ -32,6 +40,7 @@ for (k,v0) in enumerate(v0_range)
     @unpack xg, mx_arr = data
     p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
     f_p[k,:] = p
+    print_f(x, m.(x,Ref(p)), xg,  vec(mean(mx_arr; dims =2)), s)
     
     # Cosine sum 
     max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
@@ -45,6 +54,7 @@ for (k,v0) in enumerate(v0_range)
         @unpack xg, mx_arr = data
         p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
         c_p[k,degree,:] = p
+        print_f(x, m.(x,Ref(p)), xg,  vec(mean(mx_arr; dims =2)), s)
     end
  
     # Correlated random pot 
@@ -56,6 +66,7 @@ for (k,v0) in enumerate(v0_range)
     @unpack xg, mx_arr = data
     p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
     r_p[k,:] = p
+    print_f(x, m.(x,Ref(p)), xg,  vec(mean(mx_arr; dims =2)), s)
 end
 
 
