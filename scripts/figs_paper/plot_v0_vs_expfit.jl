@@ -11,8 +11,8 @@ using ProgressMeter
 include("utils_decay_comp.jl")
 
 # Comon parameters
-num_rays = 200000; 
-dt = 0.01; T = 20; xres = 20
+num_rays = 500000; 
+dt = 0.01; T = 80; xres = 20
 yres = 1024; threshold = 1.5; 
 num_angles = 100
 
@@ -52,7 +52,7 @@ for (k,v0) in enumerate(v0_range)
     sim_width = 20; sim_height = 10.;  
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))
-    data = get_data_decay(Vr, 1., num_angles, num_rays, sim_width, threshold, dt, xres, yres; prefix = s)
+    data = get_data_decay(Vr, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
     @unpack xg, mx_arr = data
     p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
     r_p[k,:] = p
