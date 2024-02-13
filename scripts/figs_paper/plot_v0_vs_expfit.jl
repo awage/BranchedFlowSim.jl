@@ -11,10 +11,10 @@ using ProgressMeter
 include("utils_decay_comp.jl")
 
 # Comon parameters
-num_rays = 50000; 
+num_rays = 150000; 
 dt = 0.01; T = 80; xres = 20
 yres = 1024; threshold = 5; 
-num_angles = 20
+num_angles = 50
 
 v0_range = range(0.04, 0.4, step = 0.04)
 f_p = zeros(length(v0_range),3)

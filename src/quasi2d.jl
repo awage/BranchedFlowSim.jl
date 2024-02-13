@@ -1,4 +1,5 @@
 using Statistics
+using Peaks
 
 export quasi2d_num_branches 
 export quasi2d_smoothed_intensity
