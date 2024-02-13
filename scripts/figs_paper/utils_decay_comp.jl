@@ -25,7 +25,7 @@ function compute_average_theta(d)
         pks_arr[:, i] = nb_pks
         next!(p)
     end
-    return @strdict(xg, yg, nb_arr, mx_arr, nb_pks)
+    return @strdict(xg, yg, nb_arr, mx_arr, pks_arr)
 end
 
 
@@ -36,7 +36,7 @@ function get_data_decay(V, a, num_angles, num_rays, T, threshold, dt, xres, yres
         d, # container for parameter
         compute_average_theta, # function
         prefix = prefix, # prefix for savename
-        force = true, # true for forcing sims
+        force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data

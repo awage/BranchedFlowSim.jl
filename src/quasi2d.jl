@@ -210,8 +210,8 @@ function quasi2d_get_stats(num_rays::Integer, dt, xs::AbstractVector, ys::Abstra
         rmin,rmax = quasi2d_compute_front_length(1024, dt, xs[end], ys, potential)
     end
     ray_y = LinRange(rmin, rmax, num_rays)
-    area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, xs, ys, potential, b, threshold, periodic_bnd, τ) 
-    return area, max_I, (rmin, rmax)
+    area, max_I, nb_pks = quasi2d_smoothed_intensity_stats(ray_y, dt, xs, ys, potential, b, threshold, periodic_bnd, τ) 
+    return area, max_I, nb_pks, (rmin, rmax)
 end
 
 # In this version you provide dt, T and x0. 

@@ -29,8 +29,8 @@ for (k,v0) in enumerate(v0_range)
     V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
     s = savename("decay_fermi", @dict(v0))
     data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
-    @unpack xg, mx_arr = data
-    p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
+    @unpack xg, pks_arr = data
+    p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
     f_p[k,:] = p
     
     # Cosine sum 
@@ -42,8 +42,8 @@ for (k,v0) in enumerate(v0_range)
             lattice_a, dot_radius, v0; softness))
         s = savename("decay_cos", @dict(degree, v0))
         data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
-        @unpack xg, mx_arr = data
-        p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
+        @unpack xg, pks_arr = data
+        p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
         c_p[k,degree,:] = p
     end
  
@@ -53,8 +53,8 @@ for (k,v0) in enumerate(v0_range)
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))
     data = get_data_decay(Vr, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
-    @unpack xg, mx_arr = data
-    p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
+    @unpack xg, pks_arr = data
+    p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
     r_p[k,:] = p
 end
 
@@ -69,7 +69,7 @@ lines!(ax1, v0_range, c_p[:,1,1], color = :black, linestyle = :dash, label = L"V
 # lines!(ax1, v0_range, c_p[:,4,1], color = :pink, label = "Cos n=4 a1")
 # lines!(ax1, v0_range, c_p[:,5,1], color = :purple, label = "Cos n=5 a1")
 lines!(ax1, v0_range, c_p[:,6,1], color = :cyan, label = L"V_{cos} ~ n = 6")
-s = "comparison_fit_coeff_C_Imax.png"
+s = "comparison_fit_coeff_C_pks.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
 
@@ -85,6 +85,6 @@ lines!(ax1, v0_range, -c_p[:,1,3], color = :black, linestyle = :dash, label = L"
 # lines!(ax1, v0_range, c_p[:,5,3], color = :purple, label = "Cos n=5 a1")
 lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
 
-s = "comparison_fit_coeff_omega_Imax.png"
+s = "comparison_fit_coeff_omega_pks.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
