@@ -224,8 +224,8 @@ function quasi2d_get_stats(num_rays::Integer, dt, T::Real, ys::AbstractVector, p
     end
     ray_y = LinRange(rmin, rmax, num_rays)
     xs = range(x0, T+x0, step = dt) 
-    area, max_I = quasi2d_smoothed_intensity_stats(ray_y, dt, xs, ys, potential, b, threshold, periodic_bnd, τ) 
-    return xs, area, max_I, (rmin, rmax)
+    area, max_I, nb_pks= quasi2d_smoothed_intensity_stats(ray_y, dt, xs, ys, potential, b, threshold, periodic_bnd, τ) 
+    return xs, area, max_I, nb_pks, (rmin, rmax)
 end
 
 function quasi2d_smoothed_intensity_stats(
@@ -247,6 +247,7 @@ function quasi2d_smoothed_intensity_stats(
     ray_y = Vector{Float64}(ray_y)
     ray_py = zeros(num_rays)
     area = zeros(length(xs))
+    nb_pks = zeros(length(xs))
     max_I = zeros(length(xs))
     intensity = zeros(length(ys))
     background = (num_rays/length(ys));  bckgnd_density = background/(dy*num_rays)
@@ -276,13 +277,13 @@ function quasi2d_smoothed_intensity_stats(
             intensity = pdf(density, ys)*(sim_h / h)
             t = findmaxima(intensity)
             ind = findall(t[2] .> threshold*bckgnd_density) 
-            area[xi] = length(ind)
-            # ind = findall(intensity .> threshold*bckgnd_density) 
-            # area[xi] = length(ind)/length(intensity)  
+            nb_pks[xi] = length(ind)
+            ind = findall(intensity .> threshold*bckgnd_density) 
+            area[xi] = length(ind)/length(intensity)  
             max_I[xi] = maximum(intensity)  
             xi += 1
         end
     end
-    return area, max_I
+    return area, max_I, nb_pks
 end
 

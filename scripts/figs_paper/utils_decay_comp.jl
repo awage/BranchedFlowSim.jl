@@ -3,9 +3,9 @@
 function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.003)
     yg = sample_midpoints(0, a, yres)
     xg = range(0+x0, T+x0, length = round(Int,xres*T))
-    area, max_I, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = false)
+    area, max_I, nb_pks, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = false)
     # @show x0, rmax, T
-    return xg, yg, area, max_I
+    return xg, yg, area, max_I, nb_pks
 end
 
 function compute_average_theta(d)
@@ -16,14 +16,16 @@ function compute_average_theta(d)
     p = Progress(num_angles, "Potential calc")
     nb_arr = zeros(T*xres, num_angles)
     mx_arr = zeros(T*xres, num_angles)
+    pks_arr = zeros(T*xres, num_angles)
     Threads.@threads for i ∈ 1:num_angles
         potential = V(angles[i])
-        xg, yg, area, max_I = compute_area(potential, a, dt, T; xres, yres,  num_rays, threshold)
+        xg, yg, area, max_I, nb_pks = compute_area(potential, a, dt, T; xres, yres,  num_rays, threshold)
         nb_arr[:, i] = area
         mx_arr[:, i] = max_I
+        pks_arr[:, i] = nb_pks
         next!(p)
     end
-    return @strdict(xg, yg, nb_arr, mx_arr)
+    return @strdict(xg, yg, nb_arr, mx_arr, nb_pks)
 end
 
 
