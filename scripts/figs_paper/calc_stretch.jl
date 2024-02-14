@@ -23,22 +23,26 @@ function _get_stretch(d)
     @unpack V, dt, a, Nt, res = d
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4], [V, dt])
     yrange = range(0, a, res)
-    py = 0.
+    py = 0.; S = 100
     points = [ [y, py] for y in yrange] 
     λ = transverse_growth_rates(df, points; Δt = Nt)
+    # λ = zeros(res, S)
+    # Threads.@threads for k in 1:length(yrange)
+    #     λ[k,:] = transverse_growth_rates(df, [yrange[k] py]; Δt = Nt, S)
+    # end
     λ .= λ./dt # normalize by time step
     return @strdict(λ,  d)
 end
 
 
-function get_stretch_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, Nt = 10000, prefix = "lyap")
+function get_stretch_index(V; res = 500, a = 1, v0 = 1., dt = 0.01, Nt = 10000, prefix = "lyap")
     d = @dict(res,  a, v0,  Nt, dt, V) # parametros
     data, file = produce_or_load(
         datadir("./storage"), # path
         d, # container for parameter
         _get_stretch, # function
         prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
+        force = true, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     @unpack λ = data
@@ -64,7 +68,7 @@ for (k,v0) in enumerate(v0_range)
     sim_width = 20; sim_height = 20.
     Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 100)
     s = savename("stretch_rand", @dict(v0))
-    α,β  = get_stretch_index(Vr, threshold; res = num_rays, a = 2, v0, dt, Nt, prefix = s)
+    α,β  = get_stretch_index(Vr; res = num_rays, a = 2, v0, dt, Nt, prefix = s)
     l_rand[k,:] = [mean(α), mean(β)]*(v0^(-2/3)) 
     @show a,b = [mean(α), mean(β)]*(v0^(-2/3))
     @show γ[k] = gamma(a,b)
@@ -92,7 +96,7 @@ function compute_stretch_fermi(v0_range, num_rays, num_angles, dt)
             softness = 0.2; II = rotation_matrix(θ)
             V = LatticePotential(lattice_a*II, dot_radius, v0; softness=softness)
             s = savename("stretch_fermi", @dict(v0, θ))
-            α,β  = get_stretch_index(V, threshold; res = num_rays, a = 2, v0, dt, Nt, prefix = s)
+            α,β  = get_stretch_index(V; res = num_rays, a = 2, v0, dt, Nt, prefix = s)
             l_fer[k,j,:] = [mean(α), mean(β)]*(v0^(-2/3)) 
             @show a,b = [mean(α), mean(β)]*(v0^(-2/3))
             @show γ[k,j] = gamma(a,b)
