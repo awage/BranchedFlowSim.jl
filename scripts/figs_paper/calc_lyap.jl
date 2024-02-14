@@ -7,6 +7,7 @@ using LaTeXStrings
 using LinearAlgebra
 using StaticArrays
 using ChaosTools
+using StatsBase
 
 
 function quasi2d_map!(du,u,p,t)
@@ -45,19 +46,19 @@ function get_lyap_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T = 
         wsave_kwargs = (;compress = true)
     )
     @unpack λ = data
-    # @show mean(λ[λ .> 0])
+    @show mean(λ[λ .> 0])
     ind = findall(λ .> threshold)
     l_index = length(ind)/length(λ) 
-    return l_index
+    return mean(λ[λ .> 0])/dt
 end
 
 
 # Comon parameters
 num_rays = 500; 
-dt = 0.001; T = 10000; 
+dt = 0.01; T = 20000; 
 threshold = 0.001
 
-num_angle = 25
+num_angles = 10
 angles = range(0, π/4, length = num_angles + 1)
 angles = angles[1:end-1]
 
@@ -91,8 +92,8 @@ for (j, θ) in enumerate(angles)
         end
 
         # Correlated random pot 
-        correlation_scale = 0.1;
-        sim_width = 20; sim_height = 4. 
+        correlation_scale = 1;
+        sim_width = 20; sim_height = 20. 
         Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, j)
         s = savename("lyap_rand", @dict(v0,j))
         l = get_lyap_index(Vr, threshold; res = num_rays, a = 1, v0, dt, T, prefix = s)
