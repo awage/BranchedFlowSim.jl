@@ -48,7 +48,7 @@ function get_fit(xg, yg)
     mx, ind = findmax(yg)
     xdata = xg[ind:end]
     ydata = yg[ind:end]
-    p0 = [5., 2., -1.]
+    p0 = [5., 2., -0.2]
     fit = curve_fit(model, xdata, ydata, p0)
     return fit.param, model, xdata
 end

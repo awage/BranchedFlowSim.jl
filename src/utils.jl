@@ -1,3 +1,4 @@
+using ChaosTools
 using LinearAlgebra:norm
 
 function transverse_growth_rates(ds::DynamicalSystem, points;
