@@ -278,7 +278,7 @@ function quasi2d_smoothed_intensity_stats(
             t = findmaxima(intensity)
             ind = findall(t[2] .> threshold*bckgnd_density) 
             nb_pks[xi] = length(ind)
-            ind = findall(intensity .> threshold*bckgnd_density) 
+            ind = findall(intensity .> 1.5*bckgnd_density) 
             area[xi] = length(ind)/length(intensity)  
             max_I[xi] = maximum(intensity)  
             xi += 1
