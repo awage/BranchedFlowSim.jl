@@ -18,13 +18,13 @@ function print_f(x,y, xp, yp,s)
     save(plotsdir(string(s,".png")),fig)
 end
 
-num_rays = 150000; 
-dt = 0.01; T = 80; xres = 20
-yres = 1024; threshold = 5; 
-num_angles = 50
+# num_rays = 150000; 
+# dt = 0.01; T = 80; xres = 20
+# yres = 1024; threshold = 5; 
+# num_angles = 50
 
 
-v0_range = range(0.04, 0.4, step = 0.04)
+# v0_range = range(0.04, 0.4, step = 0.04)
 f_p = zeros(length(v0_range),3)
 c_p = zeros(length(v0_range),6,3)
 r_p = zeros(length(v0_range),3)
