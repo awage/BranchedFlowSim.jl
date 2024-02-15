@@ -142,8 +142,11 @@ num_rays = 300;
 num_angles = 20
 dt = 0.01; 
 v0_range = range(0.02, 0.4, step = 0.01); 
-# m,s = compute_stretch_rand(v0_range, num_rays, num_angles, dt)
+mr,sr = compute_stretch_rand(v0_range, num_rays, num_angles, dt)
 mf,sf = compute_stretch_fermi(v0_range, num_rays, num_angles, dt)
 mc1,sc1 = compute_stretch_cos(v0_range, 1, num_rays, num_angles, dt)
 mc6,sc6 = compute_stretch_cos(v0_range, 6, num_rays, num_angles, dt)
+
+gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
+c = gamma(mf,sf)./(v0_range.^(-2/3))
 
