@@ -63,7 +63,7 @@ for n in 1:num_angles
         Nt = round(Int, t0*100)
         sim_width = 20; sim_height = 20.
         Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, n)
-        s = savename("stretch_rand", @dict(v0, n))
+        s = savename("stretch_rand", @dict(n))
         α,β  = get_stretch_index(Vr; res = num_rays, a = 2, v0, dt, Nt, prefix = s)
         l_rand[k,n,:] = [mean(α), mean(β)]*(v0^(-2/3)) 
         @show a,b = [mean(α), mean(β)]*(v0^(-2/3))
@@ -93,7 +93,7 @@ function compute_stretch_fermi(v0_range, num_rays, num_angles, dt)
             lattice_a = 0.2; dot_radius = 0.2*0.25
             softness = 0.2; II = rotation_matrix(θ)
             V = LatticePotential(lattice_a*II, dot_radius, v0; softness=softness)
-            s = savename("stretch_fermi", @dict(v0, θ))
+            s = savename("stretch_fermi", @dict(θ))
             α,β  = get_stretch_index(V; res = num_rays, a = 2, v0, dt, Nt, prefix = s)
             l_fer[k,j,:] = [mean(α), mean(β)]*(v0^(-2/3)) 
             @show a,b = [mean(α), mean(β)]*(v0^(-2/3))
@@ -139,7 +139,7 @@ end
 
 
 num_rays = 300; 
-num_angles = 20
+num_angles = 50
 dt = 0.01; 
 v0_range = range(0.02, 0.4, step = 0.01); 
 mr,sr = compute_stretch_rand(v0_range, num_rays, num_angles, dt)
