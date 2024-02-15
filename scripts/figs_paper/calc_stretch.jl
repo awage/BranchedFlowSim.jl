@@ -74,7 +74,7 @@ for (k,v0) in enumerate(v0_range)
     @show γ[k] = gamma(a,b)
     @show c[k] = gamma(a,b)/(v0^(-2/3))
 end
-    return c
+    return l_rand
 end
 
 
@@ -103,7 +103,7 @@ function compute_stretch_fermi(v0_range, num_rays, num_angles, dt)
             @show c[k,j] = gamma(a,b)/(v0^(-2/3))
         end
     end
-    return c
+    return l_fer
 end
 
 

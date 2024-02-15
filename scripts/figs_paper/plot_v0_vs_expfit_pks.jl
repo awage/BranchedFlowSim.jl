@@ -32,7 +32,7 @@ for (k,v0) in enumerate(v0_range)
     @unpack xg, pks_arr = data
     p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
     f_p[k,:] = p
-    print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), s)
+    print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
     
     # Cosine sum 
     max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
@@ -46,7 +46,7 @@ for (k,v0) in enumerate(v0_range)
         @unpack xg, pks_arr = data
         p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
         c_p[k,degree,:] = p
-        print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), s)
+        print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
     end
  
     # Correlated random pot 
@@ -58,7 +58,7 @@ for (k,v0) in enumerate(v0_range)
     @unpack xg, pks_arr = data
     p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
     r_p[k,:] = p
-    print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), s)
+    print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
 end
 
 
