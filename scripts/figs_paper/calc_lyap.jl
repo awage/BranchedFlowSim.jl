@@ -54,8 +54,8 @@ end
 
 
 # Comon parameters
-num_rays = 500; 
-dt = 0.01; T = 20000; 
+num_rays = 5000; 
+dt = 0.01; T = 2000; 
 threshold = 0.001
 
 num_angles = 10

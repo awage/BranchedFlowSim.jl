@@ -26,81 +26,47 @@ function _get_stretch(d)
     py = 0.
     points = [ [y, py] for y in yrange] 
     λ = transverse_growth_rates(df, points; Δt = Nt)
-    return @strdict(λ,  d)
+    λ .= λ./dt # normalize by time step
+    return @strdict(λ)
 end
 
 
-function get_stretch_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, Nt = 10000, prefix = "lyap")
-    d = @dict(res,  a, v0,  Nt, dt, V) # parametros
-    data, file = produce_or_load(
-        datadir("./storage"), # path
-        d, # container for parameter
-        _get_stretch, # function
-        prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
-        wsave_kwargs = (;compress = true)
-    )
+function get_stretch_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, Nt = 10000, prefix = "lyap", ξ = 0.1)
+    d = @dict(res,  a, v0,  Nt, dt, V, ξ) # parametros
+    # data, file = produce_or_load(
+    #     datadir("./storage"), # path
+    #     d, # container for parameter
+    #     _get_stretch, # function
+    #     prefix = prefix, # prefix for savename
+    #     force = false, # true for forcing sims
+    #     wsave_kwargs = (;compress = true)
+    # )
+    data = _get_stretch(d)
     @unpack λ = data
     ml = vec(mean(λ; dims = 2))
-    @show mean(ml)
-    @show std(ml)
-    sl = vec(std(λ; dims = 2))
-    return ml, sl
+    # @show mean(ml)
+    @show var(λ)
+    # sl = vec(var(λ; dims = 2))
+    return mean(ml)*v0^(-2/3)*ξ , var(ml)*2*v0^(-2/3)*ξ
 end
 
 # Comon parameters
-num_rays = 100000; 
-dt = 0.01; Nt = 10; 
+num_rays = 5000; 
+dt = 0.01; Nt = 400 
 threshold = 0.0
 
-v0_range = range(0.01, 0.4, step = 0.1)
-# v0_range = [0.01, 0.4]
-l_fermi = zeros(length(v0_range),2)
-l_cos = zeros(length(v0_range),6,2)
-l_rand = zeros(length(v0_range),2)
+# v0_range = range(0.01, 0.4, step = 0.1)
+# # v0_range = [0.01, 0.4]
+# l_fermi = zeros(length(v0_range),2)
+# l_cos = zeros(length(v0_range),6,2)
+# l_rand = zeros(length(v0_range),2)
 
-for (k,v0) in enumerate(v0_range)
-    # Fermi lattice
-    lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; II = rotation_matrix(0)
-    V = LatticePotential(lattice_a*II, dot_radius, v0; softness=softness)
-    s = savename("stretch_fermi", @dict(v0))
-    α,β = get_stretch_index(V, threshold; res = num_rays, a = lattice_a, v0, dt, Nt, prefix = s)
-    l_fermi[k,:] = [mean(α), mean(β)]  
-
-    # Cosine sum 
-    max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; 
-    degrees = [1,6]
-    for degree ∈ degrees
-        cos_pot = RotatedPotential(0,              
-            fermi_dot_lattice_cos_series(degree,  
-            lattice_a, dot_radius, v0; softness))
-        s = savename("stretch_cos", @dict(v0,degree))
-        α,β  = get_stretch_index(cos_pot, threshold; res = num_rays, a = lattice_a, v0 , dt, Nt , prefix = s)
-        l_cos[k,degree,:] = [mean(α),mean(β)] 
-    end
-
+# for (k,v0) in enumerate(v0_range)
     # Correlated random pot 
+    v0 = 0.057
     correlation_scale = 0.1;
-    sim_width = 20; sim_height = 2.
+    sim_width = 10; sim_height = 10.
     Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 100)
     s = savename("stretch_rand", @dict(v0))
-    α,β  = get_stretch_index(Vr, threshold; res = num_rays, a = 2, v0, dt, Nt, prefix = s)
-    l_rand[k,:] = [mean(α),mean(β)] 
-end
-
-# fig = Figure(size=(800, 600))
-# ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Stretch index", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
-# lines!(ax1, v0_range, l_cos[:,1], linestyle = :dash, color = :black, label = " Cos n=1")
-# lines!(ax1, v0_range, l_cos[:,2], color = :red, label = "Cos n=2")
-# lines!(ax1, v0_range, l_cos[:,3], color = :green, label = "Cos n=3")
-# lines!(ax1, v0_range, l_cos[:,4], color = :pink, label = "Cos n=4")
-# lines!(ax1, v0_range, l_cos[:,5], color = :purple, label = "Cos n=5")
-# lines!(ax1, v0_range, l_cos[:,6], color = :cyan, label = "Cos n=6")
-# lines!(ax1, v0_range, l_fermi, color = :blue, linestyle = :dash, label = "Fermi")
-# lines!(ax1, v0_range, l_rand, color = :olive, linestyle = :dash, label = "rand")
-
-# s = "comparison_stretch_index.png"
-# axislegend(ax1);
-# save(plotsdir(s),fig)
+    @show α,β  = get_stretch_index(Vr, threshold; res = num_rays, a = 1, v0, dt, Nt, prefix = s, ξ = correlation_scale)
+# end
