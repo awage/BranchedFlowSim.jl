@@ -12,20 +12,23 @@ include("utils_decay_comp.jl")
 
 
 function print_f(x,y, xp, yp,s) 
-    fig = Figure(size=(900, 600))
-    ax1= Axis(fig[1, 1], xlabel = L"xg", ylabel = L"Area", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
-    lines!(ax1, x, y, color = :blue, linestyle=:dash)
-    lines!(ax1, xp, yp, color = :orange)
+    fig = Figure(size=(899, 600))
+    ax0= Axis(fig[1, 1], xlabel = L"xg", ylabel = L"Area", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
+    lines!(ax0, x, y, color = :blue, linestyle=:dash)
+    lines!(ax0, xp, yp, color = :orange)
     save(plotsdir(string(s,".png")),fig)
 end
 
-num_rays = 150000; 
-dt = 0.01; T = 15; xres = 20
-yres = 1024; threshold = 2.; 
-num_angles = 100
-
-
-v0_range = range(0.04, 0.2, step = 0.04)
+# Comon parameters
+num_rays = 20000; 
+dt = 0.01; 
+# T = 80; threshold = 2; 
+threshold = 2.5; 
+# T = 100; threshold = 1.5; 
+xres = 20
+yres = 1024; 
+num_angles = 50
+v0_range = range(0.04, 0.4, step = 0.04)
 f_p = zeros(length(v0_range),3)
 c_p = zeros(length(v0_range),6,3)
 r_p = zeros(length(v0_range),3)
@@ -33,7 +36,7 @@ r_p = zeros(length(v0_range),3)
 for (k,v0) in enumerate(v0_range)
     # # Fermi lattice
     # lattice_a = 0.2; dot_radius = 0.2*0.25
-    # softness = 0.2;
+    # softness = 0.2; T = 30
     # a = lattice_a;
     # V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
     # s = savename("decay_fermi", @dict(v0))
@@ -59,7 +62,7 @@ for (k,v0) in enumerate(v0_range)
     # end
 
     # Correlated random pot
-    correlation_scale = 0.1;
+    correlation_scale = 0.1; T = 15
     sim_width = 20; sim_height = 10.;
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))

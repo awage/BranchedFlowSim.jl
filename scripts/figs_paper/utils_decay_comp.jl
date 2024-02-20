@@ -1,3 +1,4 @@
+using JLD2 
 
 # Display and compute histograms :
 function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.003)
@@ -14,9 +15,9 @@ function compute_average_theta(d)
     angles = range(0, π/4, length = num_angles + 1)
     angles = angles[1:end-1]
     p = Progress(num_angles, "Potential calc")
-    nb_arr = zeros(T*xres, num_angles)
-    mx_arr = zeros(T*xres, num_angles)
-    pks_arr = zeros(T*xres, num_angles)
+    nb_arr = zeros(round(Int,T*xres), num_angles)
+    mx_arr = zeros(round(Int,T*xres), num_angles)
+    pks_arr = zeros(round(Int,T*xres), num_angles)
     Threads.@threads for i ∈ 1:num_angles
         potential = V(angles[i])
         xg, yg, area, max_I, nb_pks = compute_area(potential, a, dt, T; xres, yres,  num_rays, threshold)
@@ -68,3 +69,26 @@ function print_f(x,y, xp, yp,s)
     lines!(ax1, xp, yp, color = :orange)
     save(plotsdir(string(s,".png")),fig)
 end
+
+
+function get_coeff_pks(v0, sim_name)
+    @load "stretch_factor_Nt=400_num_angles=50.jld2"
+    if sim_name == :rand
+        c = mr.^2 ./ sr ./(0.1*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :fermi
+        c = mf.^2 ./ sf ./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :cos1
+        c = mc1.^2 ./ sc1 ./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :cos6
+        c = mc6.^2 ./ sc6 ./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    end
+end
+
