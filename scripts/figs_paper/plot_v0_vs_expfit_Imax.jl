@@ -12,8 +12,11 @@ include("utils_decay_comp.jl")
 
 # Comon parameters
 num_rays = 1500000; 
-dt = 0.01; T = 80; xres = 20
-yres = 1024; threshold = 2; 
+# T = 80; threshold = 2; 
+# T = 100; threshold = 1.5; 
+T = 100; threshold = 2.; 
+dt = 0.01;  xres = 20
+yres = 1024; 
 num_angles = 50
 
 v0_range = range(0.04, 0.4, step = 0.04)
@@ -56,10 +59,11 @@ for (k,v0) in enumerate(v0_range)
     @unpack xg, mx_arr = data
     p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
     r_p[k,:] = p
+    # print_f(x, m.(x,Ref(p)), xg,  vec(mean(mx_arr; dims =2)), string(s,"max"))
 end
 
 
-fig = Figure(size=(600, 600))
+fig = Figure(size=(1200, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"C", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, f_p[:,1], color = :blue, linestyle = :dash, label = L"Fermi")
 lines!(ax1, v0_range, r_p[:,1], color = :orange, label = L"Rand")
@@ -86,16 +90,31 @@ lines!(ax1, v0_range, -c_p[:,1,3], color = :black, label = L"V_{Cos} ~  n = 1")
 lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
 
 using JLD2
-@load "coeff_stretch_factor.jld2"
+@load "stretch_factor_Nt=200_num_angles=50.jld2"
+# @load "stretch_factor_Nt=400_num_angles=50.jld2"
+# @load "stretch_factor_Nt=600_num_angles=50.jld2"
+# @load "stretch_factor_Nt=800_num_angles=50.jld2"
+# @load "stretch_factor_Nt=1000_num_angles=50.jld2"
+# @load "stretch_factor_Nt=2000_num_angles=50.jld2"
+gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
+
+# @load "coeff_stretch_factor_rand.jld2"
+c_r = gamma.(mr,sr)./(v0_range.^(-2/3)*0.1)
 lines!(ax1, v0_range, c_r, color = :orange, linestyle = :dash,  label = "Rand, measured with stretching")
-c_f = vec(mean(c_f, dims = 2))
+
+# @load "coeff_stretch_factor_fermi.jld2"
+c_f = gamma.(mf,sf)./(v0_range.^(-2/3)*0.2)
 lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash,  label = "Fermi, measured with stretching")
-c_c1 = vec(mean(c_c1, dims = 2))
+
+# @load "coeff_stretch_factor_cos1.jld2"
+c_c1 = gamma.(mc1,sc1)./(v0_range.^(-2/3)*0.2)
 lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash,  label = "cos n=1, measured with stretching")
-c_c6 = vec(mean(c_c6, dims = 2))
+
+# @load "coeff_stretch_factor_cos6.jld2"
+c_c6 = gamma.(mc6,sc6)./(v0_range.^(-2/3)*0.2)
 lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash,  label = "cos n=6, measured with stretching")
 
 
 s = "comparison_fit_coeff_omega_Imax.png"
-axislegend(ax1);
+axislegend(ax1; position = :lt);
 save(plotsdir(s),fig)
