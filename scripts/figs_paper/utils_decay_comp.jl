@@ -48,8 +48,23 @@ function get_fit(xg, yg)
     mx, ind = findmax(yg)
     xdata = xg[ind:end]
     ydata = yg[ind:end]
-    p0 = [yg[end], 0.5*xdata[1], -0.2]
-    fit = curve_fit(model, xdata, ydata, p0)
+    lb = [0., 0., -1.]
+    ub = [100., 100., 0.]   
+    p0 = [yg[end], ydata[1], -0.2]
+    fit = curve_fit(model, xdata, ydata, p0; lower = lb, upper = ub)
+#     model2(x, p) = p[1] * exp.(p[2] * x)
+#     xdata = xg[ind:end-1]
+#     ydata = diff(yg[ind:end])
+#     p0 = [ydata[1], fit.param[3]]
+#     fit2 = curve_fit(model2, xdata, ydata, p0)
+#     @show fit.param[3], fit2.param[2]
     return fit.param, model, xdata
 end
 
+function print_f(x,y, xp, yp,s) 
+    fig = Figure(size=(900, 600))
+    ax1= Axis(fig[1, 1], xlabel = L"xg", ylabel = L"Area", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
+    lines!(ax1, x, y, color = :blue, linestyle=:dash)
+    lines!(ax1, xp, yp, color = :orange)
+    save(plotsdir(string(s,".png")),fig)
+end

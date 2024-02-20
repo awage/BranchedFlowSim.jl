@@ -44,15 +44,15 @@ function get_stretch_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, N
     data = _get_stretch(d)
     @unpack λ = data
     ml = vec(mean(λ; dims = 2))
-    # @show mean(ml)
+    @show mean(ml)
     @show var(λ)
     # sl = vec(var(λ; dims = 2))
-    return mean(ml)*v0^(-2/3)*ξ , var(ml)*2*v0^(-2/3)*ξ
+    return mean(ml)*v0^(-2/3)*ξ , var(ml)*Nt*dt*2*v0^(-2/3)*ξ
 end
 
 # Comon parameters
-num_rays = 5000; 
-dt = 0.01; Nt = 400 
+num_rays = 200; 
+dt = 0.1; Nt = 400
 threshold = 0.0
 
 # v0_range = range(0.01, 0.4, step = 0.1)
@@ -64,9 +64,9 @@ threshold = 0.0
 # for (k,v0) in enumerate(v0_range)
     # Correlated random pot 
     v0 = 0.057
-    correlation_scale = 0.1;
+    correlation_scale = 1.;
     sim_width = 10; sim_height = 10.
-    Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 100)
+    Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 10)
     s = savename("stretch_rand", @dict(v0))
-    @show α,β  = get_stretch_index(Vr, threshold; res = num_rays, a = 1, v0, dt, Nt, prefix = s, ξ = correlation_scale)
+    @show α,β = get_stretch_index(Vr, threshold; res = num_rays, a = 1, v0, dt, Nt, prefix = s, ξ = correlation_scale)
 # end
