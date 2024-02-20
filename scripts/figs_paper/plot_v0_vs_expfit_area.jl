@@ -11,47 +11,52 @@ using ProgressMeter
 include("utils_decay_comp.jl")
 
 
-# Comon parameters
-num_rays = 1500000; 
-dt = 0.01; 
-# T = 80; threshold = 2; 
-T = 100; threshold = 2.; 
-# T = 100; threshold = 1.5; 
-xres = 20
-yres = 1024; 
-num_angles = 50
-v0_range = range(0.04, 0.4, step = 0.04)
+function print_f(x,y, xp, yp,s) 
+    fig = Figure(size=(900, 600))
+    ax1= Axis(fig[1, 1], xlabel = L"xg", ylabel = L"Area", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
+    lines!(ax1, x, y, color = :blue, linestyle=:dash)
+    lines!(ax1, xp, yp, color = :orange)
+    save(plotsdir(string(s,".png")),fig)
+end
+
+num_rays = 150000; 
+dt = 0.01; T = 15; xres = 20
+yres = 1024; threshold = 2.; 
+num_angles = 100
+
+
+v0_range = range(0.04, 0.2, step = 0.04)
 f_p = zeros(length(v0_range),3)
 c_p = zeros(length(v0_range),6,3)
 r_p = zeros(length(v0_range),3)
 
 for (k,v0) in enumerate(v0_range)
-    # Fermi lattice
-    lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2;
-    a = lattice_a;
-    V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
-    s = savename("decay_fermi", @dict(v0))
-    data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
-    @unpack xg, nb_arr = data
-    p, m, x = get_fit(xg, vec(mean(nb_arr; dims =2)))
-    f_p[k,:] = p
+    # # Fermi lattice
+    # lattice_a = 0.2; dot_radius = 0.2*0.25
+    # softness = 0.2;
+    # a = lattice_a;
+    # V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
+    # s = savename("decay_fermi", @dict(v0))
+    # data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+    # @unpack xg, nb_arr = data
+    # p, m, x = get_fit(xg, vec(mean(nb_arr; dims =2)))
+    # f_p[k,:] = p
     # print_f(x, m.(x,Ref(p)), xg,  vec(mean(nb_arr; dims =2)), string(s,"area"))
 
-    # Cosine sum
-    max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; degrees = [1,6];
-    for degree ∈ degrees
-        cos_pot(θ) = RotatedPotential(θ,
-            fermi_dot_lattice_cos_series(degree,
-            lattice_a, dot_radius, v0; softness))
-        s = savename("decay_cos", @dict(degree, v0))
-        data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
-        @unpack xg, nb_arr = data
-        p, m, x = get_fit(xg, vec(mean(nb_arr; dims =2)))
-        c_p[k,degree,:] = p
-        # print_f(x, m.(x,Ref(p)), xg,  vec(mean(nb_arr; dims =2)), string(s,"area"))
-    end
+    # # Cosine sum
+    # max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
+    # softness = 0.2; degrees = [1,6];
+    # for degree ∈ degrees
+    #     cos_pot(θ) = RotatedPotential(θ,
+    #         fermi_dot_lattice_cos_series(degree,
+    #         lattice_a, dot_radius, v0; softness))
+    #     s = savename("decay_cos", @dict(degree, v0))
+    #     data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+    #     @unpack xg, nb_arr = data
+    #     p, m, x = get_fit(xg, vec(mean(nb_arr; dims =2)))
+    #     c_p[k,degree,:] = p
+    #     print_f(x, m.(x,Ref(p)), xg,  vec(mean(nb_arr; dims =2)), string(s,"area"))
+    # end
 
     # Correlated random pot
     correlation_scale = 0.1;
@@ -62,35 +67,35 @@ for (k,v0) in enumerate(v0_range)
     @unpack xg, nb_arr = data
     p, m, x = get_fit(xg, vec(mean(nb_arr; dims =2)))
     r_p[k,:] = p
-    # print_f(x, m.(x,Ref(p)), xg,  vec(mean(nb_arr; dims =2)), string(s,"area"))
+    print_f(x, m.(x,Ref(p)), xg,  vec(mean(nb_arr; dims =2)), string(s,"area"))
 end
 
 
-fig = Figure(size=(600, 600))
-ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"C", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
-lines!(ax1, v0_range, f_p[:,1], color = :blue, linestyle = :dash, label = L"Fermi")
-lines!(ax1, v0_range, r_p[:,1], color = :orange, label = L"Rand")
-lines!(ax1, v0_range, c_p[:,1,1], color = :black, linestyle = :dash, label = L"V_{cos} ~  n = 1")
+# fig = Figure(size=(600, 600))
+# ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"C", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
+# lines!(ax1, v0_range, r_p[:,1], color = :orange, label = L"Rand")
+# lines!(ax1, v0_range, f_p[:,1], color = :blue, linestyle = :dash, label = L"Fermi")
+# lines!(ax1, v0_range, c_p[:,1,1], color = :black, linestyle = :dash, label = L"V_{cos} ~  n = 1")
 # lines!(ax1, v0_range, c_p[:,2,1], color = :red, label = "Cos n=2 a1")
 # lines!(ax1, v0_range, c_p[:,3,1], color = :green, label = "Cos n=3 a1")
 # lines!(ax1, v0_range, c_p[:,4,1], color = :pink, label = "Cos n=4 a1")
 # lines!(ax1, v0_range, c_p[:,5,1], color = :purple, label = "Cos n=5 a1")
-lines!(ax1, v0_range, c_p[:,6,1], color = :cyan, label = L"V_{cos} ~ n = 6")
-s = "comparison_fit_coeff_C_area.png"
-axislegend(ax1);
-save(plotsdir(s),fig)
+# lines!(ax1, v0_range, c_p[:,6,1], color = :cyan, label = L"V_{cos} ~ n = 6")
+# s = "comparison_fit_coeff_C_area.png"
+# axislegend(ax1);
+# save(plotsdir(s),fig)
 
 
 fig = Figure(size=(1200, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"\Omega", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
-lines!(ax1, v0_range, -f_p[:,3], color = :blue,  label = L"Fermi")
+# lines!(ax1, v0_range, -f_p[:,3], color = :blue,  label = L"Fermi")
 lines!(ax1, v0_range, -r_p[:,3], color = :orange, label = L"Rand")
-lines!(ax1, v0_range, -c_p[:,1,3], color = :black,  label = L"V_{Cos} ~  n = 1")
+# lines!(ax1, v0_range, -c_p[:,1,3], color = :black,  label = L"V_{Cos} ~  n = 1")
 # lines!(ax1, v0_range, c_p[:,2,3], color = :red, label = "Cos n=2 a2")
 # lines!(ax1, v0_range, c_p[:,3,3], color = :green, label = "Cos n=3 a2")
 # lines!(ax1, v0_range, c_p[:,4,3], color = :pink, label = "Cos n=4 a2")
 # lines!(ax1, v0_range, c_p[:,5,3], color = :purple, label = "Cos n=5 a1")
-lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
+# lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
 
 using JLD2
 # @load "stretch_factor_Nt=200_num_angles=50.jld2"
@@ -106,16 +111,16 @@ c_r = 2*gamma.(mr,sr)./(0.1*v0_range.^(-2/3))
 lines!(ax1, v0_range, c_r, color = :orange, linestyle = :dash,  label = "Rand, measured with stretching")
 
 # @load "coeff_stretch_factor_fermi.jld2"
-c_f = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash,  label = "Fermi, measured with stretching")
+# c_f = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
+# lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash,  label = "Fermi, measured with stretching")
 
-# @load "coeff_stretch_factor_cos1.jld2"
-c_c1 = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash,  label = "cos n=1, measured with stretching")
+# # @load "coeff_stretch_factor_cos1.jld2"
+# c_c1 = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))
+# lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash,  label = "cos n=1, measured with stretching")
 
-# @load "coeff_stretch_factor_cos6.jld2"
-c_c6 = 2*gamma.(mc6,sc6)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash,  label = "cos n=6, measured with stretching")
+# # @load "coeff_stretch_factor_cos6.jld2"
+# c_c6 = 2*gamma.(mc6,sc6)./(0.2*v0_range.^(-2/3))
+# lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash,  label = "cos n=6, measured with stretching")
 s = "comparison_fit_coeff_omega_area.png"
 axislegend(ax1);
 save(plotsdir(s),fig)
