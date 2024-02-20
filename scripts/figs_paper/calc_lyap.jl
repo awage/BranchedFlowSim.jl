@@ -7,6 +7,7 @@ using LaTeXStrings
 using LinearAlgebra
 using StaticArrays
 using ChaosTools
+using StatsBase
 
 
 function quasi2d_map!(du,u,p,t)
@@ -45,10 +46,11 @@ function get_lyap_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T = 
         wsave_kwargs = (;compress = true)
     )
     @unpack λ = data
-    # @show mean(λ[λ .> 0])
-    ind = findall(λ .> threshold)
-    l_index = length(ind)/length(λ) 
-    return l_index
+    @show mean(λ[λ .> 0])
+    return mean(λ[λ .> 0])
+    # ind = findall(λ .> threshold)
+    # l_index = length(ind)/length(λ) 
+    # return l_index
 end
 
 
@@ -57,7 +59,7 @@ num_rays = 500;
 dt = 0.001; T = 10000; 
 threshold = 0.001
 
-num_angle = 25
+num_angles = 50
 angles = range(0, π/4, length = num_angles + 1)
 angles = angles[1:end-1]
 
