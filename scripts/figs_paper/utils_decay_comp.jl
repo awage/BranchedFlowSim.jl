@@ -43,23 +43,24 @@ function get_data_decay(V, a, num_angles, num_rays, T, threshold, dt, xres, yres
     return data
 end 
 
-function get_fit(xg, yg)
+function get_fit(xg, yg; T = 0)
     model(x, p) = p[1] .+ p[2] * exp.(p[3] * x)
     # model(x, p) = p[1] .+ p[2] * x.^p[3]
     mx, ind = findmax(yg)
-    xdata = xg[ind:end]
-    ydata = yg[ind:end]
+    if T > 0 && T < xg[end]
+        indf = findfirst(xg .> T)
+        xdata = xg[ind:indf]
+        ydata = yg[ind:indf]
+    else
+        xdata = xg[ind:end]
+        ydata = yg[ind:end]
+    end
     lb = [0., 0., -1.]
     ub = [100., 100., 0.]   
     p0 = [yg[end], ydata[1], -0.2]
     fit = curve_fit(model, xdata, ydata, p0; lower = lb, upper = ub)
-#     model2(x, p) = p[1] * exp.(p[2] * x)
-#     xdata = xg[ind:end-1]
-#     ydata = diff(yg[ind:end])
-#     p0 = [ydata[1], fit.param[3]]
-#     fit2 = curve_fit(model2, xdata, ydata, p0)
-#     @show fit.param[3], fit2.param[2]
-    return fit.param, model, xdata
+    σ = stderror(fit)
+    return fit.param, model, xdata, σ
 end
 
 function print_f(x,y, xp, yp,s) 

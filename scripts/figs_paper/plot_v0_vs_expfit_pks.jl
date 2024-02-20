@@ -11,14 +11,14 @@ using ProgressMeter
 include("utils_decay_comp.jl")
 
 # Comon parameters
-num_rays = 200000; 
-dt = 0.01; 
-threshold = 2.5; 
-xres = 20
-yres = 1024; 
-num_angles = 100
-# num_rays = 1500000; 
-# T = 80; threshold = 2; 
+# num_rays = 200000; 
+# dt = 0.01; 
+# threshold = 2.5; 
+# xres = 20
+# yres = 1024; 
+# num_angles = 100
+num_rays = 1500000; 
+T = 80; threshold = 2; 
 # T = 100; threshold = 2.; 
 # T = 100; threshold = 1.5; 
 dt = 0.01;  xres = 20
@@ -30,35 +30,35 @@ r_p = zeros(length(v0_range),3)
 
 for (k,v0) in enumerate(v0_range)
     # Fermi lattice
-    # lattice_a = 0.2; dot_radius = 0.2*0.25
-    # softness = 0.2; 
-    # a = lattice_a;
-    # V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
-    # s = savename("decay_fermi", @dict(v0))
-    # data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
-    # @unpack xg, pks_arr = data
-    # p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
-    # f_p[k,:] = p
-    # print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
+    lattice_a = 0.2; dot_radius = 0.2*0.25
+    softness = 0.2; 
+    a = lattice_a;
+    V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
+    s = savename("decay_fermi", @dict(v0))
+    data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
+    @unpack xg, pks_arr = data
+    p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
+    f_p[k,:] = p
+    print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
     
-    # # Cosine sum 
-    # max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    # softness = 0.2; degrees = [1,6]; 
-    # for degree ∈ degrees
-    #     cos_pot(θ) = RotatedPotential(θ,              
-    #         fermi_dot_lattice_cos_series(degree,  
-    #         lattice_a, dot_radius, v0; softness))
-    #     s = savename("decay_cos", @dict(degree, v0))
-    #     data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
-    #     @unpack xg, pks_arr = data
-    #     p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
-    #     c_p[k,degree,:] = p
-    #     # print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
-    # end
+    # Cosine sum 
+    max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
+    softness = 0.2; degrees = [1,6]; 
+    for degree ∈ degrees
+        cos_pot(θ) = RotatedPotential(θ,              
+            fermi_dot_lattice_cos_series(degree,  
+            lattice_a, dot_radius, v0; softness))
+        s = savename("decay_cos", @dict(degree, v0))
+        data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+        @unpack xg, pks_arr = data
+        p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
+        c_p[k,degree,:] = p
+        # print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
+    end
  
     # Correlated random pot 
     correlation_scale = 0.1;  
-    c = get_coeff_pks(v0, :rand); T = round(4/c)
+    # c = get_coeff_pks(v0, :rand); T = round(5/c)
     sim_width = 20; sim_height = 10.;  
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))
