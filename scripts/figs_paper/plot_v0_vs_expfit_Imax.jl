@@ -13,11 +13,12 @@ include("utils_decay_comp.jl")
 # Comon parameters
 # num_rays = 1500000;  T = 80; threshold = 2; 
 # T = 100; threshold = 1.5; 
-num_rays = 1200000; threshold = 3.; 
+# num_rays = 1200000; threshold = 3.; 
+num_rays = 600000; threshold = 3.; # Funciona bien
 # T = 100; threshold = 2.; 
 dt = 0.01;  xres = 20
 yres = 1024; 
-num_angles = 50
+num_angles = 100
 
 v0_range = range(0.04, 0.4, step = 0.04)
 f_p = zeros(length(v0_range),3)

@@ -52,8 +52,8 @@ function get_fit(xg, yg; Tf = 0, Ti = 0)
         ydata = yg[indi:end]
     else  
         mx, indi = findmax(yg)
-        xdata = xg[indi:ind]
-        ydata = yg[indi:ind]
+        xdata = xg[indi:end]
+        ydata = yg[indi:end]
     end
     if Tf > 0 && Tf < xg[end]
         indf = findfirst(xg .> Tf)

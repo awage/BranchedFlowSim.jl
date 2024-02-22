@@ -125,12 +125,12 @@ c_f = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
 lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash,  label = "Fermi, measured with stretching")
 
 # # @load "coeff_stretch_factor_cos1.jld2"
-# c_c1 = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))
-# lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash,  label = "cos n=1, measured with stretching")
+c_c1 = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))
+lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash,  label = "cos n=1, measured with stretching")
 
 # # @load "coeff_stretch_factor_cos6.jld2"
-# c_c6 = 2*gamma.(mc6,sc6)./(0.2*v0_range.^(-2/3))
-# lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash,  label = "cos n=6, measured with stretching")
+c_c6 = 2*gamma.(mc6,sc6)./(0.2*v0_range.^(-2/3))
+lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash,  label = "cos n=6, measured with stretching")
 s = "comparison_fit_coeff_omega_area.png"
 xlims!(ax1, 0.04, 0.4)
 axislegend(ax1);
