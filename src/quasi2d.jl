@@ -239,9 +239,9 @@ function quasi2d_smoothed_intensity_stats(
     periodic_bnd::Bool,
     τ::Real 
 )
-    dy = ys[2] - ys[1]
+    dy = step(ys)
     rmin = ys[1]; rmax = ys[end];
-    h = length(ys) * (ys[2] - ys[1])
+    h = length(ys) * dy
     num_rays = length(ray_y)
     sim_h = (ray_y[2]-ray_y[1]) * num_rays
     ray_y = Vector{Float64}(ray_y)
@@ -250,7 +250,8 @@ function quasi2d_smoothed_intensity_stats(
     nb_pks = zeros(length(xs))
     max_I = zeros(length(xs))
     intensity = zeros(length(ys))
-    background = (num_rays/length(ys));  bckgnd_density = background/(dy*num_rays)
+    background = (num_rays/length(ys)); 
+    bckgnd_density = background/(dy*num_rays)
     xi = 1; x = xs[1]
     boundary = (
         ys[1] - dy - 4*b,
@@ -278,7 +279,7 @@ function quasi2d_smoothed_intensity_stats(
             t = findmaxima(intensity)
             ind = findall(t[2] .> threshold*bckgnd_density) 
             nb_pks[xi] = length(ind)
-            ind = findall(intensity .> 1.5*bckgnd_density) 
+            ind = findall(intensity .> threshold*bckgnd_density) 
             area[xi] = length(ind)/length(intensity)  
             max_I[xi] = maximum(intensity)  
             xi += 1

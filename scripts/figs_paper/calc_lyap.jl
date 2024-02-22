@@ -58,7 +58,7 @@ num_rays = 5000;
 dt = 0.01; T = 2000; 
 threshold = 0.001
 
-num_angles = 10
+num_angles = 50
 angles = range(0, π/4, length = num_angles + 1)
 angles = angles[1:end-1]
 
