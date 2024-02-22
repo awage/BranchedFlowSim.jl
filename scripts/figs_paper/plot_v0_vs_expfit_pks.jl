@@ -17,8 +17,8 @@ include("utils_decay_comp.jl")
 # xres = 20
 # yres = 1024; 
 # num_angles = 100
-num_rays = 1500000; 
-T = 80; threshold = 2; 
+num_rays = 1200000; threshold = 3.; 
+# num_rays = 1500000; T = 80; threshold = 2; 
 # T = 100; threshold = 2.; 
 # T = 100; threshold = 1.5; 
 dt = 0.01;  xres = 20
@@ -31,19 +31,19 @@ r_p = zeros(length(v0_range),3)
 for (k,v0) in enumerate(v0_range)
     # Fermi lattice
     lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; 
+    softness = 0.2; T = 30
     a = lattice_a;
     V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
     s = savename("decay_fermi", @dict(v0))
-    data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
+    data = get_data_decay(V, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
     @unpack xg, pks_arr = data
-    p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
+    p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)); Ti = 3)
     f_p[k,:] = p
     print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
     
     # Cosine sum 
     max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; degrees = [1,6]; 
+    softness = 0.2; degrees = [1,6]; T = 30
     for degree ∈ degrees
         cos_pot(θ) = RotatedPotential(θ,              
             fermi_dot_lattice_cos_series(degree,  
@@ -51,20 +51,19 @@ for (k,v0) in enumerate(v0_range)
         s = savename("decay_cos", @dict(degree, v0))
         data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
         @unpack xg, pks_arr = data
-        p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
+        p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)); Ti = 3)
         c_p[k,degree,:] = p
         # print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
     end
  
     # Correlated random pot 
-    correlation_scale = 0.1;  
-    # c = get_coeff_pks(v0, :rand); T = round(5/c)
-    sim_width = 20; sim_height = 10.;  
+    correlation_scale = 0.1; T = 15.
+    sim_width = 15; sim_height = 10.;  
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))
     data = get_data_decay(Vr, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
     @unpack xg, pks_arr = data
-    p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)))
+    p, m, x = get_fit(xg, vec(mean(pks_arr; dims =2)); Ti = 3)
     r_p[k,:] = p
     print_f(x, m.(x,Ref(p)), xg,  vec(mean(pks_arr; dims =2)), string(s,"pks"))
 end
@@ -73,7 +72,7 @@ end
 fig = Figure(size=(600, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"C", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, f_p[:,1], color = :blue, linestyle = :dash, label = L"Fermi")
-lines!(ax1, v0_range, r_p[:,1], color = :orange, label = L"Rand")
+lines!(ax1, v0_range, 1 .+ r_p[:,1], color = :orange, label = L"Rand")
 lines!(ax1, v0_range, c_p[:,1,1], color = :black, linestyle = :dash, label = L"V_{cos} ~  n = 1")
 # lines!(ax1, v0_range, c_p[:,2,1], color = :red, label = "Cos n=2 a1")
 # lines!(ax1, v0_range, c_p[:,3,1], color = :green, label = "Cos n=3 a1")

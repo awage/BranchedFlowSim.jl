@@ -20,15 +20,16 @@ function print_f(x,y, xp, yp,s)
 end
 
 # Comon parameters
-num_rays = 1500000; 
+
+num_rays = 600000; threshold = 3.; # Funciona bien
+# num_rays = 1200000; threshold = 3.; 
 dt = 0.01; 
 # T = 80; threshold = 2; 
 # T = 100; threshold = 2.; 
-# threshold = 2.5; 
 # T = 100; threshold = 1.5; 
 xres = 20
 yres = 1024; 
-num_angles = 50
+num_angles = 100
 v0_range = range(0.04, 0.4, step = 0.04)
 f_p = zeros(length(v0_range),3)
 f_err = zeros(length(v0_range))
@@ -37,13 +38,13 @@ r_p = zeros(length(v0_range),3)
 r_err = zeros(length(v0_range))
 
 for (k,v0) in enumerate(v0_range)
-    # # Fermi lattice
+    # Fermi lattice
     lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; T = 100; threshold = 1.5
+    softness = 0.2; T = 30; 
     a = lattice_a;
     V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
     s = savename("decay_fermi", @dict(v0))
-    data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+    data = get_data_decay(V, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
     @unpack xg, nb_arr = data
     p, m, x, σ = get_fit(xg, vec(mean(nb_arr; dims =2)))
     f_p[k,:] = p
@@ -52,7 +53,7 @@ for (k,v0) in enumerate(v0_range)
 
     # Cosine sum
     max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; degrees = [1,6];
+    softness = 0.2; degrees = [1,6]; T = 30
     for degree ∈ degrees
         cos_pot(θ) = RotatedPotential(θ,
             fermi_dot_lattice_cos_series(degree,
@@ -67,16 +68,17 @@ for (k,v0) in enumerate(v0_range)
     end
 
     # Correlated random pot
-    correlation_scale = 0.1; 
-    sim_width = 20; sim_height = 10.;
+    correlation_scale = 0.1;  T =15.
+    sim_width = 15; sim_height = 10.;
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))
-    # data = get_data_decay(Vr, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
-    data = get_data_decay(Vr, 1., 80, 20000, 15, 2.5, dt, xres, yres; prefix = s)
+    data = get_data_decay(Vr, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+    # data = get_data_decay(Vr, 1., 50, 500000, 15., 3., dt, xres, yres; prefix = s)
     @unpack xg, nb_arr = data
-    # c = get_coeff_area(v0, :rand); Tf = round(5/c)
     p, m, x, σ = get_fit(xg, vec(mean(nb_arr; dims =2)))
     r_p[k,:] = p
+    c = get_coeff_area(v0, :rand); 
+    @show c + p[3] 
     r_err[k] = σ[3]
     print_f(x, m.(x,Ref(p)), xg,  vec(mean(nb_arr; dims =2)), string(s,"area"))
 end
@@ -119,8 +121,8 @@ c_r = 2*gamma.(mr,sr)./(0.1*v0_range.^(-2/3))
 lines!(ax1, v0_range, c_r, color = :orange, linestyle = :dash,  label = "Rand, measured with stretching")
 
 # @load "coeff_stretch_factor_fermi.jld2"
-# c_f = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
-# lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash,  label = "Fermi, measured with stretching")
+c_f = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
+lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash,  label = "Fermi, measured with stretching")
 
 # # @load "coeff_stretch_factor_cos1.jld2"
 # c_c1 = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))

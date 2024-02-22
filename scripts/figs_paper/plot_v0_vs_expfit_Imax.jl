@@ -11,10 +11,10 @@ using ProgressMeter
 include("utils_decay_comp.jl")
 
 # Comon parameters
-num_rays = 1500000; 
-# T = 80; threshold = 2; 
+# num_rays = 1500000;  T = 80; threshold = 2; 
 # T = 100; threshold = 1.5; 
-T = 100; threshold = 2.; 
+num_rays = 1200000; threshold = 3.; 
+# T = 100; threshold = 2.; 
 dt = 0.01;  xres = 20
 yres = 1024; 
 num_angles = 50
@@ -27,18 +27,18 @@ r_p = zeros(length(v0_range),3)
 for (k,v0) in enumerate(v0_range)
     # Fermi lattice
     lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; 
+    softness = 0.2; T = 30
     a = lattice_a;
     V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
     s = savename("decay_fermi", @dict(v0))
-    data = get_data_decay(V, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
+    data = get_data_decay(V, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)  
     @unpack xg, mx_arr = data
     p, m, x = get_fit(xg, vec(mean(mx_arr; dims =2)))
     f_p[k,:] = p
     
     # Cosine sum 
     max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; degrees = [1,6]; 
+    softness = 0.2; degrees = [1,6]; T = 30
     for degree ∈ degrees
         cos_pot(θ) = RotatedPotential(θ,              
             fermi_dot_lattice_cos_series(degree,  
@@ -52,7 +52,7 @@ for (k,v0) in enumerate(v0_range)
  
     # Correlated random pot 
     correlation_scale = 0.1; 
-    sim_width = 20; sim_height = 10.;  
+    sim_width = 20; sim_height = 10.; T = 15.
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))
     data = get_data_decay(Vr, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
@@ -90,8 +90,8 @@ lines!(ax1, v0_range, -c_p[:,1,3], color = :black, label = L"V_{Cos} ~  n = 1")
 lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
 
 using JLD2
-@load "stretch_factor_Nt=200_num_angles=50.jld2"
-# @load "stretch_factor_Nt=400_num_angles=50.jld2"
+# @load "stretch_factor_Nt=200_num_angles=50.jld2"
+@load "stretch_factor_Nt=400_num_angles=50.jld2"
 # @load "stretch_factor_Nt=600_num_angles=50.jld2"
 # @load "stretch_factor_Nt=800_num_angles=50.jld2"
 # @load "stretch_factor_Nt=1000_num_angles=50.jld2"

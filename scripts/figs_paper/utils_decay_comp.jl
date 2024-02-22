@@ -1,7 +1,7 @@
 using JLD2 
 
 # Display and compute histograms :
-function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.003)
+function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.0003)
     yg = sample_midpoints(0, a, yres)
     xg = range(0+x0, T+x0, length = round(Int,xres*T))
     area, max_I, nb_pks, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = false)
@@ -43,20 +43,28 @@ function get_data_decay(V, a, num_angles, num_rays, T, threshold, dt, xres, yres
     return data
 end 
 
-function get_fit(xg, yg; T = 0)
+function get_fit(xg, yg; Tf = 0, Ti = 0)
     model(x, p) = p[1] .+ p[2] * exp.(p[3] * x)
     # model(x, p) = p[1] .+ p[2] * x.^p[3]
-    mx, ind = findmax(yg)
-    if T > 0 && T < xg[end]
-        indf = findfirst(xg .> T)
-        xdata = xg[ind:indf]
-        ydata = yg[ind:indf]
+    if Ti > 0 && Ti < xg[end]
+        indi = findfirst(xg .> Ti)
+        xdata = xg[indi:end]
+        ydata = yg[indi:end]
+    else  
+        mx, indi = findmax(yg)
+        xdata = xg[indi:ind]
+        ydata = yg[indi:ind]
+    end
+    if Tf > 0 && Tf < xg[end]
+        indf = findfirst(xg .> Tf)
+        xdata = xg[indi:indf]
+        ydata = yg[indi:indf]
     else
-        xdata = xg[ind:end]
-        ydata = yg[ind:end]
+        xdata = xg[indi:end]
+        ydata = yg[indi:end]
     end
     lb = [0., 0., -1.]
-    ub = [100., 100., 0.]   
+    ub = [100., 200., 0.]   
     p0 = [yg[end], ydata[1], -0.2]
     fit = curve_fit(model, xdata, ydata, p0; lower = lb, upper = ub)
     σ = stderror(fit)
