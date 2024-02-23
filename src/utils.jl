@@ -1,7 +1,7 @@
 using ChaosTools
 using LinearAlgebra:norm
 
-function transverse_growth_rates(ds::DynamicalSystem, points;
+function transverse_stretching(ds::DynamicalSystem, points;
         S = 100, Δt = 5, e = 1e-6,
         perturbation = (ds, u, j) -> _random_Q0(ds, u, j, e),
         dir = 1 # transverse dir
@@ -11,10 +11,10 @@ function transverse_growth_rates(ds::DynamicalSystem, points;
     states = [points[1], points[1] .+ Q0]
     pds = ParallelDynamicalSystem(ds, states)
     # Function barrier
-    return transverse_growth_rates(pds, dir, points, ds, S, Δt, e)
+    return transverse_stretching(pds, dir, points, ds, S, Δt, e)
 end
 
-function transverse_growth_rates(pds, dir, points, ds, S, Δt, e)
+function transverse_stretching(pds, dir, points, ds, S, Δt, e)
     λlocal = zeros(length(points), S)
     # pds_array = [deepcopy(pds) for i in 1:S]
     for (i, u) in enumerate(points)
@@ -29,7 +29,7 @@ function transverse_growth_rates(pds, dir, points, ds, S, Δt, e)
             g = current_state(pds, 2) .- current_state(pds, 1)
             g = abs(g[dir]) # only the variable y!
             tspan = current_time(pds) - initial_time(pds)
-            λlocal[i, j] = log(g/g0)/tspan
+            λlocal[i, j] = log(g/g0)
         end
     end
     return λlocal
