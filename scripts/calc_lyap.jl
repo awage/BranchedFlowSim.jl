@@ -7,6 +7,7 @@ using LaTeXStrings
 using LinearAlgebra
 using StaticArrays
 using ChaosTools
+using StatsBase
 
 
 function quasi2d_map!(du,u,p,t)
@@ -45,19 +46,19 @@ function get_lyap_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T = 
         wsave_kwargs = (;compress = true)
     )
     @unpack λ = data
-    # @show mean(λ[λ .> 0])
+    @show mean(λ[λ .> 0])
     ind = findall(λ .> threshold)
     l_index = length(ind)/length(λ) 
-    return l_index
+    return mean(λ[λ .> 0])/dt
 end
 
 
 # Comon parameters
-num_rays = 500; 
-dt = 0.001; T = 10000; 
+num_rays = 5000; 
+dt = 0.01; T = 2000; 
 threshold = 0.001
 
-num_angle = 25
+num_angles = 50
 angles = range(0, π/4, length = num_angles + 1)
 angles = angles[1:end-1]
 
@@ -91,8 +92,8 @@ for (j, θ) in enumerate(angles)
         end
 
         # Correlated random pot 
-        correlation_scale = 0.1;
-        sim_width = 20; sim_height = 4. 
+        correlation_scale = 1;
+        sim_width = 20; sim_height = 20. 
         Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, j)
         s = savename("lyap_rand", @dict(v0,j))
         l = get_lyap_index(Vr, threshold; res = num_rays, a = 1, v0, dt, T, prefix = s)
@@ -106,13 +107,9 @@ lc6 = vec(mcos[:,:,6])
 lf = vec(mean(l_fermi, dims =2))
 lr = vec(mean(l_rand, dims =2))
 
-fig = Figure(size=(600, 600))
+fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Lyap index", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, lc1, linestyle = :dash, color = :black, label = L"V_{cos} ~ n = 1")
-# lines!(ax1, v0_range, l_cos[:,2], color = :red, label = "Cos n=2")
-# lines!(ax1, v0_range, l_cos[:,3], color = :green, label = "Cos n=3")
-# lines!(ax1, v0_range, l_cos[:,4], color = :pink, label = "Cos n=4")
-# lines!(ax1, v0_range, l_cos[:,5], color = :purple, label = "Cos n=5")
 lines!(ax1, v0_range, lc6, color = :cyan, label = L"V_{cos} ~ n=6")
 lines!(ax1, v0_range, lf, color = :blue, linestyle = :dash, label = L"Fermi")
 lines!(ax1, v0_range, lr, color = :orange, label = L"Rand")

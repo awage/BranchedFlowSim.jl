@@ -10,21 +10,10 @@ using ProgressMeter
 
 include("utils_decay_comp.jl")
 
-
-
 # Comon parameters
-
-num_rays = 600000; threshold = 3.; # Funciona bien
-# num_rays = 2000000; threshold = 3.; # Funciona bien
-# num_rays = 4000000; threshold = 3.; # Funciona bien
-# num_rays = 1200000; threshold = 3.; 
-dt = 0.01; 
-# T = 80; threshold = 2; 
-# T = 100; threshold = 2.; 
-# T = 100; threshold = 1.5; 
-xres = 20
-yres = 1024; 
-num_angles = 100
+num_rays = 600000; threshold = 3.; 
+dt = 0.01; xres = 20
+yres = 1024; num_angles = 100
 v0_range = range(0.04, 0.4, step = 0.04)
 f_p = zeros(length(v0_range),3)
 f_err = zeros(length(v0_range))
@@ -56,7 +45,6 @@ for (k,v0) in enumerate(v0_range)
         s = savename("decay_cos", @dict(degree, v0))
         data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
         @unpack xg, nb_arr = data
-        # c = get_coeff_area(v0, :cos1); Tf = round(5/c)
         p, m, x, σ = get_fit(xg, vec(mean(nb_arr; dims =2)))
         c_p[k,degree,:] = p
         print_f(x, m.(x,Ref(p)), xg,  vec(mean(nb_arr; dims =2)), string(s,"area"))
@@ -68,12 +56,9 @@ for (k,v0) in enumerate(v0_range)
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))
     data = get_data_decay(Vr, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
-    # data = get_data_decay(Vr, 1., 50, 500000, 15., 3., dt, xres, yres; prefix = s)
     @unpack xg, nb_arr = data
     p, m, x, σ = get_fit(xg, vec(mean(nb_arr; dims =2)))
     r_p[k,:] = p
-    c = get_coeff_area(v0, :rand); 
-    @show c + p[3] 
     r_err[k] = σ[3]
     print_f(x, m.(x,Ref(p)), xg,  vec(mean(nb_arr; dims =2)), string(s,"area"))
 end
@@ -99,27 +84,20 @@ lines!(ax1, v0_range, -c_p[:,1,3], color = :black,  label = L"V_{Cos} ~  n = 1")
 lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
 
 using JLD2
-# @load "stretch_factor_Nt=200_num_angles=50.jld2"
-# @load "stretch_factor_Nt=400_num_angles=50.jld2"
-# @load "stretch_factor_Nt=600_num_angles=50.jld2"
 @load "stretch_factor_Nt=600_num_angles=50_num_rays=5000.jld2"
-# @load "stretch_factor_Nt=600_num_angles=50_num_rays=10000.jld2"
-# @load "stretch_factor_Nt=800_num_angles=50.jld2"
-# @load "stretch_factor_Nt=1000_num_angles=50.jld2"
-# @load "stretch_factor_Nt=2000_num_angles=50.jld2"
 gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
 
 c_r = 2*gamma.(mr,sr)./(0.1*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_r, color = :orange, linestyle = :dash) #,  label = "Rand, measured with stretching")
+lines!(ax1, v0_range, c_r, color = :orange, linestyle = :dash) 
 
 c_f = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash) #,  label = "Fermi, measured with stretching")
+lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash) 
 
 c_c1 = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash) #,  label = "cos n=1, measured with stretching")
+lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash)
 
 c_c6 = 2*gamma.(mc6,sc6)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash) #,  label = "cos n=6, measured with stretching")
+lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash) 
 s = "comparison_fit_coeff_omega_area.png"
 xlims!(ax1, 0.04, 0.4)
 axislegend(ax1; position = :lt);
