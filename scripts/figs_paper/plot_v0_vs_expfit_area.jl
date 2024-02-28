@@ -22,6 +22,8 @@ end
 # Comon parameters
 
 num_rays = 600000; threshold = 3.; # Funciona bien
+# num_rays = 2000000; threshold = 3.; # Funciona bien
+# num_rays = 4000000; threshold = 3.; # Funciona bien
 # num_rays = 1200000; threshold = 3.; 
 dt = 0.01; 
 # T = 80; threshold = 2; 
@@ -85,14 +87,10 @@ end
 
 
 fig = Figure(size=(800, 600))
-ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"C", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
+ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"C", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, r_p[:,1], color = :orange, label = L"Rand")
 lines!(ax1, v0_range, f_p[:,1], color = :blue, linestyle = :dash, label = L"Fermi")
 lines!(ax1, v0_range, c_p[:,1,1], color = :black, linestyle = :dash, label = L"V_{cos} ~  n = 1")
-# lines!(ax1, v0_range, c_p[:,2,1], color = :red, label = "Cos n=2 a1")
-# lines!(ax1, v0_range, c_p[:,3,1], color = :green, label = "Cos n=3 a1")
-# lines!(ax1, v0_range, c_p[:,4,1], color = :pink, label = "Cos n=4 a1")
-# lines!(ax1, v0_range, c_p[:,5,1], color = :purple, label = "Cos n=5 a1")
 lines!(ax1, v0_range, c_p[:,6,1], color = :cyan, label = L"V_{cos} ~ n = 6")
 s = "comparison_fit_coeff_C_area.png"
 xlims!(ax1, 0.04, 0.4)
@@ -101,7 +99,7 @@ save(plotsdir(s),fig)
 
 
 fig = Figure(size=(800, 600))
-ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"\Omega", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
+ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = L"\Omega", yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40,  titlesize = 40, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, -f_p[:,3], color = :blue,  label = L"Fermi")
 lines!(ax1, v0_range, -r_p[:,3],  color = :orange, label = L"Rand")
 lines!(ax1, v0_range, -c_p[:,1,3], color = :black,  label = L"V_{Cos} ~  n = 1")
@@ -111,36 +109,25 @@ using JLD2
 # @load "stretch_factor_Nt=200_num_angles=50.jld2"
 # @load "stretch_factor_Nt=400_num_angles=50.jld2"
 # @load "stretch_factor_Nt=600_num_angles=50.jld2"
+@load "stretch_factor_Nt=600_num_angles=50_num_rays=5000.jld2"
+# @load "stretch_factor_Nt=600_num_angles=50_num_rays=10000.jld2"
 # @load "stretch_factor_Nt=800_num_angles=50.jld2"
 # @load "stretch_factor_Nt=1000_num_angles=50.jld2"
 # @load "stretch_factor_Nt=2000_num_angles=50.jld2"
 gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
 
-# @load "coeff_stretch_factor_rand.jld2"
-num_rays = 1000; 
-Nt = 200:10:600
-include("calc_stretch_linfit.jl")
-mr = zeros(length(v0_range))
-sr = zeros(length(v0_range))
-for (k,v0) in enumerate(v0_range)
-mr[k],sr[k] = compute_stretch_rand(v0, num_rays, dt, Nt)
-end
 c_r = 2*gamma.(mr,sr)./(0.1*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_r, color = :orange, linestyle = :dash,  label = "Rand, measured with stretching")
+lines!(ax1, v0_range, c_r, color = :orange, linestyle = :dash) #,  label = "Rand, measured with stretching")
 
-@load "stretch_factor_Nt=400_num_angles=50.jld2"
-# @load "coeff_stretch_factor_fermi.jld2"
 c_f = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash,  label = "Fermi, measured with stretching")
+lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash) #,  label = "Fermi, measured with stretching")
 
-# # @load "coeff_stretch_factor_cos1.jld2"
 c_c1 = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash,  label = "cos n=1, measured with stretching")
+lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash) #,  label = "cos n=1, measured with stretching")
 
-# # @load "coeff_stretch_factor_cos6.jld2"
 c_c6 = 2*gamma.(mc6,sc6)./(0.2*v0_range.^(-2/3))
-lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash,  label = "cos n=6, measured with stretching")
+lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash) #,  label = "cos n=6, measured with stretching")
 s = "comparison_fit_coeff_omega_area.png"
 xlims!(ax1, 0.04, 0.4)
-# axislegend(ax1);
+axislegend(ax1; position = :lt);
 save(plotsdir(s),fig)

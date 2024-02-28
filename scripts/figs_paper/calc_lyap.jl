@@ -107,7 +107,7 @@ lc6 = vec(mcos[:,:,6])
 lf = vec(mean(l_fermi, dims =2))
 lr = vec(mean(l_rand, dims =2))
 
-fig = Figure(size=(600, 800))
+fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Lyap index", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
 lines!(ax1, v0_range, lc1, linestyle = :dash, color = :black, label = L"V_{cos} ~ n = 1")
 # lines!(ax1, v0_range, l_cos[:,2], color = :red, label = "Cos n=2")

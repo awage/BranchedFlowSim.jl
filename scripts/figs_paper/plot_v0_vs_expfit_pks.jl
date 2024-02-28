@@ -18,7 +18,8 @@ include("utils_decay_comp.jl")
 # yres = 1024; 
 # num_angles = 100
 # num_rays = 1200000; threshold = 3.; 
-num_rays = 600000; threshold = 3.; # Funciona bien
+num_rays = 2000000; threshold = 3.; # Funciona bien
+# num_rays = 600000; threshold = 3.; # Funciona bien
 # num_rays = 1500000; T = 80; threshold = 2; 
 # T = 100; threshold = 2.; 
 # T = 100; threshold = 1.5; 
