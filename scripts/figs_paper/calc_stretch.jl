@@ -5,8 +5,7 @@ using CairoMakie
 using LaTeXStrings
 using LinearAlgebra
 using StatsBase
-# using StaticArrays
-# using ChaosTools
+using CodecZlib
 
 include(srcdir("utils.jl"))
 
@@ -20,87 +19,136 @@ function quasi2d_map!(du,u,p,t)
 end
 
 function _get_stretch(d) 
-    @unpack V, dt, a, T, res = d
+    @unpack V, dt, a, Nt, res = d
     df = DeterministicIteratedMap(quasi2d_map!, [0., 0.4], [V, dt])
     yrange = range(0, a, res)
-    py = 0.
+    py = 0.; S = 100
     points = [ [y, py] for y in yrange] 
-    λ = transverse_growth_rates(df, points; Δt = T)
-    return @strdict(λ,  d)
+    # λ = transverse_growth_rates(df, points; Δt = Nt)
+    λ = transverse_stretching(df, points; Δt = Nt, S)
+    λ .= λ./(Nt*dt) # normalize by time range
+    return @strdict(λ)
 end
 
 
-function get_stretch_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T = 10000, prefix = "lyap")
-    d = @dict(res,  a, v0,  T, dt, V) # parametros
+function get_stretch_index(V; res = 500, a = 1, v0 = 1., dt = 0.01, Nt = 10000, prefix = "lyap", ξ)
+    d = @dict(res,  a, v0,  Nt, dt, V) # parametros
     data, file = produce_or_load(
-        datadir("./storage"), # path
+        datadir("storage"), # path
         d, # container for parameter
         _get_stretch, # function
         prefix = prefix, # prefix for savename
-        force = true, # true for forcing sims
+        force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     @unpack λ = data
     ml = vec(mean(λ; dims = 2))
-    @show ml
-    ind = findall(ml .> threshold)
-    l_index = length(ind)/res 
-    return l_index
+    @show mean(ml[ml .> 0])
+    @show mean(ml)
+    # @show std(ml)*2
+    # sl = vec(std(λ; dims = 2))
+    # DEFINTION OF KAPLAN 
+    # of α and β adding the correlation length in the mix
+    T = Nt*dt # We have to mulitply the variance by T 
+    return mean(ml)*(v0^(-2/3))*ξ , var(ml)*2*(v0^(-2/3))*ξ*T
 end
 
-# Comon parameters
-num_rays = 100; 
-dt = 0.01; T = 1000; 
-threshold = 0.0
 
-v0_range = range(0.01, 0.4, step = 0.1)
-v0_range = [0.01, 0.4]
-l_fermi = zeros(length(v0_range))
-l_cos = zeros(length(v0_range),6)
-l_rand = zeros(length(v0_range))
 
-for (k,v0) in enumerate(v0_range)
-    # Fermi lattice
-    lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; II = rotation_matrix(0)
-    V = LatticePotential(lattice_a*II, dot_radius, v0; softness=softness)
-    s = savename("stretch_fermi", @dict(v0))
-    l = get_stretch_index(V, threshold; res = num_rays, a = lattice_a, v0, dt, T, prefix = s)
-    l_fermi[k] = l   
+function compute_stretch_rand(v0_range, num_rays, num_angles, dt; Nt =40)
+gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1 )
+l_rand = zeros(length(v0_range),num_angles,2)
+γ = zeros(length(v0_range))
+c = zeros(length(v0_range))
 
-    # Cosine sum 
-    max_degree = 6; lattice_a = 0.2; dot_radius = 0.2*0.25
-    softness = 0.2; 
-    degrees = 1:max_degree
-    for degree ∈ degrees
-        cos_pot = RotatedPotential(0,              
-            fermi_dot_lattice_cos_series(degree,  
-            lattice_a, dot_radius, v0; softness))
-        s = savename("stretch_cos", @dict(v0,degree))
-        l = get_stretch_index(cos_pot, threshold; res = num_rays, a = lattice_a, v0 , dt, T , prefix = s)
-        l_cos[k,degree] = l
+   for k in 1:length(v0_range)
+        Threads.@threads for n in 1:num_angles
+        # Correlated random pot 
+        correlation_scale = 0.1;
+        sim_width = Nt*dt ; sim_height = 10.
+        Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0_range[k], n)
+        s = savename("stretch_rand", @dict(n))
+        α,β  = get_stretch_index(Vr; res = num_rays, a = 1, v0=v0_range[k], dt, Nt, prefix = s, ξ = correlation_scale)
+        l_rand[k,n,:] = [α, β]
+        @show a,b = [α, β]
+        # @show γ[k] = gamma(a,b)
+        # @show c[k] = gamma(a,b)/(v0^(-2/3))
     end
-
-    # Correlated random pot 
-    correlation_scale = 0.1;
-    sim_width = 20; sim_height = 2.
-    Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 100)
-    s = savename("stretch_rand", @dict(v0))
-    l = get_stretch_index(Vr, threshold; res = num_rays, a = 2, v0, dt, T, prefix = s)
-    l_rand[k] = l   
+end
+    m = mean(l_rand,dims =2)
+    return vec(m[:,:,1]), vec(m[:,:,2])
 end
 
-fig = Figure(size=(800, 600))
-ax1= Axis(fig[1, 1], xlabel = L"v_0", ylabel = "Stretch index", yticklabelsize = 30, xticklabelsize = 40, ylabelsize = 30, xlabelsize = 40,  titlesize = 30, yscale = Makie.pseudolog10)
-lines!(ax1, v0_range, l_cos[:,1], linestyle = :dash, color = :black, label = " Cos n=1")
-lines!(ax1, v0_range, l_cos[:,2], color = :red, label = "Cos n=2")
-lines!(ax1, v0_range, l_cos[:,3], color = :green, label = "Cos n=3")
-lines!(ax1, v0_range, l_cos[:,4], color = :pink, label = "Cos n=4")
-lines!(ax1, v0_range, l_cos[:,5], color = :purple, label = "Cos n=5")
-lines!(ax1, v0_range, l_cos[:,6], color = :cyan, label = "Cos n=6")
-lines!(ax1, v0_range, l_fermi, color = :blue, linestyle = :dash, label = "Fermi")
-lines!(ax1, v0_range, l_rand, color = :olive, linestyle = :dash, label = "rand")
 
-s = "comparison_stretch_index.png"
-axislegend(ax1);
-save(plotsdir(s),fig)
+function compute_stretch_fermi(v0_range, num_rays, num_angles, dt; Nt = 40)
+    gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1 )
+    angles = range(0, π/4, length = num_angles + 1)
+    angles = angles[1:end-1]
+    l_fer = zeros(length(v0_range),num_angles,2)
+    γ = zeros(length(v0_range), num_angles)
+    c = zeros(length(v0_range), num_angles)
+
+    for k in 1:length(v0_range)
+         Threads.@threads  for j in 1:length(angles)
+            # Correlated random pot 
+            θ = angles[j]
+            lattice_a = 0.2; dot_radius = 0.2*0.25
+            softness = 0.2; II = rotation_matrix(θ)
+            V = LatticePotential(lattice_a*II, dot_radius, v0_range[k]; softness=softness)
+            s = savename("stretch_fermi", @dict(θ))
+            α,β  = get_stretch_index(V; res = num_rays, a = 0.2, v0 = v0_range[k], dt, Nt, prefix = s, ξ = lattice_a)
+            l_fer[k,j,:] = [α, β]
+            @show a,b = [α,β]
+            # @show γ[k,j] = gamma(a,b)
+            # @show c[k,j] = gamma(a,b)/(v0_range[k]^(-2/3))
+        end
+    end
+    m = mean(l_fer,dims =2)
+    return vec(m[:,:,1]), vec(m[:,:,2])
+end
+
+function compute_stretch_cos(v0_range, d, num_rays, num_angles, dt; Nt = 40)
+    gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1 )
+    angles = range(0, π/4, length = num_angles + 1)
+    angles = angles[1:end-1]
+    l_cos = zeros(length(v0_range),num_angles,2)
+    γ = zeros(length(v0_range), num_angles)
+    c = zeros(length(v0_range), num_angles)
+
+    for k in 1:length(v0_range)
+        Threads.@threads for j in 1:length(angles)
+            θ = angles[j]
+            lattice_a = 0.2; dot_radius = 0.2*0.25
+            softness = 0.2; II = rotation_matrix(θ)
+            V = RotatedPotential(θ,              
+                fermi_dot_lattice_cos_series(d,  
+                lattice_a, dot_radius, v0_range[k]; softness))
+            s = savename("stretch_cos_n", @dict(d, θ))
+            α,β  = get_stretch_index(V; res = num_rays, a = 0.2, v0 = v0_range[k], dt, Nt, prefix = s, ξ = lattice_a)
+            l_cos[k,j,:] = [α, β]
+            println("θ=", θ, " v0=", v0_range[k])
+            # @show a,b = [mean(α), mean(β)]*(v0_range[k]^(-2/3))
+            # @show γ[k,j] = gamma(a,b)
+            # @show c[k,j] = gamma(a,b)/(v0_range[k]^(-2/3))
+        end
+    end
+    m = mean(l_cos,dims =2)
+    return vec(m[:,:,1]), vec(m[:,:,2])
+end
+
+num_rays = 10000; 
+num_angles = 50
+Nt = 600
+dt = 0.01; 
+v0_range = range(0.02, 0.4, step = 0.04); 
+mr,sr = compute_stretch_rand(v0_range, num_rays, num_angles, dt; Nt)
+mf,sf = compute_stretch_fermi(v0_range, num_rays, num_angles, dt; Nt)
+mc1,sc1 = compute_stretch_cos(v0_range, 1, num_rays, num_angles, dt; Nt)
+mc6,sc6 = compute_stretch_cos(v0_range, 6, num_rays, num_angles, dt; Nt)
+
+using JLD2
+s = savename("stretch_factor", @dict(Nt, num_angles, num_rays),"jld2")
+@save s mr sr mf sf mc1 sc1 mc6 sc6 v0_range
+# gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
+# c = gamma(mf,sf)./(v0_range.^(-2/3))
+

@@ -1,11 +1,12 @@
+using JLD2 
 
 # Display and compute histograms :
-function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.003)
+function compute_area(V, a, dt, T; yres = 1000, xres = 10, num_rays = 20000, threshold = 1.5, x0 = 0, smoothing_b = 0.0003)
     yg = sample_midpoints(0, a, yres)
     xg = range(0+x0, T+x0, length = round(Int,xres*T))
-    area, max_I, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = false)
+    area, max_I, nb_pks, rmax = quasi2d_get_stats(num_rays, dt, xg, yg, V; b = smoothing_b, threshold = threshold, periodic_bnd = false)
     # @show x0, rmax, T
-    return xg, yg, area, max_I
+    return xg, yg, area, max_I, nb_pks
 end
 
 function compute_average_theta(d)
@@ -14,16 +15,18 @@ function compute_average_theta(d)
     angles = range(0, π/4, length = num_angles + 1)
     angles = angles[1:end-1]
     p = Progress(num_angles, "Potential calc")
-    nb_arr = zeros(T*xres, num_angles)
-    mx_arr = zeros(T*xres, num_angles)
+    nb_arr = zeros(round(Int,T*xres), num_angles)
+    mx_arr = zeros(round(Int,T*xres), num_angles)
+    pks_arr = zeros(round(Int,T*xres), num_angles)
     Threads.@threads for i ∈ 1:num_angles
         potential = V(angles[i])
-        xg, yg, area, max_I = compute_area(potential, a, dt, T; xres, yres,  num_rays, threshold)
+        xg, yg, area, max_I, nb_pks = compute_area(potential, a, dt, T; xres, yres,  num_rays, threshold)
         nb_arr[:, i] = area
         mx_arr[:, i] = max_I
+        pks_arr[:, i] = nb_pks
         next!(p)
     end
-    return @strdict(xg, yg, nb_arr, mx_arr)
+    return @strdict(xg, yg, nb_arr, mx_arr, pks_arr)
 end
 
 
@@ -40,17 +43,84 @@ function get_data_decay(V, a, num_angles, num_rays, T, threshold, dt, xres, yres
     return data
 end 
 
-function get_fit(xg, yg)
+function get_fit(xg, yg; Tf = 0, Ti = 0)
     model(x, p) = p[1] .+ p[2] * exp.(p[3] * x)
-    # model(x, p) = p[1] .+ p[2] * x.^p[3]
     mx, ind = findmax(yg)
-    # mx, ind = findall(xg .> 2); ind = ind[1] 
-
-    xdata = xg[ind:end]
-    ydata = yg[ind:end]
-    p0 = [yg[end], 2., -0.2]
-    fit = curve_fit(model, xdata, ydata, p0)
-    # return [yg[end],fit.param[2], fit.param[3]], model, xdata
-    return  fit.param, model, xdata
+    if Ti > 0 && Ti < xg[end]
+        indi = findfirst(xg .> Ti)
+        xdata = xg[indi:end]
+        ydata = yg[indi:end]
+    else  
+        mx, indi = findmax(yg)
+        xdata = xg[indi:end]
+        ydata = yg[indi:end]
+    end
+    if Tf > 0 && Tf < xg[end]
+        indf = findfirst(xg .> Tf)
+        xdata = xg[indi:indf]
+        ydata = yg[indi:indf]
+    else
+        xdata = xg[indi:end]
+        ydata = yg[indi:end]
+    end
+    lb = [0., 0., -1.]
+    ub = [100., 200., 0.]   
+    p0 = [yg[end], ydata[1], -0.2]
+    fit = curve_fit(model, xdata, ydata, p0; lower = lb, upper = ub)
+    σ = stderror(fit)
+    return fit.param, model, xdata, σ
 end
 
+function print_f(x,y, xp, yp,s) 
+    fig = Figure(size=(900, 600))
+    ax1= Axis(fig[1, 1], xlabel = L"xg", ylabel = L"Area", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
+    lines!(ax1, x, y, color = :blue, linestyle=:dash)
+    lines!(ax1, xp, yp, color = :orange)
+    save(plotsdir(string(s,".png")),fig)
+end
+
+
+function get_coeff_pks(v0, sim_name)
+    @load "stretch_factor_Nt=400_num_angles=50.jld2"
+    if sim_name == :rand
+        c = mr.^2 ./ sr ./(0.1*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :fermi
+        c = mf.^2 ./ sf ./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :cos1
+        c = mc1.^2 ./ sc1 ./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :cos6
+        c = mc6.^2 ./ sc6 ./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    end
+end
+
+function get_coeff_area(v0, sim_name)
+    @load "stretch_factor_Nt=400_num_angles=50.jld2"
+    gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
+
+    if sim_name == :rand
+        c = 2*gamma.(mr,sr)./(0.1*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :fermi
+        c = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :cos1
+        c = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    elseif sim_name == :cos6
+        c = 2*gamma.(mc6,sc6)./(0.2*v0_range.^(-2/3))
+        c = mc6.^2 ./ sc6 ./(0.2*v0_range.^(-2/3))
+        ind = findall(v0_range .== v0)
+        return c[ind[1]]
+    end
+end
