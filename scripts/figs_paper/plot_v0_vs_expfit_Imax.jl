@@ -14,7 +14,8 @@ include("utils_decay_comp.jl")
 # num_rays = 1500000;  T = 80; threshold = 2; 
 # T = 100; threshold = 1.5; 
 # num_rays = 1200000; threshold = 3.; 
-num_rays = 600000; threshold = 3.; # Funciona bien
+num_rays = 2000000; threshold = 3.; # Funciona bien
+# num_rays = 600000; threshold = 3.; # Funciona bien
 # T = 100; threshold = 2.; 
 dt = 0.01;  xres = 20
 yres = 1024; 
@@ -99,22 +100,17 @@ using JLD2
 # @load "stretch_factor_Nt=2000_num_angles=50.jld2"
 gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
 
-# @load "coeff_stretch_factor_rand.jld2"
-c_r = gamma.(mr,sr)./(v0_range.^(-2/3)*0.1)
+c_r = 2*gamma.(mr,sr)./(v0_range.^(-2/3)*0.1)
 lines!(ax1, v0_range, c_r, color = :orange, linestyle = :dash,  label = "Rand, measured with stretching")
 
-# @load "coeff_stretch_factor_fermi.jld2"
 c_f = gamma.(mf,sf)./(v0_range.^(-2/3)*0.2)
 lines!(ax1, v0_range, c_f, color = :blue, linestyle = :dash,  label = "Fermi, measured with stretching")
 
-# @load "coeff_stretch_factor_cos1.jld2"
 c_c1 = gamma.(mc1,sc1)./(v0_range.^(-2/3)*0.2)
 lines!(ax1, v0_range, c_c1, color = :black, linestyle = :dash,  label = "cos n=1, measured with stretching")
 
-# @load "coeff_stretch_factor_cos6.jld2"
 c_c6 = gamma.(mc6,sc6)./(v0_range.^(-2/3)*0.2)
 lines!(ax1, v0_range, c_c6, color = :cyan, linestyle = :dash,  label = "cos n=6, measured with stretching")
-
 
 s = "comparison_fit_coeff_omega_Imax.png"
 axislegend(ax1; position = :lt);
