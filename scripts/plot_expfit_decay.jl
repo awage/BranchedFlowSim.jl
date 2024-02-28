@@ -11,13 +11,6 @@ using ProgressMeter
 include("utils_decay_comp.jl")
 
 
-function print_f(x,y, xp, yp,s) 
-    fig = Figure(size=(899, 600))
-    ax0= Axis(fig[1, 1], xlabel = L"xg", ylabel = L"Area", yticklabelsize = 30, xticklabelsize = 30, ylabelsize = 30, xlabelsize = 30,  titlesize = 30, yscale = Makie.pseudolog10)
-    lines!(ax0, x, y, color = :blue, linestyle=:dash)
-    lines!(ax0, xp, yp, color = :orange)
-    save(plotsdir(string(s,".png")),fig)
-end
 
 # Comon parameters
 
