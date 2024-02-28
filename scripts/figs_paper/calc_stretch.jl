@@ -24,8 +24,9 @@ function _get_stretch(d)
     yrange = range(0, a, res)
     py = 0.; S = 100
     points = [ [y, py] for y in yrange] 
-    λ = transverse_growth_rates(df, points; Δt = Nt)
-    λ .= λ./dt # normalize by time step
+    # λ = transverse_growth_rates(df, points; Δt = Nt)
+    λ = transverse_stretching(df, points; Δt = Nt, S)
+    λ .= λ./(Nt*dt) # normalize by time range
     return @strdict(λ)
 end
 
@@ -60,8 +61,8 @@ l_rand = zeros(length(v0_range),num_angles,2)
 γ = zeros(length(v0_range))
 c = zeros(length(v0_range))
 
-for n in 1:num_angles
-   Threads.@threads for k in 1:length(v0_range)
+   for k in 1:length(v0_range)
+        Threads.@threads for n in 1:num_angles
         # Correlated random pot 
         correlation_scale = 0.1;
         sim_width = Nt*dt ; sim_height = 10.
@@ -87,14 +88,15 @@ function compute_stretch_fermi(v0_range, num_rays, num_angles, dt; Nt = 40)
     γ = zeros(length(v0_range), num_angles)
     c = zeros(length(v0_range), num_angles)
 
-    for (j, θ) in enumerate(angles)
-        Threads.@threads for k in 1:length(v0_range)
+    for k in 1:length(v0_range)
+         Threads.@threads  for j in 1:length(angles)
             # Correlated random pot 
+            θ = angles[j]
             lattice_a = 0.2; dot_radius = 0.2*0.25
             softness = 0.2; II = rotation_matrix(θ)
             V = LatticePotential(lattice_a*II, dot_radius, v0_range[k]; softness=softness)
             s = savename("stretch_fermi", @dict(θ))
-            α,β  = get_stretch_index(V; res = num_rays, a = 1, v0 = v0_range[k], dt, Nt, prefix = s, ξ = lattice_a)
+            α,β  = get_stretch_index(V; res = num_rays, a = 0.2, v0 = v0_range[k], dt, Nt, prefix = s, ξ = lattice_a)
             l_fer[k,j,:] = [α, β]
             @show a,b = [α,β]
             # @show γ[k,j] = gamma(a,b)
@@ -113,15 +115,16 @@ function compute_stretch_cos(v0_range, d, num_rays, num_angles, dt; Nt = 40)
     γ = zeros(length(v0_range), num_angles)
     c = zeros(length(v0_range), num_angles)
 
-    for (j, θ) in enumerate(angles)
-        Threads.@threads for k in 1:length(v0_range)
+    for k in 1:length(v0_range)
+        Threads.@threads for j in 1:length(angles)
+            θ = angles[j]
             lattice_a = 0.2; dot_radius = 0.2*0.25
             softness = 0.2; II = rotation_matrix(θ)
             V = RotatedPotential(θ,              
                 fermi_dot_lattice_cos_series(d,  
                 lattice_a, dot_radius, v0_range[k]; softness))
             s = savename("stretch_cos_n", @dict(d, θ))
-            α,β  = get_stretch_index(V; res = num_rays, a = 1, v0 = v0_range[k], dt, Nt, prefix = s, ξ = lattice_a)
+            α,β  = get_stretch_index(V; res = num_rays, a = 0.2, v0 = v0_range[k], dt, Nt, prefix = s, ξ = lattice_a)
             l_cos[k,j,:] = [α, β]
             println("θ=", θ, " v0=", v0_range[k])
             # @show a,b = [mean(α), mean(β)]*(v0_range[k]^(-2/3))
@@ -133,11 +136,9 @@ function compute_stretch_cos(v0_range, d, num_rays, num_angles, dt; Nt = 40)
     return vec(m[:,:,1]), vec(m[:,:,2])
 end
 
-
-
-num_rays = 2000; 
+num_rays = 10000; 
 num_angles = 50
-Nt = 400
+Nt = 600
 dt = 0.01; 
 v0_range = range(0.02, 0.4, step = 0.04); 
 mr,sr = compute_stretch_rand(v0_range, num_rays, num_angles, dt; Nt)
