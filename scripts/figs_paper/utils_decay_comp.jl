@@ -64,10 +64,12 @@ function get_fit(xg, yg; Tf = 0, Ti = 0)
         ydata = yg[indi:end]
     end
     lb = [0., 0., -1.]
-    ub = [100., 200., 0.]   
+    ub = [100., 400., 0.]   
     p0 = [yg[end], ydata[1], -0.2]
     fit = curve_fit(model, xdata, ydata, p0; lower = lb, upper = ub)
-    σ = stderror(fit)
+    @show fit.param
+    # σ = stderror(fit)
+    σ = 0.
     return fit.param, model, xdata, σ
 end
 
@@ -80,47 +82,3 @@ function print_f(x,y, xp, yp,s)
 end
 
 
-function get_coeff_pks(v0, sim_name)
-    @load "stretch_factor_Nt=400_num_angles=50.jld2"
-    if sim_name == :rand
-        c = mr.^2 ./ sr ./(0.1*v0_range.^(-2/3))
-        ind = findall(v0_range .== v0)
-        return c[ind[1]]
-    elseif sim_name == :fermi
-        c = mf.^2 ./ sf ./(0.2*v0_range.^(-2/3))
-        ind = findall(v0_range .== v0)
-        return c[ind[1]]
-    elseif sim_name == :cos1
-        c = mc1.^2 ./ sc1 ./(0.2*v0_range.^(-2/3))
-        ind = findall(v0_range .== v0)
-        return c[ind[1]]
-    elseif sim_name == :cos6
-        c = mc6.^2 ./ sc6 ./(0.2*v0_range.^(-2/3))
-        ind = findall(v0_range .== v0)
-        return c[ind[1]]
-    end
-end
-
-function get_coeff_area(v0, sim_name)
-    @load "stretch_factor_Nt=400_num_angles=50.jld2"
-    gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
-
-    if sim_name == :rand
-        c = 2*gamma.(mr,sr)./(0.1*v0_range.^(-2/3))
-        ind = findall(v0_range .== v0)
-        return c[ind[1]]
-    elseif sim_name == :fermi
-        c = 2*gamma.(mf,sf)./(0.2*v0_range.^(-2/3))
-        ind = findall(v0_range .== v0)
-        return c[ind[1]]
-    elseif sim_name == :cos1
-        c = 2*gamma.(mc1,sc1)./(0.2*v0_range.^(-2/3))
-        ind = findall(v0_range .== v0)
-        return c[ind[1]]
-    elseif sim_name == :cos6
-        c = 2*gamma.(mc6,sc6)./(0.2*v0_range.^(-2/3))
-        c = mc6.^2 ./ sc6 ./(0.2*v0_range.^(-2/3))
-        ind = findall(v0_range .== v0)
-        return c[ind[1]]
-    end
-end

@@ -274,12 +274,16 @@ function quasi2d_smoothed_intensity_stats(
         end
 
         while xi <= length(xs) &&  xs[xi] <= x 
-            density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
+            dy_ray = diff(ray_y)/dy 
+            ind = findall(abs.(dy_ray) .< 2.)
+            density = kde(ray_y[ind], bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity = pdf(density, ys)*(sim_h / h)
+            
             t = findmaxima(intensity)
-            ind = findall(t[2] .> threshold*bckgnd_density) 
+            ind = findall(t[2] .> threshold) 
             nb_pks[xi] = length(ind)
-            ind = findall(intensity .> threshold*bckgnd_density) 
+
+            ind = findall(intensity .> threshold) 
             area[xi] = length(ind)/length(intensity)  
             max_I[xi] = maximum(intensity)  
             xi += 1
