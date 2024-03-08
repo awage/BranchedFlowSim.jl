@@ -108,10 +108,10 @@ lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
 using JLD2
 # @load "stretch_factor_Nt=200_num_angles=50.jld2"
 # @load "stretch_factor_Nt=400_num_angles=50.jld2"
-@load "stretch_factor_Nt=600_num_angles=50.jld2"
+# @load "stretch_factor_Nt=600_num_angles=50.jld2"
 # @load "stretch_factor_Nt=600_num_angles=50_num_rays=5000.jld2"
 # @load "stretch_factor_Nt=600_num_angles=50_num_rays=10000.jld2"
-# @load "stretch_factor_Nt=800_num_angles=50.jld2"
+@load "stretch_factor_Nt=800_num_angles=50.jld2"
 # @load "stretch_factor_Nt=1000_num_angles=50.jld2"
 # @load "stretch_factor_Nt=2000_num_angles=50.jld2"
 gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
