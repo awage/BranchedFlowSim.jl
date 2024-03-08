@@ -64,7 +64,7 @@ function get_fit(xg, yg; Tf = 0, Ti = 0)
         ydata = yg[indi:end]
     end
     lb = [0., 0., -1.]
-    ub = [100., 400., 0.]   
+    ub = [100., 2000, 0.]   
     p0 = [yg[end], ydata[1], -0.2]
     fit = curve_fit(model, xdata, ydata, p0; lower = lb, upper = ub)
     @show fit.param

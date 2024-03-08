@@ -59,6 +59,7 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3)
     ray_py = zeros(num_rays)
     sim_h = (ray_y[2]-ray_y[1]) * num_rays
     h = length(ys) * dy
+    bkg = 1/(dy*length(ys))
     boundary = (
         ys[1] - dy - 4*b,
         ys[end] + dy + 4*b,
@@ -82,14 +83,12 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3)
             nb_br[xi] = count_branches(ray_y, dy, ys[1], ys[end]; δ = 0.001)
 
 
-
             density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity = pdf(density, ys)*(sim_h / h)
             t = findmaxima(intensity)
-            ind = findall(t[2] .> threshold) 
+            ind = findall(t[2] .> threshold*bkg) 
             nb_pks[xi] = length(ind)
-
-            ind = findall(intensity .> threshold) 
+            ind = findall(intensity .> threshold*bkg) 
             area[xi] = length(ind)/length(intensity)  
             max_I[xi] = maximum(intensity)  
             xi += 1
@@ -98,19 +97,31 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3)
     return image, ray_y, (rmin, rmax), m_d, v_d, nb_br, nb_pks, area, max_I
 end
 
-res = 2000; v0 = 0.057; dt = 0.01; 
-num_rays = 2000000
+res = 2000; v0 = 0.18; dt = 0.01; 
+num_rays = 300000
 
-correlation_scale = 0.1; 
-sim_width = 15; sim_height = 10.;  
-V = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, 10)
+ξ = 0.1; sim_width = 25; sim_height = 20.;  
+xs = range(0,10., step = dt)
+ys = range(0,40*ξ, length = res)
+V = correlated_random_potential(sim_width, sim_height, ξ, v0, 10)
+println("start sim")
+img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, xs, ys, V; b = 0.0003)
 
-# lattice_a = 0.2; dot_radius = 0.2*0.25; softness = 0.2; 
-# V = LatticePotential(lattice_a*rotation_matrix(0.), dot_radius, v0; softness=softness)
+# pks = zeros(10,length(xs))
+# bra = zeros(10,length(xs))
+# arr = zeros(10,length(xs))
+# mdd = zeros(10,length(xs))
+# vdd = zeros(10,length(xs))
 
-xs = range(0,15., step = dt)
-ys = range(0,1., length = res)
-img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, xs, ys, V)
+# for k = 1:10
+#     V = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, k)
+#     img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, xs, ys, V)
+#     pks[k,:] = nb_pks
+#     bra[k,:] = nb_br
+#     arr[k,:] = area
+#     mdd[k,:] = m_d
+#     vdd[k,:] = v_d
+# end
 
 
 # dy = step(ys); b = 0.001
@@ -125,9 +136,8 @@ img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, 
 
 
 a,m = fit_lyap(xs[100:200],m_d[100:200])
-b,m = fit_lyap(xs[100:200],v_d[100:200])
+b,m = fit_lyap(xs[200:400],v_d[200:400])
 
-ξ = 0.1
 α = a[2]*(v0^(-2/3))*ξ 
 β = b[2]*2*(v0^(-2/3))*ξ
 gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
