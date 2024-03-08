@@ -276,9 +276,10 @@ function quasi2d_smoothed_intensity_stats(
         while xi <= length(xs) &&  xs[xi] <= x 
             density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity = pdf(density, ys)*(sim_h / h)
-            t = findmaxima(intensity)
-            ind = findall(t[2] .> threshold*bckgnd_density) 
-            nb_pks[xi] = length(ind)
+            # t = findmaxima(intensity)
+            # ind = findall(t[2] .> threshold*bckgnd_density) 
+            nb_pks[xi] = count_branches(ray_y, dy, ys[1], ys[end]; δ = 0.001)
+            # nb_pks[xi] = length(ind)
             ind = findall(intensity .> threshold*bckgnd_density) 
             area[xi] = length(ind)/length(intensity)  
             max_I[xi] = maximum(intensity)  
@@ -288,3 +289,24 @@ function quasi2d_smoothed_intensity_stats(
     return area, max_I, nb_pks
 end
 
+function count_branches(y_ray, dy, a, b; δ = 0.03)
+    dy_ray = diff(y_ray)/dy
+    ind = findall(abs.(dy_ray) .< 1.)
+    ind2 = findall( a .< y_ray[ind] .< b)
+    ray_br = y_ray[ind[ind2]]
+    br = 0; cnt = 0
+    for k in 2:length(ray_br)-1
+
+        if abs(ray_br[k] - ray_br[k+1]) < δ && abs(ray_br[k-1] - ray_br[k]) < δ
+            cnt += 1 
+        else 
+            # the manifold stops, let see if we have long enough stretch
+            if cnt > 3
+                br += 1
+            end
+            cnt = 0
+        end
+
+    end
+    return br
+end
