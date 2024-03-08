@@ -21,7 +21,7 @@ end
 
 # Comon parameters
 
-num_rays = 600000; threshold = 3.; # Funciona bien
+num_rays = 200000; threshold = 4.; 
 # num_rays = 2000000; threshold = 3.; # Funciona bien
 # num_rays = 4000000; threshold = 3.; # Funciona bien
 # num_rays = 1200000; threshold = 3.; 
@@ -31,7 +31,7 @@ dt = 0.01;
 # T = 100; threshold = 1.5; 
 xres = 20
 yres = 1024; 
-num_angles = 100
+num_angles = 50
 v0_range = range(0.04, 0.4, step = 0.04)
 f_p = zeros(length(v0_range),3)
 f_err = zeros(length(v0_range))
@@ -46,7 +46,7 @@ for (k,v0) in enumerate(v0_range)
     a = lattice_a;
     V(θ) = LatticePotential(lattice_a*rotation_matrix(θ), dot_radius, v0; softness=softness)
     s = savename("decay_fermi", @dict(v0))
-    data = get_data_decay(V, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+    data = get_data_decay(V, 40*a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
     @unpack xg, nb_arr = data
     p, m, x, σ = get_fit(xg, vec(mean(nb_arr; dims =2)))
     f_p[k,:] = p
@@ -61,7 +61,7 @@ for (k,v0) in enumerate(v0_range)
             fermi_dot_lattice_cos_series(degree,
             lattice_a, dot_radius, v0; softness))
         s = savename("decay_cos", @dict(degree, v0))
-        data = get_data_decay(cos_pot, lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+        data = get_data_decay(cos_pot, 40*lattice_a, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
         @unpack xg, nb_arr = data
         # c = get_coeff_area(v0, :cos1); Tf = round(5/c)
         p, m, x, σ = get_fit(xg, vec(mean(nb_arr; dims =2)))
@@ -74,7 +74,7 @@ for (k,v0) in enumerate(v0_range)
     sim_width = 15; sim_height = 10.;
     Vr(x) = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, round(Int, x*100))
     s = savename("decay_rand", @dict(v0))
-    data = get_data_decay(Vr, 1., num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
+    data = get_data_decay(Vr, 40*correlation_scale, num_angles, num_rays, T, threshold, dt, xres, yres; prefix = s)
     # data = get_data_decay(Vr, 1., 50, 500000, 15., 3., dt, xres, yres; prefix = s)
     @unpack xg, nb_arr = data
     p, m, x, σ = get_fit(xg, vec(mean(nb_arr; dims =2)))
@@ -108,8 +108,8 @@ lines!(ax1, v0_range, -c_p[:,6,3], color = :cyan,  label = L"V_{cos} ~ n=6")
 using JLD2
 # @load "stretch_factor_Nt=200_num_angles=50.jld2"
 # @load "stretch_factor_Nt=400_num_angles=50.jld2"
-# @load "stretch_factor_Nt=600_num_angles=50.jld2"
-@load "stretch_factor_Nt=600_num_angles=50_num_rays=5000.jld2"
+@load "stretch_factor_Nt=600_num_angles=50.jld2"
+# @load "stretch_factor_Nt=600_num_angles=50_num_rays=5000.jld2"
 # @load "stretch_factor_Nt=600_num_angles=50_num_rays=10000.jld2"
 # @load "stretch_factor_Nt=800_num_angles=50.jld2"
 # @load "stretch_factor_Nt=1000_num_angles=50.jld2"
