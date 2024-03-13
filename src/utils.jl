@@ -1,37 +1,35 @@
 using ChaosTools
 using LinearAlgebra:norm
 
-function transverse_stretching(ds::DynamicalSystem, points;
-        S = 100, Δt = 5, e = 1e-6,
-        perturbation = (ds, u, j) -> _random_Q0(ds, u, j, e),
-        dir = 1 # transverse dir
-    )
-
-    Q0 = [randn()*e, 0]
-    states = [points[1], points[1] .+ Q0]
+function transverse_stretching(ds::DynamicalSystem, T; u0 = initial_state(ds), e = 1e-6, dir = 1)
+    Δt = 1
+    Q0 = [e, 0]
+    states = [u0, u0 .+ Q0]
     pds = ParallelDynamicalSystem(ds, states)
-    # Function barrier
-    return transverse_stretching(pds, dir, points, ds, S, Δt, e)
-end
-
-function transverse_stretching(pds, dir, points, ds, S, Δt, e)
-    λlocal = zeros(length(points), S)
-    # pds_array = [deepcopy(pds) for i in 1:S]
-    for (i, u) in enumerate(points)
-        # Threads.@threads for j in 1:S
-        for j in 1:S
-            Q0 = [randn()*e, 0]
-            states1 = u
-            states2 = states1 .+ Q0
-            g0 = norm(Q0)
-            reinit!(pds, [states1, states2])
-            step!(pds, Δt, true)
-            g = current_state(pds, 2) .- current_state(pds, 1)
-            g = abs(g[dir]) # only the variable y!
-            tspan = current_time(pds) - initial_time(pds)
-            λlocal[i, j] = log(g/g0)
+    d0 = e
+    d0_upper = d0*1e3
+    λlocal = 0
+    while current_time(pds) <  T
+        d = current_state(pds, 2) .- current_state(pds, 1)
+        d = abs(d[dir]) # only the variable y!
+        while d ≤ d0_upper 
+            step!(pds, Δt)
+            d = current_state(pds, 2) .- current_state(pds, 1)
+            d = abs(d[dir]) # only the variable y!
+            current_time(pds) ≥  T && break
         end
+        a = d/d0
+        λlocal += log(a)
+        
+        u1 = current_state(pds, 1)
+        u2 = current_state(pds, 2)
+        @. u2 = u1 + (u2 - u1)/a
+        set_state!(pds, u2, 2)
     end
+    d = current_state(pds, 2) .- current_state(pds, 1)
+    d = abs(d[dir]) # only the variable y!
+    a = d/d0
+    λlocal += log(a)
     return λlocal
 end
 

@@ -56,8 +56,9 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3)
     area = zeros(width)
     max_I = zeros(width)
     ray_y = collect(LinRange(rmin, rmax, num_rays))
+    dyr = ray_y[2] - ray_y[1]
     ray_py = zeros(num_rays)
-    sim_h = (ray_y[2]-ray_y[1]) * num_rays
+    sim_h = dyr * num_rays
     h = length(ys) * dy
     bkg = 1/(dy*length(ys))
     boundary = (
@@ -73,14 +74,14 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3)
         x += dt
 
         while xi <= length(xs) &&  xs[xi] <= x 
-            dy_ray = diff(ray_y)/dy 
+            dy_ray = diff(ray_y)/dyr
             m_d[xi] = mean(log.(abs.(dy_ray)))
             v_d[xi] = var(log.(abs.(dy_ray)))
             ind = findall(abs.(dy_ray) .< 1.)
             density = kde(ray_y[ind], bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity = pdf(density, ys)*(sim_h / h)
             image[:,xi] = intensity
-            nb_br[xi] = count_branches(ray_y, dy, ys[1], ys[end]; δ = 0.001)
+            nb_br[xi] = count_branches(ray_y, dyr, ys[1], ys[end]; δ = 0.001)
 
 
             density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
@@ -97,12 +98,12 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3)
     return image, ray_y, (rmin, rmax), m_d, v_d, nb_br, nb_pks, area, max_I
 end
 
-res = 2000; v0 = 0.18; dt = 0.01; 
+res = 2000; v0 = 0.057; dt = 0.1; 
 num_rays = 300000
 
-ξ = 0.1; sim_width = 25; sim_height = 20.;  
-xs = range(0,10., step = dt)
-ys = range(0,40*ξ, length = res)
+ξ = 1.; sim_width = 35; sim_height = 30.;  
+xs = range(0,20., step = dt)
+ys = range(0,20*ξ, length = res)
 V = correlated_random_potential(sim_width, sim_height, ξ, v0, 10)
 println("start sim")
 img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, xs, ys, V; b = 0.0003)
@@ -135,10 +136,11 @@ img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, 
 # intensity = pdf(density, ys)
 
 
-a,m = fit_lyap(xs[100:200],m_d[100:200])
+a,m = fit_lyap(xs[200:300],m_d[200:300])
 b,m = fit_lyap(xs[200:400],v_d[200:400])
-
+t0 = ξ*(v0^(-2/3))
 α = a[2]*(v0^(-2/3))*ξ 
 β = b[2]*2*(v0^(-2/3))*ξ
+@show α^2/β/t0
 gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
 c_f = 2*gamma.(α,β)./(ξ*v0^(-2/3))
