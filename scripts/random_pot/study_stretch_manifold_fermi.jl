@@ -173,22 +173,33 @@ function compute_datas(d)
     return @strdict(img_pos, img_z, img_all, nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, λ1)
 end
 
-v0 = 0.05; dt = 0.01; T = 10000
-num_rays = 100000
+v0 = 0.1; dt = 0.01; T = 10000
+num_rays = 300000; range_θ =  range(0.,π/4, step = 0.05)
 a = 0.2; dot_radius = 0.2*0.25; softness = 0.2; 
-lyap_threshold = 2e-3; θ = 1e-3
-
+lyap_threshold = 2e-3; θ = 1e-3; nθ = length(range_θ)
 xs = range(0,20., step = dt)
 y_init = range(-20*a, 20*a, length = num_rays)
+mean_nb_br_z = zeros(nθ, length(xs))
+mean_nb_br_all = zeros(nθ, length(xs))
+mean_nb_br_pos = zeros(nθ, length(xs))
 
-for θ in range(0.,π/4, step = 0.1)
+mean_nb_pks_z = zeros(nθ, length(xs))
+mean_nb_pks_all = zeros(nθ, length(xs))
+mean_nb_pks_pos = zeros(nθ, length(xs))
+
+for (k,θ) in enumerate(range_θ)
     V = LatticePotential(a*rotation_matrix(θ), dot_radius, v0; softness=softness)
-
     data =  save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "fermi_dec") 
+    @unpack img_pos, img_z, img_all, nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, λ1 = data
+    mean_nb_br_pos[k,:] = nb_br_pos
+    mean_nb_br_z[k,:] = nb_br_z
+    mean_nb_br_all[k,:] = nb_br_all
+
+
+    mean_nb_pks_pos[k,:] = nb_pks_pos
+    mean_nb_pks_z[k,:] = nb_pks_z
+    mean_nb_pks_all[k,:] = nb_pks_all
 end
-
-@unpack img_pos, img_z, img_all, nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, λ1 = data
-
 
 # a,m = fit_lyap(xs[100:200],m_d[100:200])
 # b,m = fit_lyap(xs[200:400],v_d[200:400])
