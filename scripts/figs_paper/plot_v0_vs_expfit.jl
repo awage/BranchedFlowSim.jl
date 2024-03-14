@@ -12,13 +12,8 @@ include("utils_decay_comp.jl")
 
 # Comon parameters
 num_rays = 1500000; 
-<<<<<<< HEAD
-dt = 0.01; T = 100; xres = 20
-yres = 1024; threshold = 2.; 
-=======
 dt = 0.01; T = 80; xres = 20
 yres = 1024; threshold = 2; 
->>>>>>> 809c445eae3836b598f73af7ec8e9aaf9eb59c0d
 num_angles = 50
 
 v0_range = range(0.04, 0.4, step = 0.04)
