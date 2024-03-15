@@ -196,8 +196,11 @@ mean_v_pos = zeros(nθ, length(xs))
 
 for v0 in range(0.05, 0.4, step = 0.05)
     for (k,θ) in enumerate(range_θ)
-        V = LatticePotential(a*rotation_matrix(θ), dot_radius, v0; softness=softness)
-        data =  save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "fermi_dec") 
+        # V = LatticePotential(a*rotation_matrix(θ), dot_radius, v0; softness=softness)
+        V = RotatedPotential(θ,
+            fermi_dot_lattice_cos_series(6,
+            a, dot_radius, v0; softness))
+        data =  save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "cos_6_dec") 
         @unpack img_pos, img_z, img_all, nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, λ1 = data
         mean_nb_br_pos[k,:] = nb_br_pos
         mean_nb_br_z[k,:] = nb_br_z
@@ -223,7 +226,7 @@ for v0 in range(0.05, 0.4, step = 0.05)
     lines!(a1, xs, vec(mean(mean_nb_br_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
     lines!(a1, xs, vec(mean(mean_nb_br_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
    axislegend()
-   s = savename("fermi_dec_nb",@dict(v0),"png") 
+   s = savename("cos_6_dec_nb",@dict(v0),"png") 
    save(plotsdir(s), fig)
 
     fig = Figure()
@@ -233,7 +236,7 @@ for v0 in range(0.05, 0.4, step = 0.05)
     lines!(a1, xs, vec(mean(mean_nb_pks_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
     lines!(a1, xs, vec(mean(mean_nb_pks_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
    axislegend()
-   s = savename("fermi_dec_pks",@dict(v0),"png") 
+   s = savename("cos_6_dec_pks",@dict(v0),"png") 
    save(plotsdir(s), fig)
 
     fig = Figure()
@@ -243,7 +246,7 @@ for v0 in range(0.05, 0.4, step = 0.05)
     lines!(a1, xs, vec(mean(mean_m_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
     lines!(a1, xs, vec(mean(mean_m_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
    axislegend()
-   s = savename("fermi_dec_m",@dict(v0),"png") 
+   s = savename("cos_6_dec_m",@dict(v0),"png") 
    save(plotsdir(s), fig)
 
     fig = Figure()
@@ -253,6 +256,6 @@ for v0 in range(0.05, 0.4, step = 0.05)
     lines!(a1, xs, vec(mean(mean_v_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
     lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
    axislegend()
-   s = savename("fermi_dec_v",@dict(v0),"png") 
+   s = savename("cos_6_dec_v",@dict(v0),"png") 
    save(plotsdir(s), fig)
 end
