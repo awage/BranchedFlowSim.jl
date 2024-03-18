@@ -49,7 +49,7 @@ function get_lyap_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T = 
     @show mean(λ[λ .> 0])
     ind = findall(λ .> threshold)
     l_index = length(ind)/length(λ) 
-    return mean(λ[λ .> 0])/dt
+    return l_index
 end
 
 
@@ -92,7 +92,7 @@ for (j, θ) in enumerate(angles)
         end
 
         # Correlated random pot 
-        correlation_scale = 1;
+        correlation_scale = 0.1;
         sim_width = 20; sim_height = 20. 
         Vr = correlated_random_potential(sim_width, sim_height, correlation_scale, v0, j)
         s = savename("lyap_rand", @dict(v0,j))

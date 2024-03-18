@@ -67,7 +67,6 @@ function count_branches(y_ray, dy, a, b; δ = 0.03)
     ray_br = y_ray[ind[ind2]]
     br = 0; cnt = 0
     for k in 2:length(ray_br)-1
-
         if abs(ray_br[k] - ray_br[k+1]) < δ && abs(ray_br[k-1] - ray_br[k]) < δ
             cnt += 1 
         else 
@@ -183,6 +182,10 @@ mean_nb_br_z = zeros(nθ, length(xs))
 mean_nb_br_all = zeros(nθ, length(xs))
 mean_nb_br_pos = zeros(nθ, length(xs))
 
+mean_area_z = zeros(nθ, length(xs))
+mean_area_all = zeros(nθ, length(xs))
+mean_area_pos = zeros(nθ, length(xs))
+
 mean_nb_pks_z = zeros(nθ, length(xs))
 mean_nb_pks_all = zeros(nθ, length(xs))
 mean_nb_pks_pos = zeros(nθ, length(xs))
@@ -207,6 +210,10 @@ for v0 in range(0.05, 0.4, step = 0.05)
         mean_nb_pks_z[k,:] = nb_pks_z
         mean_nb_pks_all[k,:] = nb_pks_all
 
+        mean_area_pos[k,:] = area_pos
+        mean_area_z[k,:] = area_z
+        mean_area_all[k,:] = area_all
+
         mean_m_pos[k,:] = m_d_pos
         mean_m_z[k,:] = m_d_z
         mean_m_all[k,:] = m_d_all
@@ -221,7 +228,7 @@ for v0 in range(0.05, 0.4, step = 0.05)
     a1 = Axis(fig[1,1], ylabel = L"n_{b}(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_nb_br_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_nb_br_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-    lines!(a1, xs, vec(mean(mean_nb_br_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    lines!(a1, xs, vec(mean(mean_nb_br_pos, dims = 1)), color = :red, label = L"\lambda > 0")
    axislegend()
    s = savename("fermi_dec_nb",@dict(v0),"png") 
    save(plotsdir(s), fig)
@@ -231,7 +238,7 @@ for v0 in range(0.05, 0.4, step = 0.05)
     a1 = Axis(fig[1,1], ylabel = L"n_{b}(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_nb_pks_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_nb_pks_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-    lines!(a1, xs, vec(mean(mean_nb_pks_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    lines!(a1, xs, vec(mean(mean_nb_pks_pos, dims = 1)), color = :red, label = L"\lambda > 0")
    axislegend()
    s = savename("fermi_dec_pks",@dict(v0),"png") 
    save(plotsdir(s), fig)
@@ -241,7 +248,7 @@ for v0 in range(0.05, 0.4, step = 0.05)
     a1 = Axis(fig[1,1], ylabel = L"m(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_m_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_m_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-    lines!(a1, xs, vec(mean(mean_m_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    lines!(a1, xs, vec(mean(mean_m_pos, dims = 1)), color = :red, label = L"\lambda > 0")
    axislegend()
    s = savename("fermi_dec_m",@dict(v0),"png") 
    save(plotsdir(s), fig)
@@ -251,7 +258,17 @@ for v0 in range(0.05, 0.4, step = 0.05)
     a1 = Axis(fig[1,1], ylabel = L"v(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_v_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_v_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-    lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+   axislegend()
+   s = savename("fermi_dec_v",@dict(v0),"png") 
+   save(plotsdir(s), fig)
+
+    fig = Figure()
+    # g = GridLayout(fig)
+    a1 = Axis(fig[1,1], ylabel = L"f_{b}(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_area_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_area_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_area_pos, dims = 1)), color = :red, label = L"\lambda > 0")
    axislegend()
    s = savename("fermi_dec_v",@dict(v0),"png") 
    save(plotsdir(s), fig)

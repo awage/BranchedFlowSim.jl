@@ -33,3 +33,26 @@ function transverse_stretching(ds::DynamicalSystem, T; u0 = initial_state(ds), e
     return λlocal
 end
 
+function quasi2d_map!(du,u,p,t)
+    y,py = u; potential, dt = p
+    # kick
+    du[2] = py + dt * force_y(potential, dt*t, y)
+    # drift
+    du[1] = y + dt * du[2]
+    return nothing
+end
+
+
+function _get_lyap_1D(d) 
+    @unpack V, dt, T, y_init = d
+    df = DeterministicIteratedMap(quasi2d_map!, [0.4, 0.2], [V, dt])
+    py = 0.
+    res = length(y_init)
+    λ1 = zeros(res)
+    p = Progress(res, "Lyap calc") 
+    Threads.@threads for k in eachindex(y_init)
+        λ1[k] = lyapunov(df, T; u0 = [y_init[k], py]) 
+        next!(p)
+    end
+    return λ1
+end
