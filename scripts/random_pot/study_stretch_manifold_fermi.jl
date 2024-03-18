@@ -15,6 +15,27 @@ using Peaks
 
 include(srcdir("utils.jl"))
 
+function get_fit_lin(xg, yg)
+    model(x, p) = p[1] .+ p[2] .* x
+    p0 = [yg[1], 0.2]
+    fit = curve_fit(model, xg, yg, p0)
+    @show fit.param
+    return fit.param, model, xg
+end
+
+function get_fit_exp(xg, yg)
+    model(x, p) = p[1] * exp.(p[2] * x)
+        mx, indi = findmax(yg)
+        xdata = xg[indi:end]
+        ydata = yg[indi:end]
+    lb = [0., -1.]
+    ub = [2000, 0.]   
+    p0 = [ydata[1], -0.2]
+    fit = curve_fit(model, xdata, ydata, p0; lower = lb, upper = ub)
+    @show fit.param
+    return fit.param, model, xdata
+end
+
 function save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "fermi_dec") 
     d = @dict(V,v0,a , y_init, T, lyap_threshold, dt, xs, num_rays, θ)  
     data, file = produce_or_load(
@@ -197,7 +218,13 @@ mean_v_z = zeros(nθ, length(xs))
 mean_v_all = zeros(nθ, length(xs))
 mean_v_pos = zeros(nθ, length(xs))
 
-for v0 in range(0.05, 0.4, step = 0.05)
+v0_range = range(0.05, 0.4, step = 0.05)
+c0_range = zeros(length(v0_range))
+α_vec = zeros(length(v0_range))
+β_vec = zeros(length(v0_range))
+ω_vec = zeros(length(v0_range))
+
+for (jj,v0) in enumerate(v0_range)
     for (k,θ) in enumerate(range_θ)
         V = LatticePotential(a*rotation_matrix(θ), dot_radius, v0; softness=softness)
         data =  save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "fermi_dec") 
@@ -222,13 +249,25 @@ for v0 in range(0.05, 0.4, step = 0.05)
         mean_v_z[k,:] = v_d_z
         mean_v_all[k,:] = v_d_all
     end
-    
+    mm = vec(mean(mean_m_pos, dims = 1))
+    v = vec(mean(mean_v_pos, dims = 1))
+    br = vec(mean(mean_nb_br_pos, dims = 1))
+    p,m,x = get_fit_lin(xs[10:250], mm[10:250]) 
+    α_vec[jj] = p[2] 
+    p,m,x = get_fit_lin(xs[10:250], v[10:250]) 
+    β_vec[jj] = p[2]*2
+    p,m,x = get_fit_exp(xs, br) 
+    ω_vec[jj] = p[2]
+
+
     fig = Figure()
     # g = GridLayout(fig)
     a1 = Axis(fig[1,1], ylabel = L"n_{b}(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_nb_br_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_nb_br_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
     lines!(a1, xs, vec(mean(mean_nb_br_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+    p,m,x = get_fit_exp(xs, br) 
+    lines!(a1, x, m(x,p), color = :red, linestyle = :dash, label = L"\lambda > 0, \textrm{ fit}")
    axislegend()
    s = savename("fermi_dec_nb",@dict(v0),"png") 
    save(plotsdir(s), fig)
@@ -249,6 +288,8 @@ for v0 in range(0.05, 0.4, step = 0.05)
     lines!(a1, xs, vec(mean(mean_m_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_m_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
     lines!(a1, xs, vec(mean(mean_m_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+    p,m,x = get_fit_lin(xs[10:300], mm[10:300]) 
+    lines!(a1, x, m(x,p), color = :red, linestyle = :dash, label = L"\lambda > 0, \textrm{ fit}")
    axislegend()
    s = savename("fermi_dec_m",@dict(v0),"png") 
    save(plotsdir(s), fig)
@@ -258,6 +299,7 @@ for v0 in range(0.05, 0.4, step = 0.05)
     a1 = Axis(fig[1,1], ylabel = L"v(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_v_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_v_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+<<<<<<< HEAD
     lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda > 0")
    axislegend()
    s = savename("fermi_dec_v",@dict(v0),"png") 
@@ -269,7 +311,16 @@ for v0 in range(0.05, 0.4, step = 0.05)
     lines!(a1, xs, vec(mean(mean_area_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_area_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
     lines!(a1, xs, vec(mean(mean_area_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+    lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    p,m,x = get_fit_lin(xs[10:300], v[10:300]) 
+    lines!(a1, x, m(x,p), color = :red, linestyle = :dash, label = L"\lambda > 0, \textrm{ fit}")
    axislegend()
    s = savename("fermi_dec_v",@dict(v0),"png") 
    save(plotsdir(s), fig)
 end
+
+using JLD2
+@save "alfa_beta_fit.jld2" α_vec β_vec ω_vec
+
+
+

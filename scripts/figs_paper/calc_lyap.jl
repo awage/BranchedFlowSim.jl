@@ -49,7 +49,14 @@ function get_lyap_index(V, threshold; res = 500, a = 1, v0 = 1., dt = 0.01, T = 
     @show mean(λ[λ .> 0])
     ind = findall(λ .> threshold)
     l_index = length(ind)/length(λ) 
+<<<<<<< HEAD
     return l_index
+||||||| 949f7d4
+    return mean(λ[λ .> 0])/dt
+=======
+    # return mean(λ[λ .> 0])/dt
+    return l_index
+>>>>>>> 7f1f08ced28e36d84e338d6936d128c93196f881
 end
 
 
