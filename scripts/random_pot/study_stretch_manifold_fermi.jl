@@ -34,6 +34,7 @@ function compute_branches(d)
     ind = 1:length(y_init)
     img_all,_,_, m_d_all, v_d_all, nb_br_all, nb_pks_all, area_all,_,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
     return @strdict(nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z)
+
 end
 
 function save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "fermi_dec") 
@@ -42,7 +43,7 @@ function save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, 
         datadir("storage"), # path
         d, # container for parameter
         compute_lyap, # function
-        prefix = prefix, # prefix for savename
+        prefix = "lyap_fermi_dec", # prefix for savename
         force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
@@ -54,7 +55,7 @@ function save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, 
         d, # container for parameter
         compute_branches, # function
         prefix = prefix, # prefix for savename
-        force = true, # true for forcing sims
+        force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
@@ -169,12 +170,19 @@ end
 
 
 
-v0 = 0.1; dt = 0.01; T = 10000; num_rays = 100000; 
+v0 = 0.05; dt = 0.01; T = 10000; num_rays = 100000; 
 a = 0.2; dot_radius = 0.2*0.25; softness = 0.2; 
 lyap_threshold = 2e-3; θ = 0.; 
 xs = range(0,20., step = dt)
+θ_range = range(0,π/4, length = 40)
 y_init = range(-20*a, 20*a, length = num_rays)
 V = LatticePotential(a*rotation_matrix(θ), dot_radius, v0; softness=softness)
 ys = range(0, a*8, length = length(xs))
 
-data = save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "fermi_dec") 
+# Threads.@threads for k in 1:length(θ_range)
+for k in 1:length(θ_range)
+    data = save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ_range[k]; prefix = "fermi_dec") 
+    @unpack nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z = data
+end
+
+
