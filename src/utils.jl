@@ -56,3 +56,31 @@ function _get_lyap_1D(d)
     end
     return λ1
 end
+
+function get_fit_lin(xg, yg)
+    model(x, p) = p[1] .+ p[2] .* x
+    p0 = [yg[1], 0.2]
+    fit = curve_fit(model, xg, yg, p0)
+    @show fit.param
+    return fit.param, model, xg
+end
+
+function fit_lyap(xg, yg)
+    model(x, p) = p[1] .+ p[2] *x
+    p0 = [yg[1], 0.2]
+    fit = curve_fit(model, xg, yg, p0)
+    return fit.param, model
+end
+
+function get_fit_exp(xg, yg)
+    model(x, p) = p[1] * exp.(p[2] * x)
+        mx, indi = findmax(yg)
+        xdata = xg[indi:end]
+        ydata = yg[indi:end]
+    lb = [0., -1.]
+    ub = [2000, 0.]   
+    p0 = [ydata[1], -0.2]
+    fit = curve_fit(model, xdata, ydata, p0; lower = lb, upper = ub)
+    @show fit.param
+    return fit.param, model, xdata
+end
