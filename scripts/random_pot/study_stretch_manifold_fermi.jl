@@ -55,31 +55,28 @@ function save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, 
         d, # container for parameter
         compute_branches, # function
         prefix = prefix, # prefix for savename
-        force = false, # true for forcing sims
+        force = true, # true for forcing sims
         wsave_kwargs = (;compress = true)
     )
     return data
 end 
 
-
-function count_branches(y_ray, dy, ys; δ = 0.03)
+function count_branches(y_ray, dy, ys)
     dy_ray = diff(y_ray)/dy
     hst = zeros(length(ys))
-    a = ys[1]; b = ys[end]; dys = step(ys)
-    ind = findall(abs.(dy_ray) .< 1.)
-    ind2 = findall( a .< y_ray[ind] .< b)
-    ray_br = y_ray[ind[ind2]]
-    ind_br = ind[ind2]
+    a = ys[1]; b = ys[end]; dys = ys[2] - ys[1]
+    ind_br = findall(abs.(dy_ray) .< 1.)
     br = 0; cnt = 0
-    for k in 2:length(ind_br)-1
+    for k in 1:length(ind_br)-1
         if ind_br[k] == ind_br[k+1] - 1  
                 cnt += 1 
-             # end
         else 
             # the manifold stops, let see if we have long enough stretch
             if cnt ≥ 3
-                br += 1
-                for y in ray_br[k-cnt:k]
+                if all(x -> (a ≤ x ≤ b) , y_ray[ind_br[k-cnt:k]])
+                    br += 1
+                end
+                for y in y_ray[ind_br[k-cnt:k]]
                     yi = 1 + round(Int, (y - a) / dys)
                     if yi >= 1 && yi <= length(ys)
                         hst[yi] = 1
@@ -88,10 +85,41 @@ function count_branches(y_ray, dy, ys; δ = 0.03)
             end
             cnt = 0
         end
-
     end
     return br, hst
 end
+
+
+# function count_branches(y_ray, dy, ys; δ = 0.03)
+#     dy_ray = diff(y_ray)/dy
+#     hst = zeros(length(ys))
+#     a = ys[1]; b = ys[end]; dys = step(ys)
+#     ind = findall(abs.(dy_ray) .< 1.)
+#     ind2 = findall( a .< y_ray[ind] .< b)
+#     ray_br = y_ray[ind[ind2]]
+#     ind_br = ind[ind2]
+#     br = 0; cnt = 0
+#     for k in 2:length(ind_br)-1
+#         if ind_br[k] == ind_br[k+1] - 1  
+#                 cnt += 1 
+#              # end
+#         else 
+#             # the manifold stops, let see if we have long enough stretch
+#             if cnt ≥ 3
+#                 br += 1
+#                 for y in ray_br[k-cnt:k]
+#                     yi = 1 + round(Int, (y - a) / dys)
+#                     if yi >= 1 && yi <= length(ys)
+#                         hst[yi] = 1
+#                     end
+#                 end
+#             end
+#             cnt = 0
+#         end
+
+#     end
+#     return br, hst
+# end
 
 
 function get_histogram(ray_y, ys, threshold)
@@ -162,7 +190,7 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3, 
             end
             density = kde(ray_y[ind], bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity = pdf(density, ys)*(sim_h / h)
-            nb_br[xi], hst = count_branches(ray_y[ind], dyr, ys; δ = 0.001)
+            nb_br[xi], hst = count_branches(ray_y[ind], dyr, ys)
             image[:,xi] = hst
             # density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
             # intensity = pdf(density, ys)*(sim_h / h)
