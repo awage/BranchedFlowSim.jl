@@ -26,14 +26,14 @@ function compute_branches(d)
 
     ys = range(0, a*8, length = length(xs))
     ind = findall(λ1 .> lyap_threshold)
-    img_pos,_,_, m_d_pos, v_d_pos, nb_br_pos, nb_pks_pos, area_pos,_,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
+    img_pos,_,_, m_d_pos, v_d_pos, nb_br_pos, nb_pks_pos, area_pos,max_pos,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
 
     ind = findall(λ1 .≤ lyap_threshold)
-    img_z,_,_, m_d_z, v_d_z, nb_br_z, nb_pks_z, area_z,_,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
+    img_z,_,_, m_d_z, v_d_z, nb_br_z, nb_pks_z, area_z,max_z,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
 
     ind = 1:length(y_init)
-    img_all,_,_, m_d_all, v_d_all, nb_br_all, nb_pks_all, area_all,_,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
-    return @strdict(nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z)
+    img_all,_,_, m_d_all, v_d_all, nb_br_all, nb_pks_all, area_all, max_all,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
+    return @strdict(nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, max_pos, max_z, max_all)
 
 end
 
@@ -94,6 +94,19 @@ function count_branches(y_ray, dy, ys; δ = 0.03)
 end
 
 
+function get_histogram(ray_y, ys, threshold)
+dy = step(ys)
+bkg = 1/(dy*length(ys))
+hst = zeros(length(ys))
+    for y ∈ ray_y
+        yi = 1 + round(Int, (y - ys[1]) / dy)
+        if yi >= 1 && yi <= length(ys)
+            hst[yi] += 1
+        end
+    end
+    ind = findall(hst .> dy*bkg*threshold*sum(hst))
+    return length(ind)/length(hst)
+end
 
 function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3, ind_i = nothing, rmin = nothing, rmax = nothing, ray_y = nothing)
 
@@ -151,17 +164,16 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3, 
             intensity = pdf(density, ys)*(sim_h / h)
             nb_br[xi], hst = count_branches(ray_y[ind], dyr, ys; δ = 0.001)
             image[:,xi] = hst
-
-
             # density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
             # intensity = pdf(density, ys)*(sim_h / h)
             t = findmaxima(intensity)
-            ind = findall(t[2] .> threshold*bkg) 
-            nb_pks[xi] = length(ind)
-            ind = findall(intensity .> threshold*bkg) 
+            indt = findall(t[2] .> threshold*bkg) 
+            nb_pks[xi] = length(indt)
+            # ind = findall(intensity .> threshold*bkg) 
             # area[xi] = length(ind)/length(intensity)  
+            
             area[xi] = sum(hst)/length(hst)  
-            max_I[xi] = maximum(intensity)  
+            max_I[xi] = get_histogram(ray_y[ind], ys, threshold)
             xi += 1
         end
     end
@@ -170,19 +182,136 @@ end
 
 
 
-v0 = 0.05; dt = 0.01; T = 10000; num_rays = 100000; 
+v0 = 0.15; dt = 0.01; T = 10000; num_rays = 200000; 
 a = 0.2; dot_radius = 0.2*0.25; softness = 0.2; 
-lyap_threshold = 2e-3; θ = 0.; 
+lyap_threshold = 2e-3; θ = 0.; nθ = 60
 xs = range(0,20., step = dt)
-θ_range = range(0,π/4, length = 40)
+θ_range = range(0,π/4, length = nθ)
 y_init = range(-20*a, 20*a, length = num_rays)
-V = LatticePotential(a*rotation_matrix(θ), dot_radius, v0; softness=softness)
 ys = range(0, a*8, length = length(xs))
+
+mean_nb_br_z = zeros(nθ, length(xs))
+mean_nb_br_all = zeros(nθ, length(xs))
+mean_nb_br_pos = zeros(nθ, length(xs))
+
+mean_area_z = zeros(nθ, length(xs))
+mean_area_all = zeros(nθ, length(xs))
+mean_area_pos = zeros(nθ, length(xs))
+
+mean_area2_z = zeros(nθ, length(xs))
+mean_area2_all = zeros(nθ, length(xs))
+mean_area2_pos = zeros(nθ, length(xs))
+
+mean_nb_pks_z = zeros(nθ, length(xs))
+mean_nb_pks_all = zeros(nθ, length(xs))
+mean_nb_pks_pos = zeros(nθ, length(xs))
+
+mean_m_z = zeros(nθ, length(xs))
+mean_m_all = zeros(nθ, length(xs))
+mean_m_pos = zeros(nθ, length(xs))
+mean_v_z = zeros(nθ, length(xs))
+mean_v_all = zeros(nθ, length(xs))
+mean_v_pos = zeros(nθ, length(xs))
 
 # Threads.@threads for k in 1:length(θ_range)
 for k in 1:length(θ_range)
+    V = LatticePotential(a*rotation_matrix(θ_range[k]), dot_radius, v0; softness=softness)
     data = save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ_range[k]; prefix = "fermi_dec") 
-    @unpack nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z = data
+    @unpack nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, max_pos, max_z, max_all = data
+        mean_nb_br_pos[k,:] = nb_br_pos
+        mean_nb_br_z[k,:] = nb_br_z
+        mean_nb_br_all[k,:] = nb_br_all
+
+        mean_nb_pks_pos[k,:] = nb_pks_pos
+        mean_nb_pks_z[k,:] = nb_pks_z
+        mean_nb_pks_all[k,:] = nb_pks_all
+
+        mean_area_pos[k,:] = area_pos
+        mean_area_z[k,:] = area_z
+        mean_area_all[k,:] = area_all
+
+        mean_area2_pos[k,:] = max_pos
+        mean_area2_z[k,:] = max_z
+        mean_area2_all[k,:] = max_all
+
+        mean_m_pos[k,:] = m_d_pos
+        mean_m_z[k,:] = m_d_z
+        mean_m_all[k,:] = m_d_all
+
+        mean_v_pos[k,:] = v_d_pos
+        mean_v_z[k,:] = v_d_z
+        mean_v_all[k,:] = v_d_all
 end
 
+    # mm = vec(mean(mean_m_pos, dims = 1))
+    # v = vec(mean(mean_v_pos, dims = 1))
+    # br = vec(mean(mean_nb_br_pos, dims = 1))
+    # p,m,x = get_fit_lin(xs[10:250], mm[10:250]) 
+    # α_vec[jj] = p[2] 
+    # p,m,x = get_fit_lin(xs[10:250], v[10:250]) 
+    # β_vec[jj] = p[2]*2
+    # p,m,x = get_fit_exp(xs, br) 
+    # ω_vec[jj] = p[2]
 
+
+    fig = Figure()
+    a1 = Axis(fig[1,1], ylabel = L"n_{b}(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_nb_br_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_nb_br_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_nb_br_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+    # p,m,x = get_fit_exp(xs, br) 
+    # lines!(a1, x, m(x,p), color = :red, linestyle = :dash, label = L"\lambda > 0, \textrm{ fit}")
+   axislegend()
+   s = savename("fermi_dec_nb",@dict(v0),"png") 
+   save(plotsdir(s), fig)
+
+    fig = Figure()
+    a1 = Axis(fig[1,1], ylabel = L"n_{b}(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_nb_pks_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_nb_pks_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_nb_pks_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+   axislegend()
+   s = savename("fermi_dec_pks",@dict(v0),"png") 
+   save(plotsdir(s), fig)
+
+    fig = Figure()
+    a1 = Axis(fig[1,1], ylabel = L"m(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_m_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_m_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_m_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+    # p,m,x = get_fit_lin(xs[10:300], mm[10:300]) 
+    # lines!(a1, x, m(x,p), color = :red, linestyle = :dash, label = L"\lambda > 0, \textrm{ fit}")
+   axislegend()
+   s = savename("fermi_dec_m",@dict(v0),"png") 
+   save(plotsdir(s), fig)
+
+    fig = Figure()
+    a1 = Axis(fig[1,1], ylabel = L"v(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_v_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_v_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+   axislegend()
+   s = savename("fermi_dec_v",@dict(v0),"png") 
+   save(plotsdir(s), fig)
+
+    fig = Figure()
+    a1 = Axis(fig[1,1], ylabel = L"f_{b}(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_area_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_area_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_area_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+   axislegend()
+   ylims!(a1, 0., 0.2)
+   xlims!(a1, 0., 20.)
+   s = savename("fermi_area",@dict(v0),"png") 
+   save(plotsdir(s), fig)
+
+    fig = Figure()
+    a1 = Axis(fig[1,1], ylabel = L"f_{b}(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_area2_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_area2_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_area2_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+   axislegend()
+   ylims!(a1, 0., 0.2)
+   xlims!(a1, 0., 20.)
+   s = savename("fermi_area2",@dict(v0),"png") 
+   save(plotsdir(s), fig)

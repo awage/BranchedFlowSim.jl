@@ -299,7 +299,6 @@ for (jj,v0) in enumerate(v0_range)
     a1 = Axis(fig[1,1], ylabel = L"v(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_v_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_v_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-<<<<<<< HEAD
     lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda > 0")
    axislegend()
    s = savename("fermi_dec_v",@dict(v0),"png") 
