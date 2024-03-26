@@ -15,12 +15,45 @@ using Peaks
 
 include(srcdir("utils.jl"))
 
-function save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "fermi_dec") 
+function compute_lyap(d)
+    @unpack v0, T, dt, V, y_init, lyap_threshold, xs, a = d # parametros
+    λ1 = _get_lyap_1D(d) 
+    return @strdict(λ1)
+end
+
+function compute_branches(d)
+    @unpack v0, T, dt, V, y_init, lyap_threshold, xs, a, λ1 = d # parametros
+
+    ys = range(0, a*8, length = length(xs))
+    ind = findall(λ1 .> lyap_threshold)
+    img_pos,_,_, m_d_pos, v_d_pos, nb_br_pos, nb_pks_pos, area_pos,max_pos,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
+
+    ind = findall(λ1 .≤ lyap_threshold)
+    img_z,_,_, m_d_z, v_d_z, nb_br_z, nb_pks_z, area_z,max_z,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
+
+    ind = 1:length(y_init)
+    img_all,_,_, m_d_all, v_d_all, nb_br_all, nb_pks_all, area_all, max_all,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
+    return @strdict(nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, max_pos, max_z, max_all)
+
+end
+
+function save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "cos_dec") 
     d = @dict(V,v0,a , y_init, T, lyap_threshold, dt, xs, num_rays, θ)  
     data, file = produce_or_load(
         datadir("storage"), # path
         d, # container for parameter
-        compute_datas, # function
+        compute_lyap, # function
+        prefix = "lyap_cos_dec", # prefix for savename
+        force = false, # true for forcing sims
+        wsave_kwargs = (;compress = true)
+    )
+
+    @unpack λ1 = data
+    d = @dict(V,v0,a , y_init, T, lyap_threshold, dt, xs, num_rays, θ, λ1)  
+    data, file = produce_or_load(
+        datadir("storage"), # path
+        d, # container for parameter
+        compute_branches, # function
         prefix = prefix, # prefix for savename
         force = false, # true for forcing sims
         wsave_kwargs = (;compress = true)
@@ -28,61 +61,49 @@ function save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, 
     return data
 end 
 
-function quasi2d_map!(du,u,p,t)
-    y,py = u; potential, dt = p
-    # kick
-    du[2] = py + dt * force_y(potential, dt*t, y)
-    # drift
-    du[1] = y + dt * du[2]
-    return nothing
-end
-
-
-function _get_lyap_1D(d) 
-    @unpack V, dt, T, y_init = d
-    df = DeterministicIteratedMap(quasi2d_map!, [0.4, 0.2], [V, dt])
-    py = 0.
-    res = length(y_init)
-    λ1 = zeros(res)
-    p = Progress(res, "Lyap calc") 
-    Threads.@threads for k in eachindex(y_init)
-        λ1[k] = lyapunov(df, T; u0 = [y_init[k], py]) 
-        next!(p)
-    end
-    return λ1
-end
-
-# include(srcdir("utils.jl"))
-function fit_lyap(xg, yg)
-    model(x, p) = p[1] .+ p[2] *x
-    p0 = [yg[1], 0.2]
-    fit = curve_fit(model, xg, yg, p0)
-    return fit.param, model
-end
-
-function count_branches(y_ray, dy, a, b; δ = 0.03)
+function count_branches(y_ray, dy, ys)
     dy_ray = diff(y_ray)/dy
-    ind = findall(abs.(dy_ray) .< 1.)
-    ind2 = findall( a .< y_ray[ind] .< b)
-    ray_br = y_ray[ind[ind2]]
+    hst = zeros(length(ys))
+    a = ys[1]; b = ys[end]; dys = ys[2] - ys[1]
+    ind_br = findall(abs.(dy_ray) .< 1.)
     br = 0; cnt = 0
-    for k in 2:length(ray_br)-1
-
-        if abs(ray_br[k] - ray_br[k+1]) < δ && abs(ray_br[k-1] - ray_br[k]) < δ
-            cnt += 1 
+    for k in 1:length(ind_br)-1
+        if ind_br[k] == ind_br[k+1] - 1  
+                cnt += 1 
         else 
             # the manifold stops, let see if we have long enough stretch
-            if cnt > 3
-                br += 1
+            if cnt ≥ 3
+                if all(x -> (a ≤ x ≤ b) , y_ray[ind_br[k-cnt:k]])
+                    br += 1
+                end
+                for y in y_ray[ind_br[k-cnt:k]]
+                    yi = 1 + round(Int, (y - a) / dys)
+                    if yi >= 1 && yi <= length(ys)
+                        hst[yi] = 1
+                    end
+                end
             end
             cnt = 0
         end
-
     end
-    return br
+    return br, hst
 end
 
 
+
+function get_histogram(ray_y, ys, threshold)
+dy = step(ys)
+bkg = 1/(dy*length(ys))
+hst = zeros(length(ys))
+    for y ∈ ray_y
+        yi = 1 + round(Int, (y - ys[1]) / dy)
+        if yi >= 1 && yi <= length(ys)
+            hst[yi] += 1
+        end
+    end
+    ind = findall(hst .> dy*bkg*threshold*sum(hst))
+    return length(ind)/length(hst)
+end
 
 function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3, ind_i = nothing, rmin = nothing, rmax = nothing, ray_y = nothing)
 
@@ -138,18 +159,18 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3, 
             end
             density = kde(ray_y[ind], bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity = pdf(density, ys)*(sim_h / h)
-            image[:,xi] = intensity
-            nb_br[xi] = count_branches(ray_y[ind], dyr, ys[1], ys[end]; δ = 0.001)
-
-
+            nb_br[xi], hst = count_branches(ray_y[ind], dyr, ys)
+            image[:,xi] = hst
             # density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
             # intensity = pdf(density, ys)*(sim_h / h)
             t = findmaxima(intensity)
-            ind = findall(t[2] .> threshold*bkg) 
-            nb_pks[xi] = length(ind)
-            ind = findall(intensity .> threshold*bkg) 
-            area[xi] = length(ind)/length(intensity)  
-            max_I[xi] = maximum(intensity)  
+            indt = findall(t[2] .> threshold*bkg) 
+            nb_pks[xi] = length(indt)
+            # ind = findall(intensity .> threshold*bkg) 
+            # area[xi] = length(ind)/length(intensity)  
+            
+            area[xi] = sum(hst)/length(hst)  
+            max_I[xi] = get_histogram(ray_y[ind], ys, threshold)
             xi += 1
         end
     end
@@ -157,31 +178,26 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3, 
 end
 
 
-function compute_datas(d)
-    @unpack v0, T, dt, V, y_init, lyap_threshold, xs, a = d # parametros
-    λ1 = _get_lyap_1D(d) 
-    ind = findall(λ1 .> lyap_threshold)
-    ys = range(0, a*8, length = length(xs))
-    img_pos,_,_, m_d_pos, v_d_pos, nb_br_pos, nb_pks_pos, area_pos,_,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
 
-    ind = findall(λ1 .≤ lyap_threshold)
-    img_z,_,_, m_d_z, v_d_z, nb_br_z, nb_pks_z, area_z,_,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
-
-    ind = 1:length(y_init)
-    img_all,_,_, m_d_all, v_d_all, nb_br_all, nb_pks_all, area_all,_,_ = manifold_track(length(y_init), xs, ys, V; b = 0.0003, ray_y = collect(y_init), ind_i = ind)
-
-    return @strdict(img_pos, img_z, img_all, nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, λ1)
-end
-
-v0 = 0.2; dt = 0.01; T = 10000
-num_rays = 300000; range_θ =  range(0.,π/4, step = 0.05)
+v0 = 0.1; dt = 0.01; T = 10000; num_rays = 200000; 
 a = 0.2; dot_radius = 0.2*0.25; softness = 0.2; 
-lyap_threshold = 2e-3; θ = 1e-3; nθ = length(range_θ)
+lyap_threshold = 2e-3; θ = 0.; nθ = 60
 xs = range(0,20., step = dt)
+θ_range = range(0,π/4, length = nθ)
 y_init = range(-20*a, 20*a, length = num_rays)
+ys = range(0, a*8, length = length(xs))
+
 mean_nb_br_z = zeros(nθ, length(xs))
 mean_nb_br_all = zeros(nθ, length(xs))
 mean_nb_br_pos = zeros(nθ, length(xs))
+
+mean_area_z = zeros(nθ, length(xs))
+mean_area_all = zeros(nθ, length(xs))
+mean_area_pos = zeros(nθ, length(xs))
+
+mean_area2_z = zeros(nθ, length(xs))
+mean_area2_all = zeros(nθ, length(xs))
+mean_area2_pos = zeros(nθ, length(xs))
 
 mean_nb_pks_z = zeros(nθ, length(xs))
 mean_nb_pks_all = zeros(nθ, length(xs))
@@ -194,14 +210,13 @@ mean_v_z = zeros(nθ, length(xs))
 mean_v_all = zeros(nθ, length(xs))
 mean_v_pos = zeros(nθ, length(xs))
 
-for v0 in range(0.05, 0.4, step = 0.05)
-    for (k,θ) in enumerate(range_θ)
-        # V = LatticePotential(a*rotation_matrix(θ), dot_radius, v0; softness=softness)
-        V = RotatedPotential(θ,
-            fermi_dot_lattice_cos_series(1,
-            a, dot_radius, v0; softness))
-        data =  save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ; prefix = "cos_0_dec") 
-        @unpack img_pos, img_z, img_all, nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, λ1 = data
+# Threads.@threads for k in 1:length(θ_range)
+for k in 1:length(θ_range)
+    V = RotatedPotential(θ_range[k],
+        fermi_dot_lattice_cos_series(1,
+        a, dot_radius, v0; softness))
+    data = save_data_decay(v0, V, y_init, T, a, lyap_threshold, dt, xs, num_rays, θ_range[k]; prefix = "cos_dec") 
+    @unpack nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, max_pos, max_z, max_all = data
         mean_nb_br_pos[k,:] = nb_br_pos
         mean_nb_br_z[k,:] = nb_br_z
         mean_nb_br_all[k,:] = nb_br_all
@@ -210,6 +225,14 @@ for v0 in range(0.05, 0.4, step = 0.05)
         mean_nb_pks_z[k,:] = nb_pks_z
         mean_nb_pks_all[k,:] = nb_pks_all
 
+        mean_area_pos[k,:] = area_pos
+        mean_area_z[k,:] = area_z
+        mean_area_all[k,:] = area_all
+
+        mean_area2_pos[k,:] = max_pos
+        mean_area2_z[k,:] = max_z
+        mean_area2_all[k,:] = max_all
+
         mean_m_pos[k,:] = m_d_pos
         mean_m_z[k,:] = m_d_z
         mean_m_all[k,:] = m_d_all
@@ -217,45 +240,77 @@ for v0 in range(0.05, 0.4, step = 0.05)
         mean_v_pos[k,:] = v_d_pos
         mean_v_z[k,:] = v_d_z
         mean_v_all[k,:] = v_d_all
-    end
-    
+end
+
+    # mm = vec(mean(mean_m_pos, dims = 1))
+    # v = vec(mean(mean_v_pos, dims = 1))
+    # br = vec(mean(mean_nb_br_pos, dims = 1))
+    # p,m,x = get_fit_lin(xs[10:250], mm[10:250]) 
+    # α_vec[jj] = p[2] 
+    # p,m,x = get_fit_lin(xs[10:250], v[10:250]) 
+    # β_vec[jj] = p[2]*2
+    # p,m,x = get_fit_exp(xs, br) 
+    # ω_vec[jj] = p[2]
+
+
     fig = Figure()
-    # g = GridLayout(fig)
     a1 = Axis(fig[1,1], ylabel = L"n_{b}(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_nb_br_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_nb_br_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-    lines!(a1, xs, vec(mean(mean_nb_br_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    lines!(a1, xs, vec(mean(mean_nb_br_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+    # p,m,x = get_fit_exp(xs, br) 
+    # lines!(a1, x, m(x,p), color = :red, linestyle = :dash, label = L"\lambda > 0, \textrm{ fit}")
    axislegend()
-   s = savename("cos_0_dec_nb",@dict(v0),"png") 
+   s = savename("cos_dec_nb",@dict(v0),"png") 
    save(plotsdir(s), fig)
 
     fig = Figure()
-    # g = GridLayout(fig)
     a1 = Axis(fig[1,1], ylabel = L"n_{b}(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_nb_pks_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_nb_pks_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-    lines!(a1, xs, vec(mean(mean_nb_pks_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    lines!(a1, xs, vec(mean(mean_nb_pks_pos, dims = 1)), color = :red, label = L"\lambda > 0")
    axislegend()
-   s = savename("cos_0_dec_pks",@dict(v0),"png") 
+   s = savename("cos_dec_pks",@dict(v0),"png") 
    save(plotsdir(s), fig)
 
     fig = Figure()
-    # g = GridLayout(fig)
     a1 = Axis(fig[1,1], ylabel = L"m(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_m_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_m_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-    lines!(a1, xs, vec(mean(mean_m_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    lines!(a1, xs, vec(mean(mean_m_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+    # p,m,x = get_fit_lin(xs[10:300], mm[10:300]) 
+    # lines!(a1, x, m(x,p), color = :red, linestyle = :dash, label = L"\lambda > 0, \textrm{ fit}")
    axislegend()
-   s = savename("cos_0_dec_m",@dict(v0),"png") 
+   s = savename("cos_dec_m",@dict(v0),"png") 
    save(plotsdir(s), fig)
 
     fig = Figure()
-    # g = GridLayout(fig)
     a1 = Axis(fig[1,1], ylabel = L"v(t)", xlabel = "t")
     lines!(a1, xs, vec(mean(mean_v_all, dims = 1)), color = :black, label = "all")
     lines!(a1, xs, vec(mean(mean_v_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
-    lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda \ge 0")
+    lines!(a1, xs, vec(mean(mean_v_pos, dims = 1)), color = :red, label = L"\lambda > 0")
    axislegend()
-   s = savename("cos_0_dec_v",@dict(v0),"png") 
+   s = savename("cos_dec_v",@dict(v0),"png") 
    save(plotsdir(s), fig)
-end
+
+    fig = Figure()
+    a1 = Axis(fig[1,1], ylabel = L"f_{b}(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_area_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_area_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_area_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+   axislegend()
+   ylims!(a1, 0., 0.2)
+   xlims!(a1, 0., 20.)
+   s = savename("cos_area",@dict(v0),"png") 
+   save(plotsdir(s), fig)
+
+    fig = Figure()
+    a1 = Axis(fig[1,1], ylabel = L"f_{b}(t)", xlabel = "t")
+    lines!(a1, xs, vec(mean(mean_area2_all, dims = 1)), color = :black, label = "all")
+    lines!(a1, xs, vec(mean(mean_area2_z, dims = 1)), color = :blue, label = L"\lambda \simeq 0")
+    lines!(a1, xs, vec(mean(mean_area2_pos, dims = 1)), color = :red, label = L"\lambda > 0")
+   axislegend()
+   ylims!(a1, 0., 0.2)
+   xlims!(a1, 0., 20.)
+   s = savename("cos_area2",@dict(v0),"png") 
+   save(plotsdir(s), fig)

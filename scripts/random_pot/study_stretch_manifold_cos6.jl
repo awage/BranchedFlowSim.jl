@@ -173,7 +173,7 @@ function compute_datas(d)
     return @strdict(img_pos, img_z, img_all, nb_pks_pos, nb_pks_z, nb_pks_all, m_d_pos, m_d_z, m_d_all, v_d_all, v_d_pos, v_d_z, nb_br_all, nb_br_z, nb_br_pos, area_all, area_pos, area_z, λ1)
 end
 
-v0 = 0.2; dt = 0.01; T = 10000
+v0 = 0.1; dt = 0.01; T = 10000
 num_rays = 300000; range_θ =  range(0.,π/4, step = 0.05)
 a = 0.2; dot_radius = 0.2*0.25; softness = 0.2; 
 lyap_threshold = 2e-3; θ = 1e-3; nθ = length(range_θ)

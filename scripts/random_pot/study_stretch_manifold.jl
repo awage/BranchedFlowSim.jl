@@ -17,26 +17,32 @@ function fit_lyap(xg, yg)
     return fit.param, model
 end
 
-function count_branches(y_ray, dy, a, b; δ = 0.03)
+function count_branches(y_ray, dy, ys)
     dy_ray = diff(y_ray)/dy
-    ind = findall(abs.(dy_ray) .< 1.)
-    ind2 = findall( a .< y_ray[ind] .< b)
-    ray_br = y_ray[ind[ind2]]
+    hst = zeros(length(ys))
+    a = ys[1]; b = ys[end]; dys = ys[2] - ys[1]
+    ind_br = findall(abs.(dy_ray) .< 1.)
     br = 0; cnt = 0
-    for k in 2:length(ray_br)-1
-
-        if abs(ray_br[k] - ray_br[k+1]) < δ && abs(ray_br[k-1] - ray_br[k]) < δ
-            cnt += 1 
+    for k in 1:length(ind_br)-1
+        if ind_br[k] == ind_br[k+1] - 1  
+                cnt += 1 
         else 
             # the manifold stops, let see if we have long enough stretch
-            if cnt > 3
-                br += 1
+            if cnt ≥ 3
+                if all(x -> (a ≤ x ≤ b) , y_ray[ind_br[k-cnt:k]])
+                    br += 1
+                end
+                for y in y_ray[ind_br[k-cnt:k]]
+                    yi = 1 + round(Int, (y - a) / dys)
+                    if yi >= 1 && yi <= length(ys)
+                        hst[yi] = 1
+                    end
+                end
             end
             cnt = 0
         end
-
     end
-    return br
+    return br, hst
 end
 
 
@@ -81,7 +87,7 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3)
             density = kde(ray_y[ind], bandwidth=b, npoints=16 * 1024, boundary=boundary)
             intensity = pdf(density, ys)*(sim_h / h)
             image[:,xi] = intensity
-            nb_br[xi] = count_branches(ray_y, dyr, ys[1], ys[end]; δ = 0.001)
+            nb_br[xi], hst = count_branches(ray_y, dyr, ys)
 
 
             density = kde(ray_y, bandwidth=b, npoints=16 * 1024, boundary=boundary)
@@ -98,16 +104,21 @@ function manifold_track(num_rays, xs, ys, potential; b = 0.0003, threshold = 3)
     return image, ray_y, (rmin, rmax), m_d, v_d, nb_br, nb_pks, area, max_I
 end
 
-res = 2000; v0 = 0.057; dt = 0.1; 
+res = 2000; v0 = 0.1; dt = 0.1; 
 num_rays = 300000
-
-ξ = 1.; sim_width = 35; sim_height = 30.;  
+nr = 60
+ξ = 0.1; sim_width = 35; sim_height = 30.;  
 xs = range(0,20., step = dt)
 ys = range(0,20*ξ, length = res)
-V = correlated_random_potential(sim_width, sim_height, ξ, v0, 10)
-println("start sim")
-img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, xs, ys, V; b = 0.0003)
+ys = range(0, a*8, length = length(xs))
+mean_nb_br_all = zeros(nr, length(xs))
 
+for j in 1:nr
+    V = correlated_random_potential(sim_width, sim_height, ξ, v0, rand(1:5000))
+    println("start sim")
+    img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, xs, ys, V; b = 0.0003)
+    mean_nb_br_all[j,:] = nb_br
+end
 # pks = zeros(10,length(xs))
 # bra = zeros(10,length(xs))
 # arr = zeros(10,length(xs))
@@ -136,11 +147,19 @@ img, ray_y, rm, m_d, v_d, nb_br, nb_pks, area, max_I = manifold_track(num_rays, 
 # intensity = pdf(density, ys)
 
 
-a,m = fit_lyap(xs[200:300],m_d[200:300])
-b,m = fit_lyap(xs[200:400],v_d[200:400])
-t0 = ξ*(v0^(-2/3))
-α = a[2]*(v0^(-2/3))*ξ 
-β = b[2]*2*(v0^(-2/3))*ξ
-@show α^2/β/t0
-gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
-c_f = 2*gamma.(α,β)./(ξ*v0^(-2/3))
+# a,m = fit_lyap(xs[200:300],m_d[200:300])
+# b,m = fit_lyap(xs[200:400],v_d[200:400])
+# t0 = ξ*(v0^(-2/3))
+# α = a[2]*(v0^(-2/3))*ξ 
+# β = b[2]*2*(v0^(-2/3))*ξ
+# @show α^2/β/t0
+# gamma(x,y) = x - y/2*(sqrt(1+4*x/y) -1)
+# c_f = 2*gamma.(α,β)./(ξ*v0^(-2/3))
+pargs = (yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40) 
+fig = Figure(size=(800, 600))
+ax1= Axis(fig[1, 1];  xlabel = L"x", ylabel = L"n_b(t)", pargs...) 
+nb_br = vec(mean(mean_nb_br_all, dims = 1))
+lines!(ax1, xs, nb_br)
+save(plotsdir(string("plot_random_v0=", v0, "_n=", num_rays, ".png")),fig)
+using JLD2
+@save "series_random_v0=0.1_n=30000.jld2" v0 num_rays mean_nb_br_all
