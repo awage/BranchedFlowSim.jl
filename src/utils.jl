@@ -84,3 +84,13 @@ function get_fit_exp(xg, yg)
     @show fit.param
     return fit.param, model, xdata
 end
+
+function find_consecutive_streams(arr::Vector{Int})
+    diffs = diff(arr)
+    starts = [1; findall(diffs .!= 1) .+ 1]
+    ends = [findall(diffs .!= 1); length(arr)]
+
+    consecutive_streams = [arr[starts[i]:ends[i]] for i in 1:length(starts) if ends[i] - starts[i] + 1 > 1]
+
+    return consecutive_streams
+end
