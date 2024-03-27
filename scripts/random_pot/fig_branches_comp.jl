@@ -65,7 +65,7 @@ xs = range(0,20, step = dt)
 y_init = range(-30*0.2, 30*0.2, length = num_rays)
 
 pargs = (yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40) 
-fig = Figure(size=(600, 600))
+fig = Figure(size=(800, 600))
 ax1= Axis(fig[1, 1];  xlabel = L"x", ylabel = L"n_{br}", pargs...) 
 # ax2= Axis(fig[1, 2];  xlabel = L"x", ylabel = L"n_{br}", pargs...) 
 
@@ -75,7 +75,7 @@ Threads.@threads for j = 1:n_avg
     nb_br = get_branch_number(v0, V, y_init, xs, num_rays, j, K; prefix = "rand_dec") 
     push!(nb_br_v, nb_br)
 end
-lines!(ax1, xs, mean(nb_br_v, dims = 1)[1])
+lines!(ax1, xs, mean(nb_br_v, dims = 1)[1]; label = "Random correlated")
 
 a = 0.2; dot_radius = 0.2*0.25; softness = 0.2; θ_range = range(0,π/4, length = n_avg) 
 nb_br_v = Vector{Vector{Float64}}()
@@ -84,7 +84,7 @@ Threads.@threads for j = 1:n_avg
     nb_br = get_branch_number(v0, V, y_init, xs, num_rays, j, K; prefix = "fermi_dec") 
     push!(nb_br_v, nb_br)
 end
-lines!(ax1, xs, mean(nb_br_v, dims = 1)[1]; color = :red)
+lines!(ax1, xs, mean(nb_br_v, dims = 1)[1]; color = :red, label = "Fermi dot")
 
 a = 0.2; dot_radius = 0.2*0.25; softness = 0.2; θ_range = range(0,π/4, length = n_avg) 
 nb_br_v = Vector{Vector{Float64}}()
@@ -95,7 +95,7 @@ Threads.@threads for j = 1:n_avg
     nb_br = get_branch_number(v0, V, y_init, xs, num_rays, j, K; prefix = "cos0_dec") 
     push!(nb_br_v, nb_br)
 end
-lines!(ax1, xs, mean(nb_br_v, dims = 1)[1]; color = :green)
- 
+lines!(ax1, xs, mean(nb_br_v, dims = 1)[1]; color = :green, label = "Periodic integrable")
+axislegend(ax1);
 s = "branch_comp.png"
 save(plotsdir(s),fig)
