@@ -111,10 +111,10 @@ end
 
 
 
-v0 = 0.1; dt = 0.01; num_rays = 200000; n_avg = 4; K = 1.;
+v0 = 0.1; dt = 0.01; num_rays = 200000; n_avg = 40; K = 1.;
 threshold = 2e-3; T = 10000
 y_init = range(-40*0.2, 40*0.2, length = num_rays)
-ys = y_init[findall(0 .≤ y_init .≤ 2.)]
+ys = y_init[findall(0 .≤ y_init .≤ 1.)]
 xs = range(0,15., step = dt)
 
 # pargs = (yticklabelsize = 40, xticklabelsize = 40, ylabelsize = 40, xlabelsize = 40) 
@@ -129,7 +129,7 @@ hst_v_z = Vector{Vector{Float64}}()
 nb_v_all = Vector{Vector{Float64}}()
 nb_v_pos = Vector{Vector{Float64}}()
 nb_v_z = Vector{Vector{Float64}}()
-Threads.@threads for j = 1:n_avg
+for j = 1:n_avg
     V = LatticePotential(a*rotation_matrix(θ_range[j]), dot_radius, v0; softness=softness)
     dat = get_branch_number(v0, V, y_init, xs, num_rays, j, K, threshold, T; prefix = "fermi_br_lyap") 
     @unpack hst_all, hst_pos, hst_z = dat
